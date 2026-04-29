@@ -1074,7 +1074,7 @@ async function shareRota(){
   ctx.fillStyle='#9898b8';
   ctx.font=`12px -apple-system,sans-serif`;
   const typeLabel=state.type==='inside'?'Inside Staff':'Delivery';
-  ctx.fillText(`${typeLabel} • ${weekLabel(state.weekOffset)}`,PAD+54,PAD+40);
+  ctx.fillText(typeLabel,PAD+54,PAD+40);
 
   // Week dates
   const ws=weekStart(state.weekOffset);
@@ -1114,8 +1114,9 @@ async function shareRota(){
     ctx.textAlign='left';
     ctx.fillStyle='#e8e8f2'; ctx.font=`bold 12px -apple-system,sans-serif`;
     ctx.fillText(day.slice(0,3),PAD+8,rowY+ROW_H/2-4);
+    const actualDay=new Date(weekStart(state.weekOffset)); actualDay.setDate(actualDay.getDate()+di);
     ctx.fillStyle='#606080'; ctx.font=`10px -apple-system,sans-serif`;
-    ctx.fillText(`${dayDate(di,state.weekOffset)} ${MONTHS[new Date(weekStart(state.weekOffset)).getMonth()]}`,PAD+8,rowY+ROW_H/2+9);
+    ctx.fillText(`${actualDay.getDate()} ${MONTHS[actualDay.getMonth()]}`,PAD+8,rowY+ROW_H/2+9);
 
     // Column divider after day
     ctx.fillStyle='#1e1e35';
