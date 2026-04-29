@@ -1136,10 +1136,8 @@ async function shareRota(){
   ))*22+14));
   const TBL_H=TH_H+DAYS.length*ROW_H;
 
-  // ── Footer geometry ──────────────────────────────────
-  const FTR_Y=TBL_Y+TBL_H+GAP;
-  const FTR_H=30;
-  const H=FTR_Y+FTR_H+PAD;
+  // ── Canvas height (no footer) ────────────────────────
+  const H=TBL_Y+TBL_H+PAD;
 
   const canvas=document.createElement('canvas');
   canvas.width=W*scale; canvas.height=H*scale;
@@ -1164,14 +1162,15 @@ async function shareRota(){
   roundRect(ctx,PAD,HDR_Y,W-PAD*2,HDR_H,CR);
   ctx.stroke();
 
-  // icon — draw CC logo in a white circle
+  // icon — crop just the circular badge from the 600×300 source image
+  // Badge sits at sx=162, sy=12, sw=276, sh=276 in the original PNG
   ctx.save();
   ctx.beginPath();
   ctx.arc(ICON_X+ICON_SZ/2, ICON_Y+ICON_SZ/2, ICON_SZ/2, 0, Math.PI*2);
   ctx.fillStyle='#ffffff';
   ctx.fill();
   ctx.clip();
-  ctx.drawImage(_ccLogoImg, ICON_X, ICON_Y, ICON_SZ, ICON_SZ);
+  ctx.drawImage(_ccLogoImg, 162, 12, 276, 276, ICON_X, ICON_Y, ICON_SZ, ICON_SZ);
   ctx.restore();
 
   // header text
@@ -1290,11 +1289,7 @@ async function shareRota(){
 
   ctx.restore(); // end table clip
 
-  // ── Footer ───────────────────────────────────────────
-  ctx.fillStyle='#333355';
-  ctx.font=`11px -apple-system,sans-serif`;
-  ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.fillText('Chicken Cottage',W/2,FTR_Y+FTR_H/2);
+  // (footer removed)
 
   // Share or download
   canvas.toBlob(async blob=>{
