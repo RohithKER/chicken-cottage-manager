@@ -1132,10 +1132,24 @@ async function shareRota(){
   const TH_H=34;
   const DAY_W=72;
   const COL_W=Math.floor((W-PAD*2-DAY_W)/cols.length);
+  // Estimate how many visual rows of pills a cell needs (horizontal wrap)
+  function estPillRows(names,cellW,padX=12){
+    const maxW=cellW-padX*2; const PW_GAP=5;
+    let cx=0,rows=1;
+    names.forEach((n,i)=>{
+      const dn=n.length>9?n.slice(0,8)+'…':n;
+      const pw=Math.min(dn.length*7+18,maxW);
+      if(i>0&&cx+pw>maxW){cx=0;rows++;}
+      cx+=pw+PW_GAP;
+    });
+    return rows;
+  }
   const rowHeights=DAYS.map(day=>
-    Math.max(52,Math.ceil(Math.max(...cols.map(col=>
-      Math.max(1,getShift(state.type,state.weekOffset,day,col).length)
-    )))*27+20)
+    Math.max(52,Math.max(...cols.map(col=>{
+      const st=getShift(state.type,state.weekOffset,day,col);
+      if(!st.length)return 52;
+      return estPillRows(st,COL_W)*27+20;
+    })))
   );
   const TBL_H=TH_H+rowHeights.reduce((a,b)=>a+b,0);
 
@@ -1278,24 +1292,31 @@ async function shareRota(){
         ctx.textBaseline='middle'; ctx.textAlign='left';
         ctx.fillText('—',cellX+CELL_PAD_X,rowY+ROW_H/2);
       } else {
+        // Pills flow horizontally, wrapping to next row when cell width exceeded
+        const PILL_GAP_X=5;
+        const maxPW=COL_W-CELL_PAD_X*2;
+        let curX=cellX+CELL_PAD_X, curY=rowY+CELL_PAD_Y;
         staff.forEach((name,si)=>{
-          const pillH=PILL_H; const pillGap=PILL_GAP;
-          const pillY=rowY+CELL_PAD_Y+si*(pillH+pillGap);
-          const pillX=cellX+CELL_PAD_X;
           const c=getStaffCanvasColor(name);
           ctx.font=`bold 11px -apple-system,sans-serif`;
           const displayName=name.length>9?name.slice(0,8)+'…':name;
           const tw=ctx.measureText(displayName).width;
-          const pw=Math.min(tw+18,COL_W-CELL_PAD_X*2);
+          const pw=Math.min(tw+18,maxPW);
+          // Wrap if pill won't fit on current line
+          if(si>0 && curX+pw>cellX+COL_W-CELL_PAD_X){
+            curX=cellX+CELL_PAD_X;
+            curY+=PILL_H+PILL_GAP;
+          }
           ctx.fillStyle=c.bg;
-          roundRect(ctx,pillX,pillY,pw,pillH,pillH/2);
+          roundRect(ctx,curX,curY,pw,PILL_H,PILL_H/2);
           ctx.fill();
           ctx.strokeStyle=c.border; ctx.lineWidth=1;
-          roundRect(ctx,pillX,pillY,pw,pillH,pillH/2);
+          roundRect(ctx,curX,curY,pw,PILL_H,PILL_H/2);
           ctx.stroke();
           ctx.fillStyle=c.text;
           ctx.textAlign='left'; ctx.textBaseline='alphabetic';
-          ctx.fillText(displayName,pillX+9,pillY+15);
+          ctx.fillText(displayName,curX+9,curY+15);
+          curX+=pw+PILL_GAP_X;
         });
       }
     });
