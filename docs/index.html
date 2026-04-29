@@ -145,6 +145,13 @@ body{
   display:flex;align-items:center;
 }
 .cp-btn:active{opacity:1;transform:scale(1.2)}
+.cp-swatch{
+  aspect-ratio:1;border-radius:50%;cursor:pointer;
+  border:3px solid transparent;transition:border-color .15s,transform .1s;
+  min-height:44px;
+}
+.cp-swatch.active{border-color:#fff;transform:scale(1.15)}
+.cp-swatch:active{transform:scale(1.05)}
 .view-toggle{
   display:flex;background:var(--surface);border:1px solid var(--border);
   border-radius:7px;overflow:hidden;flex-shrink:0;margin-left:2px;
@@ -520,6 +527,10 @@ body{
           <option value="delivery">Delivery</option>
           <option value="both">Both</option>
         </select>
+        <div style="margin:6px 0 2px">
+          <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Colour</div>
+          <div id="new-staff-palette" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:2px"></div>
+        </div>
         <div class="form-row">
           <button class="btn-sm primary" onclick="addStaff()">Add Member</button>
         </div>
@@ -696,21 +707,29 @@ function applyStaffColors(){
   if(!st){st=document.createElement('style');st.id='staff-colors-style';document.head.appendChild(st);}
   st.textContent=css;
 }
+let _cpTarget=null;
 function pickStaffColor(name){
-  const inp=document.createElement('input');
-  inp.type='color';inp.value=getStaffHex(name);
-  inp.style.cssText='position:fixed;opacity:0;width:1px;height:1px;top:0;left:0';
-  document.body.appendChild(inp);
-  let done=false;
-  const cleanup=()=>{if(!done){done=true;try{document.body.removeChild(inp);}catch{}}};
-  inp.addEventListener('input',e=>{staffColors[name]=e.target.value;applyStaffColors();});
-  inp.addEventListener('change',e=>{
-    staffColors[name]=e.target.value;
-    localStorage.setItem('cc_staff_colors',JSON.stringify(staffColors));
-    applyStaffColors();renderStaff();renderRota();
-    cleanup();toast('Colour saved ✓');
-  });
-  setTimeout(()=>inp.click(),0);
+  _cpTarget=name;
+  document.getElementById('cp-title').textContent=name;
+  const cur=getStaffHex(name);
+  document.getElementById('cp-swatches').innerHTML=COLOR_PALETTE.map(hex=>`
+    <div class="cp-swatch${hex===cur?' active':''}" style="background:${hex}" onclick="selectStaffColor('${hex}')"></div>
+  `).join('');
+  document.getElementById('color-sheet-overlay').style.display='flex';
+}
+function selectStaffColor(hex){
+  if(!_cpTarget)return;
+  staffColors[_cpTarget]=hex;
+  localStorage.setItem('cc_staff_colors',JSON.stringify(staffColors));
+  applyStaffColors();
+  // update swatch highlights
+  document.querySelectorAll('.cp-swatch').forEach(el=>
+    el.classList.toggle('active',el.style.background===hex||el.style.backgroundColor===hex));
+  renderStaff();renderRota();
+}
+function closeColorSheet(){
+  document.getElementById('color-sheet-overlay').style.display='none';
+  _cpTarget=null;
 }
 
 /* ─── Dynamic Columns (editable) ─────────────────────── */
@@ -905,8 +924,9 @@ function renderStaff(){
       el.innerHTML='<div style="color:var(--text3);font-size:13px;padding:8px 0">No staff yet</div>';return;
     }
     el.innerHTML=state.staff[t].map(n=>`<div class="staff-item">
-      <span class="pill sc-${n}" onclick="pickStaffColor('${n}')" style="cursor:pointer;user-select:none">${n}</span>
-      <span style="font-size:10px;color:var(--text3);flex:1;padding-left:4px">tap to recolour</span>
+      <div class="staff-color-dot" onclick="pickStaffColor('${n}')" style="width:28px;height:28px;border-radius:50%;background:${getStaffHex(n)};flex-shrink:0;cursor:pointer;border:2px solid rgba(255,255,255,.2)"></div>
+      <span class="pill sc-${n}" style="cursor:pointer;user-select:none" onclick="pickStaffColor('${n}')">${n}</span>
+      <div style="flex:1"></div>
       <button class="btn-del" onclick="removeStaff('${t}','${n}')">×</button>
     </div>`).join('');
   });
@@ -930,7 +950,7 @@ function showView(v){
   document.getElementById(`view-${v}`).classList.add('active');
   document.getElementById(`nav-${v}`).classList.add('active');
   document.getElementById('type-tabs').style.display=v==='rota'?'flex':'none';
-  if(v==='staff')renderStaff();
+  if(v==='staff'){renderStaff();populateNewStaffPalette();}
   closeUserMenu();
 }
 
@@ -994,6 +1014,10 @@ async function addStaff(){
   if(type==='inside'||type==='both'){if(!state.staff.inside.includes(name))state.staff.inside.push(name);}
   if(type==='delivery'||type==='both'){if(!state.staff.delivery.includes(name))state.staff.delivery.push(name);}
   document.getElementById('ns-name').value='';
+  // save chosen colour
+  staffColors[name]=newStaffColor;
+  localStorage.setItem('cc_staff_colors',JSON.stringify(staffColors));
+  applyStaffColors();
   await saveStaffToCloud(name,type);
   renderStaff();toast(`${name} added`);
 }
@@ -1336,6 +1360,21 @@ function handleImport(e){
   };
   r.readAsText(f);e.target.value='';
 }
+/* ─── New Staff Colour Selection ────────────────────── */
+let newStaffColor = COLOR_PALETTE[0];
+function populateNewStaffPalette(){
+  const el=document.getElementById('new-staff-palette');
+  if(!el)return;
+  el.innerHTML=COLOR_PALETTE.map(hex=>`
+    <div class="cp-swatch${hex===newStaffColor?' active':''}" style="background:${hex};width:36px;min-height:36px" onclick="selectNewStaffColor('${hex}')"></div>
+  `).join('');
+}
+function selectNewStaffColor(hex){
+  newStaffColor=hex;
+  document.querySelectorAll('#new-staff-palette .cp-swatch').forEach(el=>
+    el.classList.toggle('active',el.style.background===hex));
+}
+
 /* ─── Copy/Paste Week ───────────────────────────────── */
 let weekClipboard = JSON.parse(localStorage.getItem('cc_week_clipboard')||'null');
 
@@ -1498,5 +1537,14 @@ applyStaffColors();
 
 init();
 </script>
+<!-- Colour Picker Sheet -->
+<div id="color-sheet-overlay" style="display:none;position:fixed;inset:0;z-index:9000;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.55)" onclick="if(event.target===this)closeColorSheet()">
+  <div style="width:100%;max-width:480px;background:#1a1a2e;border-radius:18px 18px 0 0;padding:20px 20px 32px;box-shadow:0 -4px 24px rgba(0,0,0,.6)">
+    <div style="width:36px;height:4px;background:#333;border-radius:2px;margin:0 auto 18px"></div>
+    <div style="font-size:13px;color:var(--text2);text-align:center;margin-bottom:16px">Choose colour for <strong id="cp-title" style="color:var(--text)"></strong></div>
+    <div id="cp-swatches" style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:20px"></div>
+    <button onclick="closeColorSheet()" style="width:100%;padding:13px;background:var(--accent);border:none;color:#fff;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer">Done</button>
+  </div>
+</div>
 </body>
 </html>
