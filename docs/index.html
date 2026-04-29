@@ -476,6 +476,8 @@ body{
       <div id="week-label">This week</div>
       <button onclick="changeWeek(1)">›</button>
     </div>
+    <div class="icon-btn" onclick="copyWeek()" title="Copy this week's shifts" id="copy-btn">📋</div>
+    <div class="icon-btn" onclick="pasteWeek()" title="Paste copied shifts to this week" id="paste-btn" style="display:none">📌</div>
     <div class="icon-btn" onclick="shareRota()" title="Share rota as image">📤</div>
     <div class="icon-btn" onclick="toggleUserMenu()">👤</div>
   </div>
@@ -1327,6 +1329,51 @@ function handleImport(e){
   };
   r.readAsText(f);e.target.value='';
 }
+/* ─── Copy/Paste Week ───────────────────────────────── */
+let weekClipboard = JSON.parse(localStorage.getItem('cc_week_clipboard')||'null');
+
+function updatePasteBtn(){
+  const btn = document.getElementById('paste-btn');
+  if(btn) btn.style.display = weekClipboard ? 'flex' : 'none';
+}
+
+function copyWeek(){
+  const type = state.type;
+  const wk = weekKey();
+  const data = {};
+  Object.entries(state.schedules).forEach(([k,v])=>{
+    if(k.startsWith(`${type}|${wk}|`)){
+      const parts = k.split('|');
+      // parts: [type, weekKey, day, col]
+      data[`${parts[2]}|${parts[3]}`] = [...v];
+    }
+  });
+  weekClipboard = {type, data};
+  localStorage.setItem('cc_week_clipboard', JSON.stringify(weekClipboard));
+  updatePasteBtn();
+  const count = Object.keys(data).length;
+  toast(`${count} shift${count!==1?'s':''} copied ✓`);
+}
+
+async function pasteWeek(){
+  if(!weekClipboard){toast('Copy a week first');return;}
+  const type = state.type;
+  const wk = weekKey();
+  const cols = COLS[type];
+  let pasted = 0;
+  for(const [dayCol, names] of Object.entries(weekClipboard.data)){
+    const sep = dayCol.lastIndexOf('|');
+    const day = dayCol.slice(0,sep);
+    const col = dayCol.slice(sep+1);
+    if(cols.includes(col)){
+      setShift(type, state.weekOffset, day, col, [...names]);
+      pasted++;
+    }
+  }
+  renderRota();
+  toast(pasted ? `${pasted} shift${pasted!==1?'s':''} pasted ✓` : 'No matching columns to paste');
+}
+
 function clearWeek(){
   if(!confirm(`Clear all shifts for ${weekLabel(state.weekOffset)}?`))return;
   const wk=weekKey();
@@ -1406,6 +1453,7 @@ function toast(msg){
 
 /* ─── Init ───────────────────────────────────────────── */
 async function init(){
+  updatePasteBtn();
   const {data:{session}}=await db.auth.getSession();
   if(session){
     user=session.user;
