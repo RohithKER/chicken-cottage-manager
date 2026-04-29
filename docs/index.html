@@ -499,6 +499,7 @@ body{
     <div style="flex:1"></div>
     <button class="cp-btn" onclick="copyWeek()" id="copy-btn" title="Copy this week">📋</button>
     <button class="cp-btn" onclick="pasteWeek()" id="paste-btn" title="Paste to this week" style="display:none">📌</button>
+    <button class="cp-btn" onclick="clearWeek()" id="clear-btn" title="Clear this week">🗑️</button>
     <div class="view-toggle">
       <button class="vt-btn active" id="vt-cards" onclick="setViewMode('cards')">☰</button>
       <button class="vt-btn" id="vt-table" onclick="setViewMode('table')">⊞</button>
@@ -694,7 +695,7 @@ function getStaffHex(name){
 }
 function getStaffCanvasColor(name){
   const hex=getStaffHex(name);const{r,g,b}=hexToRgb(hex);
-  return{bg:`rgba(${r},${g},${b},0.35)`,text:hex};
+  return{bg:`rgba(${r},${g},${b},0.35)`,text:hex,border:`rgba(${r},${g},${b},0.55)`};
 }
 function applyStaffColors(){
   const names=[...new Set([...Object.keys(DEFAULT_STAFF_HEX),...Object.keys(staffColors)])];
@@ -1289,6 +1290,9 @@ async function shareRota(){
           ctx.fillStyle=c.bg;
           roundRect(ctx,pillX,pillY,pw,pillH,pillH/2);
           ctx.fill();
+          ctx.strokeStyle=c.border; ctx.lineWidth=1;
+          roundRect(ctx,pillX,pillY,pw,pillH,pillH/2);
+          ctx.stroke();
           ctx.fillStyle=c.text;
           ctx.textAlign='left'; ctx.textBaseline='alphabetic';
           ctx.fillText(displayName,pillX+9,pillY+15);
@@ -1408,6 +1412,7 @@ function copyWeek(){
 
 async function pasteWeek(){
   if(!weekClipboard){toast('Copy a week first');return;}
+  if(!confirm(`Paste copied shifts to ${weekLabel(state.weekOffset)}?\nThis will overwrite existing shifts.`))return;
   const type = state.type;
   const wk = weekKey();
   const cols = COLS[type];
