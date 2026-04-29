@@ -1132,9 +1132,9 @@ async function shareRota(){
   const DAY_W=72;
   const COL_W=Math.floor((W-PAD*2-DAY_W)/cols.length);
   const rowHeights=DAYS.map(day=>
-    Math.max(48,Math.ceil(Math.max(...cols.map(col=>
+    Math.max(52,Math.ceil(Math.max(...cols.map(col=>
       Math.max(1,getShift(state.type,state.weekOffset,day,col).length)
-    )))*22+14)
+    )))*27+20)
   );
   const TBL_H=TH_H+rowHeights.reduce((a,b)=>a+b,0);
 
@@ -1249,17 +1249,22 @@ async function shareRota(){
     ctx.fillStyle='#2d2d50';
     ctx.fillRect(PAD+DAY_W,rowY,2,ROW_H);
 
-    // day name + date — vertically centered
+    // day name + date — pin to vertical centre of row
+    const midY=rowY+Math.round(ROW_H/2);
     ctx.textAlign='left'; ctx.textBaseline='alphabetic';
     ctx.fillStyle='#e8e8f2';
     ctx.font=`bold 13px -apple-system,sans-serif`;
-    ctx.fillText(day.slice(0,3),PAD+10,rowY+ROW_H/2-2);
+    ctx.fillText(day.slice(0,3),PAD+11,midY-2);
     const actualDay=new Date(ws); actualDay.setDate(ws.getDate()+di);
     ctx.fillStyle='#505070';
     ctx.font=`11px -apple-system,sans-serif`;
-    ctx.fillText(`${actualDay.getDate()} ${MONTHS[actualDay.getMonth()]}`,PAD+10,rowY+ROW_H/2+12);
+    ctx.fillText(`${actualDay.getDate()} ${MONTHS[actualDay.getMonth()]}`,PAD+11,midY+12);
 
     // shift cells
+    const CELL_PAD_X=12; // horizontal padding inside each cell
+    const CELL_PAD_Y=10; // top padding above first pill
+    const PILL_H=22;     // pill height
+    const PILL_GAP=5;    // gap between pills
     cols.forEach((col,ci)=>{
       const cellX=PAD+DAY_W+ci*COL_W;
       // column dividers
@@ -1268,25 +1273,25 @@ async function shareRota(){
       const staff=getShift(state.type,state.weekOffset,day,col);
       if(staff.length===0){
         ctx.fillStyle='#2a2a42';
-        ctx.font=`13px -apple-system,sans-serif`;
+        ctx.font=`12px -apple-system,sans-serif`;
         ctx.textBaseline='middle'; ctx.textAlign='left';
-        ctx.fillText('—',cellX+12,rowY+ROW_H/2);
+        ctx.fillText('—',cellX+CELL_PAD_X,rowY+ROW_H/2);
       } else {
         staff.forEach((name,si)=>{
-          const pillH=20; const pillGap=4;
-          const pillY=rowY+8+si*(pillH+pillGap);
-          const pillX=cellX+8;
+          const pillH=PILL_H; const pillGap=PILL_GAP;
+          const pillY=rowY+CELL_PAD_Y+si*(pillH+pillGap);
+          const pillX=cellX+CELL_PAD_X;
           const c=getStaffCanvasColor(name);
           ctx.font=`bold 11px -apple-system,sans-serif`;
           const displayName=name.length>9?name.slice(0,8)+'…':name;
           const tw=ctx.measureText(displayName).width;
-          const pw=Math.min(tw+18,COL_W-16);
+          const pw=Math.min(tw+18,COL_W-CELL_PAD_X*2);
           ctx.fillStyle=c.bg;
           roundRect(ctx,pillX,pillY,pw,pillH,pillH/2);
           ctx.fill();
           ctx.fillStyle=c.text;
           ctx.textAlign='left'; ctx.textBaseline='alphabetic';
-          ctx.fillText(displayName,pillX+9,pillY+14);
+          ctx.fillText(displayName,pillX+9,pillY+15);
         });
       }
     });
