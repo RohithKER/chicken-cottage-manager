@@ -227,17 +227,17 @@ body{
 }
 .rota-tbl th:first-child{min-width:68px;width:68px}
 .rota-tbl td{
-  border:1px solid var(--border);
+  border:1px solid var(--border2);
   padding:7px 7px;vertical-align:top;
   min-width:90px;
 }
+.rota-tbl tr:nth-child(even) td{background:rgba(255,255,255,.025)}
 .rota-tbl td.day-cell{
   background:var(--surface2);cursor:default;
-  width:68px;min-width:68px;
+  width:68px;min-width:68px;border-right:2px solid var(--border2);
 }
 .rota-tbl td.shift-cell{
-  background:var(--surface);cursor:pointer;
-  transition:background .1s;
+  cursor:pointer;transition:background .1s;
 }
 .rota-tbl td.shift-cell:active{background:var(--surface2)}
 .td-day{font-size:12px;font-weight:600;color:var(--text)}
@@ -1131,10 +1131,12 @@ async function shareRota(){
   const TH_H=34;
   const DAY_W=72;
   const COL_W=Math.floor((W-PAD*2-DAY_W)/cols.length);
-  const ROW_H=Math.max(48,Math.ceil(Math.max(...DAYS.map(day=>
-    Math.max(...cols.map(col=>Math.max(1,getShift(state.type,state.weekOffset,day,col).length)))
-  ))*22+14));
-  const TBL_H=TH_H+DAYS.length*ROW_H;
+  const rowHeights=DAYS.map(day=>
+    Math.max(48,Math.ceil(Math.max(...cols.map(col=>
+      Math.max(1,getShift(state.type,state.weekOffset,day,col).length)
+    )))*22+14)
+  );
+  const TBL_H=TH_H+rowHeights.reduce((a,b)=>a+b,0);
 
   // ── Canvas height (no footer) ────────────────────────
   const H=TBL_Y+TBL_H+PAD;
@@ -1229,22 +1231,25 @@ async function shareRota(){
   ctx.fillRect(PAD+DAY_W,TBL_Y,1,TH_H);
 
   // data rows
+  let _rowY=TBL_Y+TH_H;
   DAYS.forEach((day,di)=>{
-    const rowY=TBL_Y+TH_H+di*ROW_H;
+    const rowY=_rowY;
+    const ROW_H=rowHeights[di];
+    _rowY+=ROW_H;
 
     // row background (alternating)
-    ctx.fillStyle=di%2===0?'#0f0f1a':'#111120';
+    ctx.fillStyle=di%2===0?'#0f0f1a':'#13132a';
     ctx.fillRect(PAD,rowY,W-PAD*2,ROW_H);
 
-    // row bottom border
-    ctx.fillStyle='#1a1a2e';
+    // row bottom border — visible separator
+    ctx.fillStyle='#2d2d50';
     ctx.fillRect(PAD,rowY+ROW_H-1,W-PAD*2,1);
 
-    // day column divider
-    ctx.fillStyle='#1a1a2e';
-    ctx.fillRect(PAD+DAY_W,rowY,1,ROW_H);
+    // day column divider — thicker, more visible
+    ctx.fillStyle='#2d2d50';
+    ctx.fillRect(PAD+DAY_W,rowY,2,ROW_H);
 
-    // day name + date
+    // day name + date — vertically centered
     ctx.textAlign='left'; ctx.textBaseline='alphabetic';
     ctx.fillStyle='#e8e8f2';
     ctx.font=`bold 13px -apple-system,sans-serif`;
@@ -1257,8 +1262,8 @@ async function shareRota(){
     // shift cells
     cols.forEach((col,ci)=>{
       const cellX=PAD+DAY_W+ci*COL_W;
-      // column dividers (between columns)
-      if(ci>0){ctx.fillStyle='#1a1a2e';ctx.fillRect(cellX,rowY,1,ROW_H);}
+      // column dividers
+      if(ci>0){ctx.fillStyle='#252548';ctx.fillRect(cellX,rowY,1,ROW_H);}
 
       const staff=getShift(state.type,state.weekOffset,day,col);
       if(staff.length===0){
