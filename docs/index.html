@@ -1,37 +1,878 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
-    <title>Chicken Cottage Manager</title>
-    <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
-    <style id="expo-reset">
-      /* These styles make the body full-height */
-      html,
-      body {
-        height: 100%;
-      }
-      /* These styles disable body scrolling if you are using <ScrollView> */
-      body {
-        overflow: hidden;
-      }
-      /* These styles make the root element full-height */
-      #root {
-        display: flex;
-        height: 100%;
-        flex: 1;
-      }
-    </style>
-  <link rel="icon" href="/chicken-cottage-manager/favicon.ico" /></head>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="CC Manager">
+<meta name="theme-color" content="#09090f">
+<title>Chicken Cottage Manager</title>
+<style>
+/* ─── Reset & Base ─────────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;width:100%;overflow:hidden}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',sans-serif;
+  background:#09090f;
+  color:#e8e8f2;
+  -webkit-tap-highlight-color:transparent;
+  touch-action:manipulation;
+  -webkit-text-size-adjust:100%;
+}
 
-  <body>
-    <!-- Use static rendering with Expo Router to support running without JavaScript. -->
-    <noscript>
-      You need to enable JavaScript to run this app.
-    </noscript>
-    <!-- The root element for your Expo app. -->
-    <div id="root"></div>
-  <script src="/chicken-cottage-manager/_expo/static/js/web/entry-9f3787d6824b92d066206fe503d64416.js" defer></script>
+/* ─── Design Tokens ────────────────────────────────────── */
+:root{
+  --bg:#09090f;
+  --bg2:#0f0f1a;
+  --surface:#13131f;
+  --surface2:#1a1a2c;
+  --border:#1e1e35;
+  --border2:#252542;
+  --text:#e8e8f2;
+  --text2:#9898b8;
+  --text3:#606080;
+  --accent:#6366f1;
+  --accent-glow:rgba(99,102,241,0.15);
+  --radius:12px;
+  --radius-sm:8px;
+  --nav-h:58px;
+  --header-h:56px;
+  --tab-h:44px;
+  --safe-bottom:env(safe-area-inset-bottom,0px);
+  --safe-top:env(safe-area-inset-top,0px);
+}
+
+/* ─── Layout Shell ─────────────────────────────────────── */
+#app{
+  display:flex;
+  flex-direction:column;
+  height:100%;
+  height:100dvh;
+  position:relative;
+  max-width:480px;
+  margin:0 auto;
+}
+
+/* ─── Header ───────────────────────────────────────────── */
+#header{
+  flex-shrink:0;
+  padding:calc(12px + var(--safe-top)) 16px 12px;
+  background:var(--bg);
+  border-bottom:1px solid var(--border);
+  display:flex;
+  align-items:center;
+  gap:12px;
+  z-index:10;
+}
+.logo{
+  width:32px;height:32px;
+  background:linear-gradient(135deg,#6366f1,#818cf8);
+  border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:17px;flex-shrink:0;
+}
+#header h1{
+  font-size:17px;font-weight:600;
+  color:var(--text);letter-spacing:-0.3px;
+}
+#header .subtitle{
+  font-size:11px;color:var(--text3);
+  margin-top:1px;
+}
+.week-nav{
+  margin-left:auto;
+  display:flex;align-items:center;gap:2px;
+}
+.week-nav button{
+  background:none;border:none;color:var(--text2);
+  width:30px;height:30px;border-radius:6px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:16px;cursor:pointer;transition:background 0.15s;
+}
+.week-nav button:active{background:var(--surface2)}
+.week-label{
+  font-size:12px;color:var(--text2);
+  white-space:nowrap;padding:0 4px;
+  min-width:70px;text-align:center;
+}
+
+/* ─── Type Tabs ────────────────────────────────────────── */
+#type-tabs{
+  flex-shrink:0;
+  display:flex;
+  background:var(--bg2);
+  border-bottom:1px solid var(--border);
+  padding:6px 16px;
+  gap:8px;
+}
+.type-tab{
+  flex:1;
+  padding:8px 0;
+  border:none;
+  border-radius:var(--radius-sm);
+  font-size:13px;font-weight:500;
+  cursor:pointer;
+  transition:all 0.15s;
+  color:var(--text2);
+  background:none;
+  letter-spacing:0.1px;
+}
+.type-tab.active{
+  background:var(--accent);
+  color:#fff;
+  font-weight:600;
+}
+
+/* ─── Main Content ─────────────────────────────────────── */
+#content{
+  flex:1;
+  overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain;
+}
+
+/* ─── Views ────────────────────────────────────────────── */
+.view{display:none;padding:12px 12px calc(12px + var(--safe-bottom))}
+.view.active{display:block}
+
+/* ─── Day Cards ────────────────────────────────────────── */
+.day-card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  margin-bottom:8px;
+  overflow:hidden;
+}
+.day-header{
+  background:var(--surface2);
+  padding:10px 14px;
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:8px;
+}
+.day-dot{
+  width:5px;height:5px;border-radius:50%;
+  background:var(--accent);flex-shrink:0;
+}
+.day-name{
+  font-size:13px;font-weight:600;
+  color:var(--text);letter-spacing:-0.1px;
+}
+.day-date{font-size:11px;color:var(--text3);margin-left:auto}
+
+/* ─── Shift Rows ───────────────────────────────────────── */
+.shift-row{
+  display:flex;align-items:flex-start;gap:10px;
+  padding:10px 14px;
+  border-bottom:1px solid var(--border);
+  cursor:pointer;
+  transition:background 0.12s;
+  min-height:44px;
+}
+.shift-row:last-child{border-bottom:none}
+.shift-row:active{background:var(--surface2)}
+.shift-label{
+  font-size:10px;font-weight:700;
+  text-transform:uppercase;letter-spacing:0.7px;
+  color:var(--text3);
+  min-width:52px;
+  padding-top:4px;flex-shrink:0;
+}
+.pills-wrap{flex:1;display:flex;flex-wrap:wrap;gap:5px;min-height:24px}
+.pill{
+  display:inline-flex;align-items:center;
+  padding:3px 10px;border-radius:20px;
+  font-size:12px;font-weight:600;
+  white-space:nowrap;
+  border:1px solid transparent;
+}
+.edit-hint{
+  font-size:10px;color:var(--text3);
+  padding-top:4px;flex-shrink:0;
+  opacity:0;transition:opacity 0.15s;
+}
+.shift-row:hover .edit-hint{opacity:1}
+.empty-label{
+  font-size:12px;color:var(--text3);
+  padding-top:4px;font-style:italic;
+}
+
+/* ─── Staff Colors ─────────────────────────────────────── */
+[data-staff="Kado"],.sc-Kado{background:rgba(129,140,248,.18);color:#a5b4fc;border-color:rgba(129,140,248,.3)}
+[data-staff="Ercan"],.sc-Ercan{background:rgba(96,165,250,.18);color:#93c5fd;border-color:rgba(96,165,250,.3)}
+[data-staff="Rohith"],.sc-Rohith{background:rgba(52,211,153,.18);color:#6ee7b7;border-color:rgba(52,211,153,.3)}
+[data-staff="Albert"],.sc-Albert{background:rgba(251,146,60,.18);color:#fdba74;border-color:rgba(251,146,60,.3)}
+[data-staff="Anu"],.sc-Anu{background:rgba(248,113,113,.18);color:#fca5a5;border-color:rgba(248,113,113,.3)}
+[data-staff="Abzar"],.sc-Abzar{background:rgba(45,212,191,.18);color:#5eead4;border-color:rgba(45,212,191,.3)}
+[data-staff="Aibal"],.sc-Aibal{background:rgba(192,132,252,.18);color:#d8b4fe;border-color:rgba(192,132,252,.3)}
+[data-staff="Abuzar"],.sc-Abuzar{background:rgba(250,204,21,.18);color:#fde047;border-color:rgba(250,204,21,.3)}
+[data-staff="Abdul"],.sc-Abdul{background:rgba(74,222,128,.18);color:#86efac;border-color:rgba(74,222,128,.3)}
+[data-staff="Shami"],.sc-Shami{background:rgba(167,139,250,.18);color:#c4b5fd;border-color:rgba(167,139,250,.3)}
+[data-staff="Asim"],.sc-Asim{background:rgba(251,191,36,.18);color:#fcd34d;border-color:rgba(251,191,36,.3)}
+
+/* ─── Staff View ───────────────────────────────────────── */
+.staff-section{margin-bottom:20px}
+.section-label{
+  font-size:11px;font-weight:700;
+  text-transform:uppercase;letter-spacing:0.8px;
+  color:var(--text3);
+  padding:4px 0 10px;
+}
+.staff-list{display:flex;flex-direction:column;gap:6px}
+.staff-item{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+  display:flex;align-items:center;gap:10px;
+  padding:10px 12px;
+}
+.staff-badge-dot{
+  width:10px;height:10px;border-radius:50%;flex-shrink:0;
+}
+.staff-item-name{font-size:14px;color:var(--text)}
+.staff-item-type{
+  font-size:11px;color:var(--text3);
+  margin-left:auto;
+}
+.btn-del{
+  background:none;border:none;
+  color:var(--text3);font-size:18px;
+  width:32px;height:32px;
+  display:flex;align-items:center;justify-content:center;
+  border-radius:6px;cursor:pointer;
+  transition:all 0.15s;flex-shrink:0;
+}
+.btn-del:active{background:rgba(248,113,113,.15);color:#fca5a5}
+
+.add-staff-form{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:14px;
+  margin-top:8px;
+}
+.add-staff-form label{
+  font-size:11px;font-weight:600;
+  text-transform:uppercase;letter-spacing:0.5px;
+  color:var(--text3);display:block;margin-bottom:6px;
+}
+.input{
+  width:100%;padding:10px 12px;
+  background:var(--bg2);
+  border:1px solid var(--border2);
+  border-radius:var(--radius-sm);
+  color:var(--text);font-size:14px;
+  outline:none;transition:border-color 0.15s;
+  -webkit-appearance:none;
+}
+.input:focus{border-color:var(--accent)}
+select.input{cursor:pointer}
+.btn-row{display:flex;gap:8px;margin-top:10px}
+.btn{
+  padding:10px 16px;border-radius:var(--radius-sm);
+  font-size:14px;font-weight:600;
+  border:none;cursor:pointer;
+  transition:all 0.15s;flex:1;
+}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:active{opacity:0.85}
+.btn-ghost{background:var(--surface2);color:var(--text2);border:1px solid var(--border2)}
+.btn-ghost:active{background:var(--border2)}
+
+/* ─── Settings View ────────────────────────────────────── */
+.settings-group{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  overflow:hidden;
+  margin-bottom:16px;
+}
+.settings-group-label{
+  font-size:11px;font-weight:700;
+  text-transform:uppercase;letter-spacing:0.8px;
+  color:var(--text3);
+  padding:14px 14px 6px;
+}
+.settings-item{
+  display:flex;align-items:center;gap:12px;
+  padding:14px;
+  border-top:1px solid var(--border);
+  cursor:pointer;transition:background 0.12s;
+}
+.settings-item:first-of-type{border-top:none}
+.settings-item:active{background:var(--surface2)}
+.settings-icon{
+  width:36px;height:36px;
+  border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:18px;flex-shrink:0;
+}
+.settings-item-text strong{font-size:14px;color:var(--text);display:block}
+.settings-item-text span{font-size:12px;color:var(--text3)}
+.settings-item-arrow{margin-left:auto;color:var(--text3);font-size:16px}
+
+/* ─── Bottom Nav ───────────────────────────────────────── */
+#bottom-nav{
+  flex-shrink:0;
+  display:flex;
+  background:var(--bg);
+  border-top:1px solid var(--border);
+  padding:0 0 var(--safe-bottom);
+}
+.nav-btn{
+  flex:1;
+  display:flex;flex-direction:column;align-items:center;
+  gap:3px;padding:10px 4px;
+  background:none;border:none;cursor:pointer;
+  color:var(--text3);font-size:10px;font-weight:500;
+  transition:color 0.15s;letter-spacing:0.3px;
+}
+.nav-icon{font-size:20px;line-height:1}
+.nav-btn.active{color:var(--accent)}
+
+/* ─── Modal / Bottom Sheet ─────────────────────────────── */
+#modal-overlay{
+  position:fixed;inset:0;
+  background:rgba(0,0,0,0.6);
+  backdrop-filter:blur(4px);
+  -webkit-backdrop-filter:blur(4px);
+  z-index:50;
+  display:none;align-items:flex-end;justify-content:center;
+  opacity:0;transition:opacity 0.2s;
+}
+#modal-overlay.open{display:flex;opacity:1}
+#modal-sheet{
+  width:100%;max-width:480px;
+  background:var(--surface);
+  border-radius:20px 20px 0 0;
+  border-top:1px solid var(--border2);
+  padding:0 0 calc(16px + var(--safe-bottom));
+  transform:translateY(100%);
+  transition:transform 0.25s cubic-bezier(0.32,0.72,0,1);
+  max-height:85dvh;
+  display:flex;flex-direction:column;
+}
+#modal-overlay.open #modal-sheet{transform:translateY(0)}
+
+.sheet-handle{
+  width:36px;height:4px;
+  background:var(--border2);border-radius:2px;
+  margin:10px auto 0;flex-shrink:0;
+}
+.sheet-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 16px 10px;flex-shrink:0;
+  border-bottom:1px solid var(--border);
+}
+.sheet-title{font-size:16px;font-weight:600;color:var(--text)}
+.sheet-close{
+  background:var(--surface2);border:none;
+  width:28px;height:28px;border-radius:50%;
+  color:var(--text2);font-size:16px;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;
+}
+.sheet-subtitle{
+  font-size:12px;color:var(--text3);
+  padding:8px 16px;flex-shrink:0;
+}
+.staff-picker-list{
+  overflow-y:auto;
+  flex:1;
+  padding:4px 0;
+}
+.picker-item{
+  display:flex;align-items:center;gap:12px;
+  padding:12px 16px;
+  cursor:pointer;
+  transition:background 0.1s;
+  border-bottom:1px solid var(--border);
+}
+.picker-item:last-child{border-bottom:none}
+.picker-item:active{background:var(--surface2)}
+.picker-check{
+  width:20px;height:20px;border-radius:50%;
+  border:2px solid var(--border2);
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;transition:all 0.15s;
+}
+.picker-item.selected .picker-check{
+  background:var(--accent);border-color:var(--accent);
+  color:#fff;font-size:12px;
+}
+.picker-name{font-size:14px;color:var(--text)}
+.sheet-footer{
+  padding:12px 16px 0;flex-shrink:0;
+  border-top:1px solid var(--border);
+}
+
+/* ─── Empty state ──────────────────────────────────────── */
+.empty-state{
+  text-align:center;padding:48px 24px;
+  color:var(--text3);font-size:14px;
+}
+
+/* ─── Toast ────────────────────────────────────────────── */
+#toast{
+  position:fixed;bottom:calc(var(--nav-h) + 16px + var(--safe-bottom));
+  left:50%;transform:translateX(-50%) translateY(20px);
+  background:var(--surface2);
+  border:1px solid var(--border2);
+  border-radius:var(--radius-sm);
+  padding:10px 16px;
+  font-size:13px;color:var(--text);
+  white-space:nowrap;
+  opacity:0;transition:all 0.2s;
+  pointer-events:none;z-index:99;
+}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ─── Scrollbar ────────────────────────────────────────── */
+::-webkit-scrollbar{width:3px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- Header -->
+  <div id="header">
+    <div class="logo">🍗</div>
+    <div>
+      <div id="header-title" style="font-size:17px;font-weight:600;letter-spacing:-0.3px">Chicken Cottage</div>
+      <div class="subtitle">Shift Manager</div>
+    </div>
+    <div class="week-nav">
+      <button onclick="changeWeek(-1)" title="Previous week">‹</button>
+      <div class="week-label" id="week-label">This week</div>
+      <button onclick="changeWeek(1)" title="Next week">›</button>
+    </div>
+  </div>
+
+  <!-- Type Tabs (only shown on rota view) -->
+  <div id="type-tabs">
+    <button class="type-tab active" onclick="setType('inside')">Inside Staff</button>
+    <button class="type-tab" onclick="setType('delivery')">Delivery</button>
+  </div>
+
+  <!-- Content -->
+  <div id="content">
+
+    <!-- ROTA VIEW -->
+    <div id="view-rota" class="view active" style="padding:12px">
+      <div id="rota-cards"></div>
+    </div>
+
+    <!-- STAFF VIEW -->
+    <div id="view-staff" class="view" style="padding:12px">
+      <div class="staff-section">
+        <div class="section-label">Inside Staff</div>
+        <div class="staff-list" id="staff-list-inside"></div>
+      </div>
+      <div class="staff-section">
+        <div class="section-label">Delivery Staff</div>
+        <div class="staff-list" id="staff-list-delivery"></div>
+      </div>
+      <div class="add-staff-form">
+        <label>Add Staff Member</label>
+        <input class="input" id="new-staff-name" placeholder="Name" style="margin-bottom:8px">
+        <select class="input" id="new-staff-type">
+          <option value="inside">Inside Staff</option>
+          <option value="delivery">Delivery</option>
+          <option value="both">Both</option>
+        </select>
+        <div class="btn-row" style="margin-top:10px">
+          <button class="btn btn-primary" onclick="addStaff()">Add Member</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- SETTINGS VIEW -->
+    <div id="view-settings" class="view" style="padding:12px">
+      <div class="settings-group">
+        <div class="settings-group-label">Data</div>
+        <div class="settings-item" onclick="exportBackup()">
+          <div class="settings-icon" style="background:rgba(99,102,241,.15)">💾</div>
+          <div class="settings-item-text">
+            <strong>Export Backup</strong>
+            <span>Save data as JSON file</span>
+          </div>
+          <div class="settings-item-arrow">›</div>
+        </div>
+        <div class="settings-item" onclick="importBackup()">
+          <div class="settings-icon" style="background:rgba(52,211,153,.15)">📥</div>
+          <div class="settings-item-text">
+            <strong>Restore Backup</strong>
+            <span>Load data from JSON file</span>
+          </div>
+          <div class="settings-item-arrow">›</div>
+        </div>
+        <div class="settings-item" onclick="clearCurrentWeek()">
+          <div class="settings-icon" style="background:rgba(251,146,60,.15)">🗑</div>
+          <div class="settings-item-text">
+            <strong>Clear This Week</strong>
+            <span>Reset all shifts for current week</span>
+          </div>
+          <div class="settings-item-arrow">›</div>
+        </div>
+      </div>
+      <div class="settings-group">
+        <div class="settings-group-label">About</div>
+        <div class="settings-item">
+          <div class="settings-icon" style="background:rgba(129,140,248,.15)">🍗</div>
+          <div class="settings-item-text">
+            <strong>Chicken Cottage Manager</strong>
+            <span>Version 2.0 • PWA</span>
+          </div>
+        </div>
+      </div>
+      <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)">
+    </div>
+
+  </div><!-- /content -->
+
+  <!-- Bottom Nav -->
+  <div id="bottom-nav">
+    <button class="nav-btn active" onclick="showView('rota')" id="nav-rota">
+      <span class="nav-icon">📅</span>
+      <span>Rota</span>
+    </button>
+    <button class="nav-btn" onclick="showView('staff')" id="nav-staff">
+      <span class="nav-icon">👥</span>
+      <span>Staff</span>
+    </button>
+    <button class="nav-btn" onclick="showView('settings')" id="nav-settings">
+      <span class="nav-icon">⚙️</span>
+      <span>Settings</span>
+    </button>
+  </div>
+</div><!-- /app -->
+
+<!-- Modal -->
+<div id="modal-overlay" onclick="handleOverlayClick(event)">
+  <div id="modal-sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-title" id="sheet-title">Select Staff</div>
+      <button class="sheet-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="sheet-subtitle" id="sheet-subtitle"></div>
+    <div class="staff-picker-list" id="picker-list"></div>
+    <div class="sheet-footer">
+      <div class="btn-row">
+        <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveShift()">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+/* ─── Constants ─────────────────────────────────────────── */
+const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+
+const DELIVERY_COLS = ['DAY','4:00','5:00'];
+const INSIDE_COLS   = ['MORNING','NIGHT','OFF'];
+
+const DEFAULT_STAFF = {
+  inside: ['Kado','Ercan','Rohith','Albert','Anu','Abzar','Aibal','Abuzar','Abdul'],
+  delivery: ['Shami','Abdul','Asim']
+};
+
+/* ─── State ─────────────────────────────────────────────── */
+let state = {
+  type: 'inside',
+  weekOffset: 0,
+  staff: { inside: [...DEFAULT_STAFF.inside], delivery: [...DEFAULT_STAFF.delivery] },
+  schedules: {}  // key: "type|weekKey|day|col" → string[]
+};
+
+let modalContext = null; // {day, col}
+let modalSelected = [];
+
+/* ─── Storage ───────────────────────────────────────────── */
+function saveState() {
+  try { localStorage.setItem('ccm_v2', JSON.stringify(state)); } catch(e){}
+}
+function loadState() {
+  try {
+    const raw = localStorage.getItem('ccm_v2');
+    if (raw) state = { ...state, ...JSON.parse(raw) };
+  } catch(e){}
+}
+
+/* ─── Week Helpers ──────────────────────────────────────── */
+function getWeekStart(offset = 0) {
+  const d = new Date();
+  d.setHours(0,0,0,0);
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day; // Monday
+  d.setDate(d.getDate() + diff + offset * 7);
+  return d;
+}
+function weekKey(offset) {
+  const d = getWeekStart(offset);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function formatWeekLabel(offset) {
+  const d = getWeekStart(offset);
+  const end = new Date(d); end.setDate(end.getDate()+6);
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  if (offset === 0) return 'This week';
+  if (offset === 1) return 'Next week';
+  if (offset === -1) return 'Last week';
+  return `${d.getDate()} ${months[d.getMonth()]}`;
+}
+function getDayDate(dayIndex, offset) {
+  const start = getWeekStart(offset);
+  const d = new Date(start);
+  d.setDate(d.getDate() + dayIndex);
+  return d.getDate();
+}
+function getDayMonth(dayIndex, offset) {
+  const start = getWeekStart(offset);
+  const d = new Date(start);
+  d.setDate(d.getDate() + dayIndex);
+  return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()];
+}
+
+/* ─── Schedule Data ─────────────────────────────────────── */
+function getShift(type, offset, day, col) {
+  const key = `${type}|${weekKey(offset)}|${day}|${col}`;
+  return state.schedules[key] || [];
+}
+function setShift(type, offset, day, col, names) {
+  const key = `${type}|${weekKey(offset)}|${day}|${col}`;
+  if (names.length === 0) delete state.schedules[key];
+  else state.schedules[key] = names;
+  saveState();
+}
+
+/* ─── Rendering ─────────────────────────────────────────── */
+function pillHtml(name) {
+  const cls = `sc-${name}`;
+  return `<span class="pill ${cls}" data-staff="${name}">${name}</span>`;
+}
+
+function renderRota() {
+  const cols = state.type === 'inside' ? INSIDE_COLS : DELIVERY_COLS;
+  let html = '';
+  DAYS.forEach((day, di) => {
+    const date = getDayDate(di, state.weekOffset);
+    const month = getDayMonth(di, state.weekOffset);
+    html += `<div class="day-card">
+      <div class="day-header">
+        <div class="day-dot"></div>
+        <div class="day-name">${day}</div>
+        <div class="day-date">${date} ${month}</div>
+      </div>`;
+    cols.forEach(col => {
+      const staff = getShift(state.type, state.weekOffset, day, col);
+      const pills = staff.length
+        ? staff.map(pillHtml).join('')
+        : `<span class="empty-label">Tap to assign</span>`;
+      html += `<div class="shift-row" onclick="openModal('${day}','${col}')">
+        <div class="shift-label">${col}</div>
+        <div class="pills-wrap">${pills}</div>
+        <div class="edit-hint">✎</div>
+      </div>`;
+    });
+    html += `</div>`;
+  });
+  document.getElementById('rota-cards').innerHTML = html;
+}
+
+function renderStaffLists() {
+  ['inside','delivery'].forEach(type => {
+    const list = document.getElementById(`staff-list-${type}`);
+    if (!state.staff[type] || state.staff[type].length === 0) {
+      list.innerHTML = `<div class="empty-state">No staff yet</div>`;
+      return;
+    }
+    list.innerHTML = state.staff[type].map(name => {
+      const cls = `sc-${name}`;
+      const color = getComputedStyle(document.documentElement).getPropertyValue('--color') || '#818cf8';
+      return `<div class="staff-item">
+        <div class="pill ${cls}" style="min-width:0">${name}</div>
+        <button class="btn-del" onclick="removeStaff('${type}','${name}')" title="Remove">×</button>
+      </div>`;
+    }).join('');
+  });
+}
+
+/* ─── Navigation ────────────────────────────────────────── */
+function showView(view) {
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById(`view-${view}`).classList.add('active');
+  document.getElementById(`nav-${view}`).classList.add('active');
+  document.getElementById('type-tabs').style.display = view === 'rota' ? 'flex' : 'none';
+  if (view === 'staff') renderStaffLists();
+}
+
+function setType(type) {
+  state.type = type;
+  document.querySelectorAll('.type-tab').forEach((t,i) => {
+    t.classList.toggle('active', (i===0 && type==='inside') || (i===1 && type==='delivery'));
+  });
+  renderRota();
+}
+
+function changeWeek(delta) {
+  state.weekOffset += delta;
+  document.getElementById('week-label').textContent = formatWeekLabel(state.weekOffset);
+  renderRota();
+  saveState();
+}
+
+/* ─── Modal ─────────────────────────────────────────────── */
+function openModal(day, col) {
+  modalContext = {day, col};
+  modalSelected = [...getShift(state.type, state.weekOffset, day, col)];
+
+  const staffPool = state.type === 'inside'
+    ? state.staff.inside
+    : state.staff.delivery;
+
+  document.getElementById('sheet-title').textContent = `${day} — ${col}`;
+  document.getElementById('sheet-subtitle').textContent = 'Tap staff to assign to this shift';
+
+  const list = document.getElementById('picker-list');
+  list.innerHTML = staffPool.map(name => {
+    const sel = modalSelected.includes(name) ? 'selected' : '';
+    const cls = `sc-${name}`;
+    return `<div class="picker-item ${sel}" onclick="togglePicker(this,'${name}')">
+      <div class="picker-check">${sel ? '✓' : ''}</div>
+      <span class="pill ${cls}">${name}</span>
+      <span class="picker-name">${name}</span>
+    </div>`;
+  }).join('');
+
+  const overlay = document.getElementById('modal-overlay');
+  overlay.style.display = 'flex';
+  requestAnimationFrame(() => {
+    overlay.classList.add('open');
+    // scroll to top of picker
+    list.scrollTop = 0;
+  });
+}
+
+function togglePicker(el, name) {
+  const idx = modalSelected.indexOf(name);
+  if (idx === -1) { modalSelected.push(name); el.classList.add('selected'); el.querySelector('.picker-check').textContent='✓'; }
+  else { modalSelected.splice(idx,1); el.classList.remove('selected'); el.querySelector('.picker-check').textContent=''; }
+}
+
+function saveShift() {
+  if (!modalContext) return;
+  setShift(state.type, state.weekOffset, modalContext.day, modalContext.col, modalSelected);
+  closeModal();
+  renderRota();
+  showToast('Shift saved');
+}
+
+function closeModal() {
+  const overlay = document.getElementById('modal-overlay');
+  overlay.classList.remove('open');
+  setTimeout(()=>{ overlay.style.display='none'; modalContext=null; }, 220);
+}
+
+function handleOverlayClick(e) {
+  if (e.target === document.getElementById('modal-overlay')) closeModal();
+}
+
+/* ─── Staff CRUD ────────────────────────────────────────── */
+function addStaff() {
+  const name = document.getElementById('new-staff-name').value.trim();
+  const type = document.getElementById('new-staff-type').value;
+  if (!name) { showToast('Enter a name'); return; }
+  if (type === 'both' || type === 'inside') {
+    if (!state.staff.inside.includes(name)) state.staff.inside.push(name);
+  }
+  if (type === 'both' || type === 'delivery') {
+    if (!state.staff.delivery.includes(name)) state.staff.delivery.push(name);
+  }
+  document.getElementById('new-staff-name').value = '';
+  saveState();
+  renderStaffLists();
+  showToast(`${name} added`);
+}
+
+function removeStaff(type, name) {
+  state.staff[type] = state.staff[type].filter(n => n !== name);
+  saveState();
+  renderStaffLists();
+  showToast(`${name} removed`);
+}
+
+/* ─── Backup / Restore ──────────────────────────────────── */
+function exportBackup() {
+  const json = JSON.stringify(state, null, 2);
+  const blob = new Blob([json], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `rota-backup-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('Backup exported');
+}
+
+function importBackup() {
+  document.getElementById('import-file').click();
+}
+
+function handleImport(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const parsed = JSON.parse(ev.target.result);
+      state = {...state, ...parsed};
+      saveState();
+      renderRota();
+      renderStaffLists();
+      showToast('Backup restored ✓');
+    } catch { showToast('Invalid backup file'); }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+}
+
+function clearCurrentWeek() {
+  if (!confirm(`Clear all shifts for ${formatWeekLabel(state.weekOffset)}?`)) return;
+  const wk = weekKey(state.weekOffset);
+  Object.keys(state.schedules).forEach(k => {
+    if (k.startsWith(`${state.type}|${wk}|`)) delete state.schedules[k];
+  });
+  saveState();
+  renderRota();
+  showToast('Week cleared');
+}
+
+/* ─── Toast ─────────────────────────────────────────────── */
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(()=>t.classList.remove('show'), 2000);
+}
+
+/* ─── Init ──────────────────────────────────────────────── */
+loadState();
+document.getElementById('week-label').textContent = formatWeekLabel(state.weekOffset);
+// Sync type tabs
+document.querySelectorAll('.type-tab').forEach((t,i) => {
+  t.classList.toggle('active', (i===0 && state.type==='inside') || (i===1 && state.type==='delivery'));
+});
+renderRota();
+</script>
 </body>
 </html>
