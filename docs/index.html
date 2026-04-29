@@ -96,9 +96,9 @@ body{
 /* ─── Header ─────────────────────────────────────── */
 #header{
   flex-shrink:0;
-  padding:calc(10px + var(--safe-top)) 14px 10px;
+  padding:calc(10px + var(--safe-top)) 12px 10px;
   background:var(--bg);border-bottom:1px solid var(--border);
-  display:flex;align-items:center;gap:10px;z-index:10;
+  display:flex;align-items:center;gap:8px;z-index:10;
 }
 .logo{
   width:30px;height:30px;
@@ -107,43 +107,55 @@ body{
   display:flex;align-items:center;justify-content:center;
   font-size:16px;flex-shrink:0;
 }
-#header h1{font-size:16px;font-weight:600;letter-spacing:-0.3px}
+#header h1{font-size:15px;font-weight:600;letter-spacing:-0.3px;flex-shrink:0}
 .week-nav{margin-left:auto;display:flex;align-items:center;gap:0}
 .week-nav button{
   background:none;border:none;color:var(--text2);
-  width:32px;height:32px;border-radius:6px;
+  width:30px;height:30px;border-radius:6px;
   display:flex;align-items:center;justify-content:center;
   font-size:18px;cursor:pointer;
 }
 .week-nav button:active{background:var(--surface2)}
-#week-label{font-size:12px;color:var(--text2);min-width:68px;text-align:center}
-.user-btn{
+#week-label{font-size:12px;color:var(--text2);min-width:62px;text-align:center}
+.icon-btn{
   background:var(--surface2);border:1px solid var(--border);
   border-radius:6px;width:30px;height:30px;
   display:flex;align-items:center;justify-content:center;
-  font-size:14px;cursor:pointer;flex-shrink:0;margin-left:4px;
+  font-size:14px;cursor:pointer;flex-shrink:0;
 }
-.user-btn:active{background:var(--border)}
+.icon-btn:active{background:var(--border)}
 
 /* ─── Type Tabs ──────────────────────────────────── */
 #type-tabs{
-  flex-shrink:0;display:flex;
+  flex-shrink:0;display:flex;align-items:center;
   background:var(--bg2);border-bottom:1px solid var(--border);
-  padding:6px 14px;gap:8px;
+  padding:6px 10px;gap:6px;
 }
 .type-tab{
-  flex:1;padding:8px 0;border:none;border-radius:var(--rs);
+  flex:1;padding:7px 0;border:none;border-radius:var(--rs);
   font-size:13px;font-weight:500;cursor:pointer;
   transition:all .15s;color:var(--text2);background:none;
 }
 .type-tab.active{background:var(--accent);color:#fff;font-weight:600}
+.view-toggle{
+  display:flex;background:var(--surface);border:1px solid var(--border);
+  border-radius:7px;overflow:hidden;flex-shrink:0;margin-left:2px;
+}
+.vt-btn{
+  padding:6px 9px;border:none;background:none;
+  color:var(--text3);font-size:11px;font-weight:500;cursor:pointer;
+  transition:all .15s;white-space:nowrap;
+}
+.vt-btn.active{background:var(--surface2);color:var(--text);font-weight:600}
 
 /* ─── Content ────────────────────────────────────── */
 #content{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
 .view{display:none;padding:10px 10px calc(10px + var(--safe-bottom))}
 .view.active{display:block}
+#view-rota{padding:0}
 
 /* ─── Day Cards ──────────────────────────────────── */
+#cards-wrap{padding:10px}
 .day-card{
   background:var(--surface);border:1px solid var(--border);
   border-radius:var(--r);margin-bottom:8px;overflow:hidden;
@@ -182,6 +194,45 @@ body{
 .sync-dot.saving{background:#facc15}
 .sync-dot.saved{background:var(--green)}
 
+/* ─── Table View ─────────────────────────────────── */
+#table-wrap{
+  overflow-x:auto;-webkit-overflow-scrolling:touch;
+  padding:10px;
+}
+.rota-tbl{
+  width:100%;border-collapse:collapse;
+  font-size:13px;
+}
+.rota-tbl th{
+  background:var(--surface2);color:var(--text3);
+  font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;
+  padding:8px 8px;text-align:left;
+  border:1px solid var(--border);
+  white-space:nowrap;position:sticky;top:0;z-index:2;
+}
+.rota-tbl th:first-child{min-width:68px;width:68px}
+.rota-tbl td{
+  border:1px solid var(--border);
+  padding:7px 7px;vertical-align:top;
+  min-width:90px;
+}
+.rota-tbl td.day-cell{
+  background:var(--surface2);cursor:default;
+  width:68px;min-width:68px;
+}
+.rota-tbl td.shift-cell{
+  background:var(--surface);cursor:pointer;
+  transition:background .1s;
+}
+.rota-tbl td.shift-cell:active{background:var(--surface2)}
+.td-day{font-size:12px;font-weight:600;color:var(--text)}
+.td-date{font-size:10px;color:var(--text3);margin-top:1px}
+.td-pills{display:flex;flex-wrap:wrap;gap:3px;min-height:22px}
+.td-empty{font-size:11px;color:var(--text3);font-style:italic;padding-top:3px}
+.tbl-sync{display:inline-block;width:5px;height:5px;border-radius:50%;background:transparent;margin-left:3px;vertical-align:middle;transition:background .2s}
+.tbl-sync.saving{background:#facc15}
+.tbl-sync.saved{background:var(--green)}
+
 /* Staff colors */
 [data-s="Kado"],.sc-Kado{background:rgba(129,140,248,.18);color:#a5b4fc;border-color:rgba(129,140,248,.3)}
 [data-s="Ercan"],.sc-Ercan{background:rgba(96,165,250,.18);color:#93c5fd;border-color:rgba(96,165,250,.3)}
@@ -217,6 +268,8 @@ body{
 .btn-sm{flex:1;padding:10px;border:none;border-radius:var(--rs);font-size:14px;font-weight:600;cursor:pointer}
 .btn-sm.primary{background:var(--accent);color:#fff}
 .btn-sm.primary:active{opacity:.85}
+.btn-sm.ghost{background:var(--surface2);color:var(--text2);border:1px solid var(--border2)}
+.btn-sm.ghost:active{background:var(--border2)}
 
 /* ─── Settings ───────────────────────────────────── */
 .settings-group{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:16px}
@@ -231,6 +284,51 @@ body{
 .si strong{font-size:14px;color:var(--text);display:block}
 .si span{font-size:12px;color:var(--text3)}
 .si-arr{margin-left:auto;color:var(--text3);font-size:16px}
+
+/* ─── Column Editor Sheet ────────────────────────── */
+#col-sheet-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.65);
+  backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
+  z-index:55;display:none;align-items:flex-end;justify-content:center;
+  opacity:0;transition:opacity .2s;
+}
+#col-sheet-overlay.open{display:flex;opacity:1}
+#col-sheet{
+  width:100%;max-width:480px;background:var(--surface);
+  border-radius:20px 20px 0 0;border-top:1px solid var(--border2);
+  padding:0 0 calc(20px + var(--safe-bottom));
+  transform:translateY(100%);
+  transition:transform .25s cubic-bezier(.32,.72,0,1);
+  max-height:80dvh;display:flex;flex-direction:column;
+}
+#col-sheet-overlay.open #col-sheet{transform:translateY(0)}
+.col-editor-body{overflow-y:auto;flex:1;padding:14px 16px}
+.col-row{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.col-input{
+  flex:1;background:var(--bg2);border:1px solid var(--border2);
+  border-radius:var(--rs);color:var(--text);font-size:14px;
+  padding:9px 12px;outline:none;-webkit-appearance:none;
+}
+.col-input:focus{border-color:var(--accent)}
+.btn-icon{
+  background:none;border:none;color:var(--text3);font-size:18px;
+  width:32px;height:32px;border-radius:6px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.btn-icon:active{color:var(--red);background:var(--surface2)}
+.btn-add-col{
+  width:100%;padding:10px;border:1.5px dashed var(--border2);
+  border-radius:var(--rs);background:none;color:var(--text3);
+  font-size:13px;cursor:pointer;margin-top:4px;margin-bottom:14px;
+}
+.btn-add-col:active{background:var(--surface)}
+.col-type-tabs{display:flex;gap:6px;margin-bottom:14px}
+.col-type-tab{
+  flex:1;padding:7px;border:1px solid var(--border);
+  border-radius:var(--rs);background:none;color:var(--text2);
+  font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;
+}
+.col-type-tab.active{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600}
 
 /* ─── Bottom Nav ─────────────────────────────────── */
 #bottom-nav{
@@ -283,8 +381,6 @@ body{
 .pi-name{font-size:14px;color:var(--text)}
 .sh-foot{padding:12px 16px 0;flex-shrink:0;border-top:1px solid var(--border);display:flex;gap:8px}
 .sh-foot .btn-sm{padding:11px}
-.btn-sm.ghost{background:var(--surface2);color:var(--text2);border:1px solid var(--border2)}
-.btn-sm.ghost:active{background:var(--border2)}
 
 /* ─── User Menu ──────────────────────────────────── */
 #user-menu{
@@ -378,18 +474,26 @@ body{
       <div id="week-label">This week</div>
       <button onclick="changeWeek(1)">›</button>
     </div>
-    <div class="user-btn" onclick="toggleUserMenu()">👤</div>
+    <div class="icon-btn" onclick="shareRota()" title="Share rota as image">📤</div>
+    <div class="icon-btn" onclick="toggleUserMenu()">👤</div>
   </div>
 
   <div id="type-tabs">
     <button class="type-tab active" onclick="setType('inside')">Inside Staff</button>
     <button class="type-tab" onclick="setType('delivery')">Delivery</button>
+    <div class="view-toggle">
+      <button class="vt-btn active" id="vt-cards" onclick="setViewMode('cards')">☰</button>
+      <button class="vt-btn" id="vt-table" onclick="setViewMode('table')">⊞</button>
+    </div>
   </div>
 
   <div id="content">
 
-    <div id="view-rota" class="view active" style="padding:10px">
-      <div id="rota-cards"></div>
+    <div id="view-rota" class="view active">
+      <!-- Cards view -->
+      <div id="cards-wrap"></div>
+      <!-- Table view -->
+      <div id="table-wrap" style="display:none"></div>
     </div>
 
     <div id="view-staff" class="view" style="padding:10px">
@@ -412,6 +516,14 @@ body{
     </div>
 
     <div id="view-settings" class="view" style="padding:10px">
+      <div class="settings-group">
+        <div class="sg-label">Rota</div>
+        <div class="si" onclick="openColEditor()">
+          <div class="si-icon" style="background:rgba(99,102,241,.15)">✏️</div>
+          <div><strong>Edit Shift Columns</strong><span>Rename, add or remove shift types</span></div>
+          <div class="si-arr">›</div>
+        </div>
+      </div>
       <div class="settings-group">
         <div class="sg-label">Data</div>
         <div class="si" onclick="exportBackup()">
@@ -442,7 +554,7 @@ body{
         <div class="sg-label">App</div>
         <div class="si">
           <div class="si-icon" style="background:rgba(99,102,241,.15)">🍗</div>
-          <div><strong>Chicken Cottage Manager</strong><span>Version 2.0 • Cloud sync</span></div>
+          <div><strong>Chicken Cottage Manager</strong><span>Version 3.0 • Cloud sync</span></div>
         </div>
       </div>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)">
@@ -470,9 +582,7 @@ body{
   <div class="um-item danger" onclick="signOut()">🚪 Sign Out</div>
 </div>
 
-</div><!-- /app -->
-
-<!-- Shift Picker -->
+<!-- Shift Picker Modal -->
 <div id="overlay" onclick="handleOverlay(event)">
   <div id="sheet">
     <div class="sh-handle"></div>
@@ -489,11 +599,33 @@ body{
   </div>
 </div>
 
+<!-- Column Editor Sheet -->
+<div id="col-sheet-overlay" onclick="handleColOverlay(event)">
+  <div id="col-sheet">
+    <div class="sh-handle"></div>
+    <div class="sh-hdr">
+      <div class="sh-title">Edit Shift Columns</div>
+      <button class="sh-close" onclick="closeColEditor()">✕</button>
+    </div>
+    <div class="col-editor-body">
+      <div class="col-type-tabs">
+        <button class="col-type-tab active" id="ct-inside" onclick="setColEditorType('inside')">Inside Staff</button>
+        <button class="col-type-tab" id="ct-delivery" onclick="setColEditorType('delivery')">Delivery</button>
+      </div>
+      <div id="col-list"></div>
+      <button class="btn-add-col" onclick="addColRow()">+ Add Shift Column</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn-sm ghost" onclick="closeColEditor()">Cancel</button>
+        <button class="btn-sm primary" onclick="saveColEditor()">Save Changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
 /* ─── Config ─────────────────────────────────────────── */
-// REPLACE THESE with your actual Supabase credentials
 const SUPABASE_URL = 'https://bnwicexckfuhebornsjc.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJud2ljZXhja2Z1aGVib3Juc2pjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc0ODEzNzMsImV4cCI6MjA5MzA1NzM3M30.VjYKew3lnOFDgk9TwLoBTUUvERx3IqT1m_X8yIPBPWs';
 
@@ -502,10 +634,35 @@ const db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
-const COLS = { inside:['MORNING','NIGHT','OFF'], delivery:['DAY','4:00','5:00'] };
+const DEFAULT_COLS = {
+  inside: ['MORNING','NIGHT','OFF'],
+  delivery: ['DAY','4:00','5:00']
+};
 const DEFAULT_STAFF = {
   inside:['Kado','Ercan','Rohith','Albert','Anu','Abzar','Aibal','Abuzar','Abdul'],
   delivery:['Shami','Abdul','Asim']
+};
+
+// Staff colors for canvas drawing
+const STAFF_CANVAS_COLORS = {
+  'Kado':  {bg:'rgba(129,140,248,0.35)',text:'#c7d2fe'},
+  'Ercan': {bg:'rgba(96,165,250,0.35)', text:'#bfdbfe'},
+  'Rohith':{bg:'rgba(52,211,153,0.35)', text:'#a7f3d0'},
+  'Albert':{bg:'rgba(251,146,60,0.35)', text:'#fed7aa'},
+  'Anu':   {bg:'rgba(248,113,113,0.35)',text:'#fecaca'},
+  'Abzar': {bg:'rgba(45,212,191,0.35)', text:'#99f6e4'},
+  'Aibal': {bg:'rgba(192,132,252,0.35)',text:'#e9d5ff'},
+  'Abuzar':{bg:'rgba(250,204,21,0.35)', text:'#fef08a'},
+  'Abdul': {bg:'rgba(74,222,128,0.35)', text:'#bbf7d0'},
+  'Shami': {bg:'rgba(167,139,250,0.35)',text:'#ddd6fe'},
+  'Asim':  {bg:'rgba(251,191,36,0.35)', text:'#fde68a'},
+};
+const DEFAULT_COLOR = {bg:'rgba(150,150,220,0.35)',text:'#c8c8f0'};
+
+/* ─── Dynamic Columns (editable) ─────────────────────── */
+let COLS = {
+  inside: JSON.parse(localStorage.getItem('cc_cols_inside') || 'null') || [...DEFAULT_COLS.inside],
+  delivery: JSON.parse(localStorage.getItem('cc_cols_delivery') || 'null') || [...DEFAULT_COLS.delivery]
 };
 
 /* ─── State ──────────────────────────────────────────── */
@@ -513,12 +670,13 @@ let user = null;
 let state = {
   type:'inside', weekOffset:0,
   staff:{inside:[...DEFAULT_STAFF.inside],delivery:[...DEFAULT_STAFF.delivery]},
-  schedules:{} // local cache: "type|wk|day|col" → string[]
+  schedules:{}
 };
+let viewMode = localStorage.getItem('cc_view') || 'cards';
 let modalCtx = null;
 let modalSel = [];
-let saveTimers = {};
-let authMode = 'signin'; // 'signin' or 'signup'
+let authMode = 'signin';
+let colEditorType = 'inside';
 
 /* ─── Week helpers ───────────────────────────────────── */
 function weekStart(off=0){
@@ -547,18 +705,13 @@ function dayMonth(di,off){
 
 /* ─── Supabase helpers ───────────────────────────────── */
 async function loadFromCloud(){
-  if(!user) return;
+  if(!user)return;
   try{
-    // Load staff
     const {data:staffData}=await db.from('staff').select('*').eq('user_id',user.id);
-    if(staffData && staffData.length>0){
+    if(staffData&&staffData.length>0){
       state.staff.inside=staffData.filter(s=>s.type==='inside'||s.type==='both').map(s=>s.name);
       state.staff.delivery=staffData.filter(s=>s.type==='delivery'||s.type==='both').map(s=>s.name);
-    } else {
-      // First time - seed default staff
-      await seedDefaultStaff();
-    }
-    // Load schedules for visible weeks (current ±1)
+    }else{await seedDefaultStaff();}
     await loadSchedules();
   }catch(e){console.error('Load error:',e)}
 }
@@ -567,12 +720,11 @@ async function seedDefaultStaff(){
   const rows=[];
   DEFAULT_STAFF.inside.forEach(name=>rows.push({user_id:user.id,name,type:'inside'}));
   DEFAULT_STAFF.delivery.forEach(name=>{
-    if(!rows.find(r=>r.name===name)) rows.push({user_id:user.id,name,type:'delivery'});
+    if(!rows.find(r=>r.name===name))rows.push({user_id:user.id,name,type:'delivery'});
     else rows.find(r=>r.name===name).type='both';
   });
-  // Abdul is in both
   const abdulRow=rows.find(r=>r.name==='Abdul'&&r.type==='inside');
-  if(abdulRow) abdulRow.type='both';
+  if(abdulRow)abdulRow.type='both';
   await db.from('staff').insert(rows);
 }
 
@@ -590,35 +742,37 @@ async function loadSchedules(){
 }
 
 async function saveShiftToCloud(type,wk,day,col,names){
-  if(!user) return;
-  const key=`${type}|${wk}|${day}|${col}`;
-  // Show saving indicator
-  const dotEl=document.getElementById(`dot-${day}-${col}`);
-  if(dotEl){dotEl.className='sync-dot saving';}
+  if(!user)return;
+  setSyncDot(day,col,'saving');
   try{
     await db.from('schedules').upsert({
-      user_id:user.id,
-      schedule_type:type,
-      week_key:wk,
-      day,
-      shift_col:col,
-      staff_names:names,
-      updated_at:new Date().toISOString()
+      user_id:user.id,schedule_type:type,
+      week_key:wk,day,shift_col:col,
+      staff_names:names,updated_at:new Date().toISOString()
     },{onConflict:'user_id,schedule_type,week_key,day,shift_col'});
-    if(dotEl){dotEl.className='sync-dot saved';setTimeout(()=>{if(dotEl)dotEl.className='sync-dot';},1500);}
+    setSyncDot(day,col,'saved');
+    setTimeout(()=>setSyncDot(day,col,''),1500);
   }catch(e){
     console.error('Save error:',e);
-    if(dotEl)dotEl.className='sync-dot';
+    setSyncDot(day,col,'');
   }
 }
 
-async function saveStaffToCloud(name,type){
-  if(!user) return;
-  await db.from('staff').upsert({user_id:user.id,name,type},{onConflict:'user_id,name'});
+function setSyncDot(day,col,status){
+  // Works for both card and table views
+  const ids=[`dot-${day}-${col}`,`tdot-${day}-${col}`];
+  ids.forEach(id=>{
+    const el=document.getElementById(id);
+    if(el)el.className=el.className.replace(/saving|saved/,'').trim()+(status?' '+status:'');
+  });
 }
 
+async function saveStaffToCloud(name,type){
+  if(!user)return;
+  await db.from('staff').upsert({user_id:user.id,name,type},{onConflict:'user_id,name'});
+}
 async function deleteStaffFromCloud(name){
-  if(!user) return;
+  if(!user)return;
   await db.from('staff').delete().eq('user_id',user.id).eq('name',name);
 }
 
@@ -628,7 +782,7 @@ function getShift(type,off,day,col){
 }
 function setShift(type,off,day,col,names){
   const k=`${type}|${weekKey(off)}|${day}|${col}`;
-  if(names.length===0) delete state.schedules[k]; else state.schedules[k]=names;
+  if(names.length===0)delete state.schedules[k]; else state.schedules[k]=names;
   saveShiftToCloud(type,weekKey(off),day,col,names);
 }
 
@@ -638,6 +792,11 @@ function pill(name){
 }
 
 function renderRota(){
+  if(viewMode==='table') renderTable();
+  else renderCards();
+}
+
+function renderCards(){
   const cols=COLS[state.type];
   let html='';
   DAYS.forEach((day,di)=>{
@@ -654,18 +813,59 @@ function renderRota(){
     });
     html+='</div>';
   });
-  document.getElementById('rota-cards').innerHTML=html;
+  document.getElementById('cards-wrap').innerHTML=html;
+}
+
+function renderTable(){
+  const cols=COLS[state.type];
+  let html=`<table class="rota-tbl"><thead><tr>
+    <th>Day</th>
+    ${cols.map(c=>`<th>${c}</th>`).join('')}
+  </tr></thead><tbody>`;
+  DAYS.forEach((day,di)=>{
+    html+=`<tr>
+      <td class="day-cell">
+        <div class="td-day">${day.slice(0,3)}</div>
+        <div class="td-date">${dayDate(di,state.weekOffset)} ${dayMonth(di,state.weekOffset)}</div>
+      </td>`;
+    cols.forEach(col=>{
+      const staff=getShift(state.type,state.weekOffset,day,col);
+      const pills=staff.length
+        ?staff.map(n=>`<span class="pill sc-${n}" style="font-size:11px;padding:2px 7px">${n}</span>`).join('')
+        :`<span class="td-empty">—</span>`;
+      html+=`<td class="shift-cell" onclick="openModal('${day}','${col}')">
+        <div class="td-pills">${pills}</div>
+        <span class="tbl-sync" id="tdot-${day}-${col}"></span>
+      </td>`;
+    });
+    html+=`</tr>`;
+  });
+  html+=`</tbody></table>`;
+  document.getElementById('table-wrap').innerHTML=html;
 }
 
 function renderStaff(){
   ['inside','delivery'].forEach(t=>{
     const el=document.getElementById(`sl-${t}`);
-    if(!state.staff[t]||!state.staff[t].length){el.innerHTML='<div style="color:var(--text3);font-size:13px;padding:8px 0">No staff yet</div>';return;}
+    if(!state.staff[t]||!state.staff[t].length){
+      el.innerHTML='<div style="color:var(--text3);font-size:13px;padding:8px 0">No staff yet</div>';return;
+    }
     el.innerHTML=state.staff[t].map(n=>`<div class="staff-item">
       <span class="pill sc-${n}">${n}</span>
       <button class="btn-del" onclick="removeStaff('${t}','${n}')">×</button>
     </div>`).join('');
   });
+}
+
+/* ─── View Mode ──────────────────────────────────────── */
+function setViewMode(mode){
+  viewMode=mode;
+  localStorage.setItem('cc_view',mode);
+  document.getElementById('vt-cards').classList.toggle('active',mode==='cards');
+  document.getElementById('vt-table').classList.toggle('active',mode==='table');
+  document.getElementById('cards-wrap').style.display=mode==='cards'?'block':'none';
+  document.getElementById('table-wrap').style.display=mode==='table'?'block':'none';
+  renderRota();
 }
 
 /* ─── Navigation ─────────────────────────────────────── */
@@ -675,13 +875,14 @@ function showView(v){
   document.getElementById(`view-${v}`).classList.add('active');
   document.getElementById(`nav-${v}`).classList.add('active');
   document.getElementById('type-tabs').style.display=v==='rota'?'flex':'none';
-  if(v==='staff') renderStaff();
+  if(v==='staff')renderStaff();
   closeUserMenu();
 }
 
 function setType(t){
   state.type=t;
-  document.querySelectorAll('.type-tab').forEach((el,i)=>el.classList.toggle('active',(i===0&&t==='inside')||(i===1&&t==='delivery')));
+  document.querySelectorAll('.type-tab').forEach((el,i)=>
+    el.classList.toggle('active',(i===0&&t==='inside')||(i===1&&t==='delivery')));
   loadSchedules().then(renderRota);
 }
 
@@ -697,7 +898,7 @@ function openModal(day,col){
   modalSel=[...getShift(state.type,state.weekOffset,day,col)];
   const pool=state.staff[state.type]||[];
   document.getElementById('sh-title').textContent=`${day} — ${col}`;
-  document.getElementById('sh-sub').textContent='Tap to assign staff to this shift';
+  document.getElementById('sh-sub').textContent='Tap names to assign to this shift';
   document.getElementById('picker-list').innerHTML=pool.map(n=>{
     const sel=modalSel.includes(n)?'sel':'';
     return `<div class="pi ${sel}" onclick="togglePick(this,'${n}')">
@@ -718,9 +919,9 @@ function togglePick(el,name){
 }
 
 function saveShift(){
-  if(!modalCtx) return;
+  if(!modalCtx)return;
   setShift(state.type,state.weekOffset,modalCtx.day,modalCtx.col,modalSel);
-  closeModal(); renderRota(); toast('Shift saved ✓');
+  closeModal();renderRota();toast('Shift saved ✓');
 }
 
 function closeModal(){
@@ -739,45 +940,299 @@ async function addStaff(){
   if(type==='delivery'||type==='both'){if(!state.staff.delivery.includes(name))state.staff.delivery.push(name);}
   document.getElementById('ns-name').value='';
   await saveStaffToCloud(name,type);
-  renderStaff(); toast(`${name} added`);
+  renderStaff();toast(`${name} added`);
 }
 
 async function removeStaff(type,name){
   state.staff[type]=state.staff[type].filter(n=>n!==name);
-  // Only delete from cloud if not in other type
   const inInside=state.staff.inside.includes(name);
   const inDelivery=state.staff.delivery.includes(name);
-  if(!inInside&&!inDelivery) await deleteStaffFromCloud(name);
-  else await saveStaffToCloud(name, inInside&&inDelivery?'both':inInside?'inside':'delivery');
-  renderStaff(); toast(`${name} removed`);
+  if(!inInside&&!inDelivery)await deleteStaffFromCloud(name);
+  else await saveStaffToCloud(name,inInside&&inDelivery?'both':inInside?'inside':'delivery');
+  renderStaff();toast(`${name} removed`);
+}
+
+/* ─── Column Editor ──────────────────────────────────── */
+function openColEditor(){
+  colEditorType=state.type;
+  refreshColEditorTabs();
+  renderColList();
+  const ov=document.getElementById('col-sheet-overlay');
+  ov.style.display='flex';
+  requestAnimationFrame(()=>ov.classList.add('open'));
+}
+
+function closeColEditor(){
+  const ov=document.getElementById('col-sheet-overlay');
+  ov.classList.remove('open');
+  setTimeout(()=>{ov.style.display='none';},220);
+}
+
+function handleColOverlay(e){
+  if(e.target===document.getElementById('col-sheet-overlay'))closeColEditor();
+}
+
+function setColEditorType(t){
+  colEditorType=t;
+  refreshColEditorTabs();
+  renderColList();
+}
+
+function refreshColEditorTabs(){
+  document.getElementById('ct-inside').classList.toggle('active',colEditorType==='inside');
+  document.getElementById('ct-delivery').classList.toggle('active',colEditorType==='delivery');
+}
+
+function renderColList(){
+  const cols=COLS[colEditorType];
+  document.getElementById('col-list').innerHTML=cols.map((c,i)=>`
+    <div class="col-row">
+      <input class="col-input" value="${c}" id="col-inp-${i}" placeholder="Shift name">
+      <button class="btn-icon" onclick="removeColRow(${i})" title="Remove">✕</button>
+    </div>`).join('');
+}
+
+function addColRow(){
+  COLS[colEditorType].push('NEW');
+  renderColList();
+  // Focus new input
+  const inputs=document.querySelectorAll('.col-input');
+  if(inputs.length)inputs[inputs.length-1].focus();
+}
+
+function removeColRow(i){
+  if(COLS[colEditorType].length<=1){toast('Need at least 1 column');return;}
+  COLS[colEditorType].splice(i,1);
+  renderColList();
+}
+
+function saveColEditor(){
+  // Read current values from inputs
+  const inputs=document.querySelectorAll('.col-input');
+  const newCols=[];
+  inputs.forEach(inp=>{
+    const v=inp.value.trim();
+    if(v)newCols.push(v.toUpperCase());
+  });
+  if(!newCols.length){toast('Add at least 1 column');return;}
+  COLS[colEditorType]=newCols;
+  localStorage.setItem(`cc_cols_${colEditorType}`,JSON.stringify(newCols));
+  closeColEditor();
+  renderRota();
+  toast('Columns updated ✓');
+}
+
+/* ─── Share as Image ─────────────────────────────────── */
+async function shareRota(){
+  toast('Preparing image...');
+  await new Promise(r=>setTimeout(r,100));
+
+  const cols=COLS[state.type];
+  const scale=2;
+  const W=420;
+  const PAD=16;
+  const HEADER_H=70;
+  const TH_H=32;
+  const DAY_W=60;
+  const COL_W=Math.floor((W-PAD*2-DAY_W)/cols.length);
+  const ROW_H=Math.max(44, Math.ceil(Math.max(...DAYS.map(day=>
+    Math.max(...cols.map(col=>Math.max(1,getShift(state.type,state.weekOffset,day,col).length)))
+  ))*20+12));
+  const FOOTER_H=28;
+  const H=HEADER_H+TH_H+DAYS.length*ROW_H+FOOTER_H+PAD;
+
+  const canvas=document.createElement('canvas');
+  canvas.width=W*scale; canvas.height=H*scale;
+  const ctx=canvas.getContext('2d');
+  ctx.scale(scale,scale);
+
+  // Background
+  ctx.fillStyle='#09090f';
+  ctx.fillRect(0,0,W,H);
+
+  // Header card
+  ctx.fillStyle='#13131f';
+  roundRect(ctx,PAD,PAD,W-PAD*2,HEADER_H-PAD,10);
+  ctx.fill();
+  ctx.strokeStyle='#1e1e35'; ctx.lineWidth=1;
+  roundRect(ctx,PAD,PAD,W-PAD*2,HEADER_H-PAD,10);
+  ctx.stroke();
+
+  // App icon area
+  ctx.fillStyle='#6366f1';
+  roundRect(ctx,PAD+10,PAD+8,36,36,8);
+  ctx.fill();
+  ctx.font=`20px sans-serif`;
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText('🍗',PAD+10+18,PAD+8+18);
+
+  // Title
+  ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+  ctx.fillStyle='#e8e8f2';
+  ctx.font=`bold 15px -apple-system,sans-serif`;
+  ctx.fillText('Chicken Cottage',PAD+54,PAD+22);
+  ctx.fillStyle='#9898b8';
+  ctx.font=`12px -apple-system,sans-serif`;
+  const typeLabel=state.type==='inside'?'Inside Staff':'Delivery';
+  ctx.fillText(`${typeLabel} • ${weekLabel(state.weekOffset)}`,PAD+54,PAD+40);
+
+  // Week dates
+  const ws=weekStart(state.weekOffset);
+  const we=new Date(ws); we.setDate(we.getDate()+6);
+  const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const dateStr=`${ws.getDate()} ${MONTHS[ws.getMonth()]} – ${we.getDate()} ${MONTHS[we.getMonth()]}`;
+  ctx.fillStyle='#606080'; ctx.font=`11px -apple-system,sans-serif`;
+  ctx.fillText(dateStr,PAD+54,PAD+55);
+
+  // Table header
+  const tableY=HEADER_H;
+  ctx.fillStyle='#1a1a2c';
+  ctx.fillRect(PAD,tableY,W-PAD*2,TH_H);
+  ctx.strokeStyle='#1e1e35'; ctx.lineWidth=1;
+  ctx.strokeRect(PAD,tableY,W-PAD*2,TH_H);
+
+  ctx.fillStyle='#606080';
+  ctx.font=`bold 9px -apple-system,sans-serif`;
+  ctx.textAlign='left';
+  ctx.fillText('DAY',PAD+8,tableY+TH_H/2+3);
+  cols.forEach((c,i)=>{
+    ctx.fillText(c.toUpperCase(),PAD+DAY_W+i*COL_W+8,tableY+TH_H/2+3);
+  });
+
+  // Table rows
+  DAYS.forEach((day,di)=>{
+    const rowY=tableY+TH_H+di*ROW_H;
+    // Row bg
+    ctx.fillStyle=di%2===0?'#0f0f1a':'#13131f';
+    ctx.fillRect(PAD,rowY,W-PAD*2,ROW_H);
+
+    // Row border
+    ctx.strokeStyle='#1e1e35'; ctx.lineWidth=1;
+    ctx.strokeRect(PAD,rowY,W-PAD*2,ROW_H);
+
+    // Day label
+    ctx.textAlign='left';
+    ctx.fillStyle='#e8e8f2'; ctx.font=`bold 12px -apple-system,sans-serif`;
+    ctx.fillText(day.slice(0,3),PAD+8,rowY+ROW_H/2-4);
+    ctx.fillStyle='#606080'; ctx.font=`10px -apple-system,sans-serif`;
+    ctx.fillText(`${dayDate(di,state.weekOffset)} ${MONTHS[new Date(weekStart(state.weekOffset)).getMonth()]}`,PAD+8,rowY+ROW_H/2+9);
+
+    // Column divider after day
+    ctx.fillStyle='#1e1e35';
+    ctx.fillRect(PAD+DAY_W,rowY,1,ROW_H);
+
+    // Shift cells
+    cols.forEach((col,ci)=>{
+      const cellX=PAD+DAY_W+ci*COL_W;
+      const staff=getShift(state.type,state.weekOffset,day,col);
+
+      // Column divider
+      if(ci>0){ctx.fillStyle='#1e1e35';ctx.fillRect(cellX,rowY,1,ROW_H);}
+
+      if(staff.length===0){
+        ctx.fillStyle='#3a3a5a';
+        ctx.font=`11px -apple-system,sans-serif`;
+        ctx.fillText('—',cellX+10,rowY+ROW_H/2+4);
+      } else {
+        staff.forEach((name,si)=>{
+          const pillY=rowY+8+si*22;
+          const pillX=cellX+6;
+          const c=STAFF_CANVAS_COLORS[name]||DEFAULT_COLOR;
+          const tw=ctx.measureText(name).width;
+          const pw=Math.min(tw+16,COL_W-12);
+
+          // Pill background
+          ctx.fillStyle=c.bg;
+          roundRect(ctx,pillX,pillY,pw,18,9);
+          ctx.fill();
+
+          // Pill text
+          ctx.fillStyle=c.text;
+          ctx.font=`bold 10px -apple-system,sans-serif`;
+          ctx.textAlign='left';
+          // Clip name if needed
+          const displayName=name.length>8?name.slice(0,7)+'…':name;
+          ctx.fillText(displayName,pillX+8,pillY+13);
+        });
+      }
+    });
+  });
+
+  // Footer
+  const footerY=tableY+TH_H+DAYS.length*ROW_H;
+  ctx.fillStyle='#606080';
+  ctx.font=`10px -apple-system,sans-serif`;
+  ctx.textAlign='center';
+  ctx.fillText('Chicken Cottage Manager • rohithker.github.io/chicken-cottage-manager',W/2,footerY+18);
+
+  // Share or download
+  canvas.toBlob(async blob=>{
+    const fname=`rota-${state.type}-${weekKey()}.png`;
+    const file=new File([blob],fname,{type:'image/png'});
+    if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){
+      try{
+        await navigator.share({files:[file],title:'Chicken Cottage Rota'});
+      }catch(e){
+        if(e.name!=='AbortError')downloadBlob(blob,fname);
+      }
+    } else {
+      downloadBlob(blob,fname);
+    }
+  },'image/png');
+}
+
+function downloadBlob(blob,fname){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=fname;
+  a.click();
+  toast('Image saved ✓');
+}
+
+function roundRect(ctx,x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.lineTo(x+w-r,y);
+  ctx.arcTo(x+w,y,x+w,y+r,r);
+  ctx.lineTo(x+w,y+h-r);
+  ctx.arcTo(x+w,y+h,x+w-r,y+h,r);
+  ctx.lineTo(x+r,y+h);
+  ctx.arcTo(x,y+h,x,y+h-r,r);
+  ctx.lineTo(x,y+r);
+  ctx.arcTo(x,y,x+r,y,r);
+  ctx.closePath();
 }
 
 /* ─── Settings ───────────────────────────────────────── */
 function exportBackup(){
-  const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
+  const blob=new Blob([JSON.stringify({state,cols:COLS},null,2)],{type:'application/json'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
   a.download=`rota-${new Date().toISOString().slice(0,10)}.json`;
-  a.click(); toast('Backup exported');
+  a.click();toast('Backup exported');
 }
 function importBackup(){document.getElementById('import-file').click();}
 function handleImport(e){
-  const f=e.target.files[0]; if(!f)return;
+  const f=e.target.files[0];if(!f)return;
   const r=new FileReader();
   r.onload=async ev=>{
     try{
       const p=JSON.parse(ev.target.result);
-      state={...state,...p};
-      renderRota(); renderStaff(); toast('Restored ✓');
+      if(p.state)state={...state,...p.state};
+      if(p.cols){
+        COLS=p.cols;
+        localStorage.setItem('cc_cols_inside',JSON.stringify(COLS.inside));
+        localStorage.setItem('cc_cols_delivery',JSON.stringify(COLS.delivery));
+      }
+      renderRota();renderStaff();toast('Restored ✓');
     }catch{toast('Invalid file');}
   };
-  r.readAsText(f); e.target.value='';
+  r.readAsText(f);e.target.value='';
 }
 function clearWeek(){
   if(!confirm(`Clear all shifts for ${weekLabel(state.weekOffset)}?`))return;
   const wk=weekKey();
   Object.keys(state.schedules).forEach(k=>{if(k.startsWith(`${state.type}|${wk}|`))delete state.schedules[k];});
-  // Also clear from cloud
   db.from('schedules').delete()
     .eq('user_id',user.id).eq('schedule_type',state.type).eq('week_key',wk)
     .then(()=>toast('Week cleared'));
@@ -802,12 +1257,12 @@ async function doAuth(){
   errEl.classList.remove('show');
   if(!email||!pw){errEl.textContent='Please fill in all fields.';errEl.classList.add('show');return;}
   const btn=document.getElementById('auth-btn');
-  btn.disabled=true; btn.textContent='Please wait...';
+  btn.disabled=true;btn.textContent='Please wait...';
   const fn=authMode==='signin'
     ?db.auth.signInWithPassword({email,password:pw})
     :db.auth.signUp({email,password:pw});
   const {data,error}=await fn;
-  btn.disabled=false; btn.textContent=authMode==='signin'?'Sign In':'Create Account';
+  btn.disabled=false;btn.textContent=authMode==='signin'?'Sign In':'Create Account';
   if(error){errEl.textContent=error.message;errEl.classList.add('show');return;}
   if(authMode==='signup'&&data?.user&&!data?.session){
     errEl.style.background='rgba(52,211,153,.12)';errEl.style.color='#6ee7b7';errEl.style.borderColor='rgba(52,211,153,.25)';
@@ -818,20 +1273,16 @@ async function doAuth(){
 
 async function signOut(){
   await db.auth.signOut();
-  user=null; state.schedules={};
-  showAuthScreen(); closeUserMenu();
+  user=null;state.schedules={};
+  showAuthScreen();closeUserMenu();
 }
 
 /* ─── User Menu ──────────────────────────────────────── */
-function toggleUserMenu(){
-  document.getElementById('user-menu').classList.toggle('open');
-}
-function closeUserMenu(){
-  document.getElementById('user-menu').classList.remove('open');
-}
+function toggleUserMenu(){document.getElementById('user-menu').classList.toggle('open');}
+function closeUserMenu(){document.getElementById('user-menu').classList.remove('open');}
 document.addEventListener('click',e=>{
   const menu=document.getElementById('user-menu');
-  if(menu.classList.contains('open')&&!menu.contains(e.target)&&!e.target.closest('.user-btn'))closeUserMenu();
+  if(menu.classList.contains('open')&&!menu.contains(e.target)&&!e.target.closest('.icon-btn'))closeUserMenu();
 });
 
 /* ─── Screens ────────────────────────────────────────── */
@@ -844,18 +1295,19 @@ function showMainApp(){
   document.getElementById('auth-screen').style.display='none';
   document.getElementById('main-app').style.display='flex';
   document.getElementById('loading-screen').style.display='none';
+  // Apply saved view mode
+  setViewMode(viewMode);
 }
 
 /* ─── Toast ──────────────────────────────────────────── */
 function toast(msg){
   const t=document.getElementById('toast');
-  t.textContent=msg; t.classList.add('show');
-  clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),2000);
+  t.textContent=msg;t.classList.add('show');
+  clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2200);
 }
 
 /* ─── Init ───────────────────────────────────────────── */
 async function init(){
-  // Check for existing session
   const {data:{session}}=await db.auth.getSession();
   if(session){
     user=session.user;
@@ -865,11 +1317,9 @@ async function init(){
     document.getElementById('week-label').textContent=weekLabel(state.weekOffset);
     renderRota();
     showMainApp();
-  } else {
+  }else{
     showAuthScreen();
   }
-
-  // Listen for auth changes
   db.auth.onAuthStateChange(async(event,session)=>{
     if(event==='SIGNED_IN'&&session){
       user=session.user;
@@ -879,7 +1329,7 @@ async function init(){
       document.getElementById('week-label').textContent=weekLabel(state.weekOffset);
       renderRota();
       showMainApp();
-    } else if(event==='SIGNED_OUT'){
+    }else if(event==='SIGNED_OUT'){
       showAuthScreen();
     }
   });
