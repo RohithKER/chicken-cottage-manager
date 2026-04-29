@@ -1030,141 +1030,188 @@ async function shareRota(){
   const cols=COLS[state.type];
   const scale=2;
   const W=420;
-  const PAD=16;
-  const HEADER_H=96;
-  const TH_H=32;
-  const DAY_W=60;
+  const PAD=16;          // outer margin
+  const GAP=10;          // gap between cards
+  const CR=14;           // card corner radius
+  const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  // ── Header card geometry ─────────────────────────────
+  const HDR_H=84;
+  const HDR_Y=PAD;
+  const ICON_SZ=46;
+  const ICON_X=PAD+14;
+  const ICON_Y=HDR_Y+(HDR_H-ICON_SZ)/2;
+  const TEXT_X=ICON_X+ICON_SZ+14;
+
+  // ── Table card geometry ──────────────────────────────
+  const TBL_Y=HDR_Y+HDR_H+GAP;
+  const TH_H=34;
+  const DAY_W=72;
   const COL_W=Math.floor((W-PAD*2-DAY_W)/cols.length);
-  const ROW_H=Math.max(44, Math.ceil(Math.max(...DAYS.map(day=>
+  const ROW_H=Math.max(48,Math.ceil(Math.max(...DAYS.map(day=>
     Math.max(...cols.map(col=>Math.max(1,getShift(state.type,state.weekOffset,day,col).length)))
-  ))*20+12));
-  const FOOTER_H=28;
-  const H=HEADER_H+TH_H+DAYS.length*ROW_H+FOOTER_H+PAD;
+  ))*22+14));
+  const TBL_H=TH_H+DAYS.length*ROW_H;
+
+  // ── Footer geometry ──────────────────────────────────
+  const FTR_Y=TBL_Y+TBL_H+GAP;
+  const FTR_H=30;
+  const H=FTR_Y+FTR_H+PAD;
 
   const canvas=document.createElement('canvas');
   canvas.width=W*scale; canvas.height=H*scale;
   const ctx=canvas.getContext('2d');
   ctx.scale(scale,scale);
 
-  // Background
-  ctx.fillStyle='#09090f';
+  // ── Background ───────────────────────────────────────
+  ctx.fillStyle='#06060d';
   ctx.fillRect(0,0,W,H);
 
-  // Header card
-  ctx.fillStyle='#13131f';
-  roundRect(ctx,PAD,PAD,W-PAD*2,HEADER_H-PAD,10);
+  // ── Header Card ──────────────────────────────────────
+  // subtle drop shadow
+  ctx.fillStyle='rgba(0,0,0,0.4)';
+  roundRect(ctx,PAD+1,HDR_Y+3,W-PAD*2,HDR_H,CR);
   ctx.fill();
-  ctx.strokeStyle='#1e1e35'; ctx.lineWidth=1;
-  roundRect(ctx,PAD,PAD,W-PAD*2,HEADER_H-PAD,10);
+  // card body
+  ctx.fillStyle='#13131f';
+  roundRect(ctx,PAD,HDR_Y,W-PAD*2,HDR_H,CR);
+  ctx.fill();
+  // card border
+  ctx.strokeStyle='#252542'; ctx.lineWidth=1;
+  roundRect(ctx,PAD,HDR_Y,W-PAD*2,HDR_H,CR);
   ctx.stroke();
 
-  // App icon area
-  ctx.fillStyle='#6366f1';
-  roundRect(ctx,PAD+10,PAD+8,36,36,8);
+  // icon background
+  const grad=ctx.createLinearGradient(ICON_X,ICON_Y,ICON_X,ICON_Y+ICON_SZ);
+  grad.addColorStop(0,'#7c7cf8'); grad.addColorStop(1,'#4f46e5');
+  ctx.fillStyle=grad;
+  roundRect(ctx,ICON_X,ICON_Y,ICON_SZ,ICON_SZ,12);
   ctx.fill();
-  ctx.font=`20px sans-serif`;
+  ctx.font=`${Math.round(ICON_SZ*0.52)}px sans-serif`;
   ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.fillText('🍗',PAD+10+18,PAD+8+18);
+  ctx.fillText('🍗',ICON_X+ICON_SZ/2,ICON_Y+ICON_SZ/2+1);
 
-  // Title
+  // header text
   ctx.textAlign='left'; ctx.textBaseline='alphabetic';
-  ctx.fillStyle='#e8e8f2';
-  ctx.font=`bold 15px -apple-system,sans-serif`;
-  ctx.fillText('Chicken Cottage',PAD+54,PAD+22);
+  ctx.fillStyle='#f0f0fa';
+  ctx.font=`bold 17px -apple-system,sans-serif`;
+  ctx.fillText('Chicken Cottage',TEXT_X,HDR_Y+28);
   ctx.fillStyle='#9898b8';
-  ctx.font=`12px -apple-system,sans-serif`;
+  ctx.font=`13px -apple-system,sans-serif`;
   const typeLabel=state.type==='inside'?'Inside Staff':'Delivery';
-  ctx.fillText(typeLabel,PAD+54,PAD+40);
-
-  // Week dates
+  ctx.fillText(typeLabel,TEXT_X,HDR_Y+48);
   const ws=weekStart(state.weekOffset);
   const we=new Date(ws); we.setDate(we.getDate()+6);
-  const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const dateStr=`${ws.getDate()} ${MONTHS[ws.getMonth()]} – ${we.getDate()} ${MONTHS[we.getMonth()]}`;
-  ctx.fillStyle='#606080'; ctx.font=`11px -apple-system,sans-serif`;
-  ctx.fillText(dateStr,PAD+54,PAD+55);
+  ctx.fillStyle='#505070';
+  ctx.font=`12px -apple-system,sans-serif`;
+  ctx.fillText(dateStr,TEXT_X,HDR_Y+66);
 
-  // Table header
-  const tableY=HEADER_H;
-  ctx.fillStyle='#1a1a2c';
-  ctx.fillRect(PAD,tableY,W-PAD*2,TH_H);
+  // ── Table Card ───────────────────────────────────────
+  // shadow
+  ctx.fillStyle='rgba(0,0,0,0.4)';
+  roundRect(ctx,PAD+1,TBL_Y+3,W-PAD*2,TBL_H,CR);
+  ctx.fill();
+  // card body
+  ctx.fillStyle='#0f0f1a';
+  roundRect(ctx,PAD,TBL_Y,W-PAD*2,TBL_H,CR);
+  ctx.fill();
+  // border
   ctx.strokeStyle='#1e1e35'; ctx.lineWidth=1;
-  ctx.strokeRect(PAD,tableY,W-PAD*2,TH_H);
+  roundRect(ctx,PAD,TBL_Y,W-PAD*2,TBL_H,CR);
+  ctx.stroke();
 
-  ctx.fillStyle='#606080';
-  ctx.font=`bold 9px -apple-system,sans-serif`;
-  ctx.textAlign='left';
-  ctx.fillText('DAY',PAD+8,tableY+TH_H/2+3);
+  // clip everything inside the table card
+  ctx.save();
+  roundRect(ctx,PAD,TBL_Y,W-PAD*2,TBL_H,CR);
+  ctx.clip();
+
+  // column header row
+  ctx.fillStyle='#1a1a2e';
+  ctx.fillRect(PAD,TBL_Y,W-PAD*2,TH_H);
+  // header bottom border
+  ctx.fillStyle='#252540';
+  ctx.fillRect(PAD,TBL_Y+TH_H-1,W-PAD*2,1);
+
+  // column header labels
+  ctx.textAlign='left'; ctx.textBaseline='middle';
+  ctx.fillStyle='#555575';
+  ctx.font=`bold 10px -apple-system,sans-serif`;
+  ctx.fillText('DAY',PAD+10,TBL_Y+TH_H/2);
   cols.forEach((c,i)=>{
-    ctx.fillText(c.toUpperCase(),PAD+DAY_W+i*COL_W+8,tableY+TH_H/2+3);
+    ctx.fillText(c.toUpperCase(),PAD+DAY_W+i*COL_W+10,TBL_Y+TH_H/2);
   });
 
-  // Table rows
+  // day column divider header
+  ctx.fillStyle='#252540';
+  ctx.fillRect(PAD+DAY_W,TBL_Y,1,TH_H);
+
+  // data rows
   DAYS.forEach((day,di)=>{
-    const rowY=tableY+TH_H+di*ROW_H;
-    // Row bg
-    ctx.fillStyle=di%2===0?'#0f0f1a':'#13131f';
+    const rowY=TBL_Y+TH_H+di*ROW_H;
+
+    // row background (alternating)
+    ctx.fillStyle=di%2===0?'#0f0f1a':'#111120';
     ctx.fillRect(PAD,rowY,W-PAD*2,ROW_H);
 
-    // Row border
-    ctx.strokeStyle='#1e1e35'; ctx.lineWidth=1;
-    ctx.strokeRect(PAD,rowY,W-PAD*2,ROW_H);
+    // row bottom border
+    ctx.fillStyle='#1a1a2e';
+    ctx.fillRect(PAD,rowY+ROW_H-1,W-PAD*2,1);
 
-    // Day label
-    ctx.textAlign='left';
-    ctx.fillStyle='#e8e8f2'; ctx.font=`bold 12px -apple-system,sans-serif`;
-    ctx.fillText(day.slice(0,3),PAD+8,rowY+ROW_H/2-4);
-    const actualDay=new Date(weekStart(state.weekOffset)); actualDay.setDate(actualDay.getDate()+di);
-    ctx.fillStyle='#606080'; ctx.font=`10px -apple-system,sans-serif`;
-    ctx.fillText(`${actualDay.getDate()} ${MONTHS[actualDay.getMonth()]}`,PAD+8,rowY+ROW_H/2+9);
-
-    // Column divider after day
-    ctx.fillStyle='#1e1e35';
+    // day column divider
+    ctx.fillStyle='#1a1a2e';
     ctx.fillRect(PAD+DAY_W,rowY,1,ROW_H);
 
-    // Shift cells
+    // day name + date
+    ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+    ctx.fillStyle='#e8e8f2';
+    ctx.font=`bold 13px -apple-system,sans-serif`;
+    ctx.fillText(day.slice(0,3),PAD+10,rowY+ROW_H/2-2);
+    const actualDay=new Date(ws); actualDay.setDate(ws.getDate()+di);
+    ctx.fillStyle='#505070';
+    ctx.font=`11px -apple-system,sans-serif`;
+    ctx.fillText(`${actualDay.getDate()} ${MONTHS[actualDay.getMonth()]}`,PAD+10,rowY+ROW_H/2+12);
+
+    // shift cells
     cols.forEach((col,ci)=>{
       const cellX=PAD+DAY_W+ci*COL_W;
+      // column dividers (between columns)
+      if(ci>0){ctx.fillStyle='#1a1a2e';ctx.fillRect(cellX,rowY,1,ROW_H);}
+
       const staff=getShift(state.type,state.weekOffset,day,col);
-
-      // Column divider
-      if(ci>0){ctx.fillStyle='#1e1e35';ctx.fillRect(cellX,rowY,1,ROW_H);}
-
       if(staff.length===0){
-        ctx.fillStyle='#3a3a5a';
-        ctx.font=`11px -apple-system,sans-serif`;
-        ctx.fillText('—',cellX+10,rowY+ROW_H/2+4);
+        ctx.fillStyle='#2a2a42';
+        ctx.font=`13px -apple-system,sans-serif`;
+        ctx.textBaseline='middle'; ctx.textAlign='left';
+        ctx.fillText('—',cellX+12,rowY+ROW_H/2);
       } else {
         staff.forEach((name,si)=>{
-          const pillY=rowY+8+si*22;
-          const pillX=cellX+6;
+          const pillH=20; const pillGap=4;
+          const pillY=rowY+8+si*(pillH+pillGap);
+          const pillX=cellX+8;
           const c=STAFF_CANVAS_COLORS[name]||DEFAULT_COLOR;
-          const tw=ctx.measureText(name).width;
-          const pw=Math.min(tw+16,COL_W-12);
-
-          // Pill background
+          ctx.font=`bold 11px -apple-system,sans-serif`;
+          const displayName=name.length>9?name.slice(0,8)+'…':name;
+          const tw=ctx.measureText(displayName).width;
+          const pw=Math.min(tw+18,COL_W-16);
           ctx.fillStyle=c.bg;
-          roundRect(ctx,pillX,pillY,pw,18,9);
+          roundRect(ctx,pillX,pillY,pw,pillH,pillH/2);
           ctx.fill();
-
-          // Pill text
           ctx.fillStyle=c.text;
-          ctx.font=`bold 10px -apple-system,sans-serif`;
-          ctx.textAlign='left';
-          // Clip name if needed
-          const displayName=name.length>8?name.slice(0,7)+'…':name;
-          ctx.fillText(displayName,pillX+8,pillY+13);
+          ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+          ctx.fillText(displayName,pillX+9,pillY+14);
         });
       }
     });
   });
 
-  // Footer
-  const footerY=tableY+TH_H+DAYS.length*ROW_H;
-  ctx.fillStyle='#606080';
-  ctx.font=`10px -apple-system,sans-serif`;
-  ctx.textAlign='center';
-  ctx.fillText('Chicken Cottage',W/2,footerY+18);
+  ctx.restore(); // end table clip
+
+  // ── Footer ───────────────────────────────────────────
+  ctx.fillStyle='#333355';
+  ctx.font=`11px -apple-system,sans-serif`;
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText('Chicken Cottage',W/2,FTR_Y+FTR_H/2);
 
   // Share or download
   canvas.toBlob(async blob=>{
