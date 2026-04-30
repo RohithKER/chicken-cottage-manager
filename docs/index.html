@@ -1005,7 +1005,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v38-local-first-sync';
+const _COLOR_VER='v39-share-print';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -2543,30 +2543,76 @@ async function saveDaySales(){
   closeDayEntry();
 }
 
-function printDaySales(){
+function _fmtMoney(n){return'£'+n.toFixed(2);}
+function _padLine(label,value,width=32){
+  const v=_fmtMoney(value);
+  const spaces=width-label.length-v.length;
+  return label+(spaces>0?' '.repeat(spaces):' ')+v;
+}
+function _receiptText(dateLabel,timeLabel,je,cc,ue,dr,cash,card){
+  const del=je+cc+ue+dr;
+  const total=del+cash+card;
+  const div='--------------------------------';
+  const dbl='================================';
+  const lines=[
+    dbl,
+    '         CC CHELMSFORD',
+    '          TOTAL SALES',
+    dbl,
+    dateLabel+'  '+timeLabel,
+    div,
+    _padLine('Just Eat',je),
+    _padLine('CC App',cc),
+    _padLine('Uber Eats',ue),
+    _padLine('Deliveroo',dr),
+    div,
+    _padLine('Total Delivery',del),
+    div,
+    _padLine('Cash',cash),
+    _padLine('Card',card),
+    div,
+    _padLine('TOTAL SALES',total),
+    dbl,
+    '',''
+  ];
+  return lines.join('\n');
+}
+
+async function printDaySales(){
   if(!salesOpenDate){toast('No day selected');return;}
   const je=getSdVal('sd-je'),cc=getSdVal('sd-cc'),ue=getSdVal('sd-ue'),dr=getSdVal('sd-dr');
   const cash=getSdVal('sd-cash'),card=getSdVal('sd-card');
-  const del=je+cc+ue+dr;
-  const total=del+cash+card;
-
   const dateLabel=new Date(salesOpenDate+'T12:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'});
   const now=new Date();
   const timeLabel=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',hour12:true}).toUpperCase();
 
+  const text=_receiptText(dateLabel,timeLabel,je,cc,ue,dr,cash,card);
+
+  // Try Web Share API first (iOS share sheet → lets user pick thermal printer app)
+  if(navigator.share){
+    try{
+      await navigator.share({title:'CC Chelmsford — '+dateLabel,text});
+      return;
+    }catch(e){
+      if(e.name==='AbortError')return; // user cancelled share sheet — don't fallback to print
+    }
+  }
+
+  // Desktop fallback: render the hidden receipt div and use browser print dialog
   const logo=document.getElementById('rcp-logo');
-  if(logo) logo.src=CC_LOGO;
+  if(logo)logo.src=CC_LOGO;
   document.getElementById('rcp-date').textContent=dateLabel+' '+timeLabel;
   document.getElementById('rcp-je').textContent=je.toFixed(2);
   document.getElementById('rcp-cc').textContent=cc.toFixed(2);
   document.getElementById('rcp-ue').textContent=ue.toFixed(2);
   document.getElementById('rcp-dr').textContent=dr.toFixed(2);
+  const del=je+cc+ue+dr;
   document.getElementById('rcp-del').textContent=del.toFixed(2);
   document.getElementById('rcp-cash').textContent=cash.toFixed(2);
   document.getElementById('rcp-card').textContent=card.toFixed(2);
-  document.getElementById('rcp-total').textContent=total.toFixed(2);
+  document.getElementById('rcp-total').textContent=(del+cash+card).toFixed(2);
   const ws=document.getElementById('rcp-wages-section');
-  if(ws) ws.style.display='none';
+  if(ws)ws.style.display='none';
   window.print();
 }
 
