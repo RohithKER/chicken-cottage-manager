@@ -24,11 +24,11 @@ body{
   -webkit-text-size-adjust:100%;
 }
 :root{
-  --bg:#111111;--bg2:#171717;--surface:#1e1e1e;--surface2:#252525;
-  --border:#2e2e2e;--border2:#383838;
-  --text:#ededed;--text2:#888888;--text3:#555555;
-  --accent:#6b8cba;--accent2:#8aaad4;
-  --red:#c05050;--green:#4f9e6f;
+  --bg:#0d1117;--bg2:#161b22;--surface:#1c2128;--surface2:#22272e;
+  --border:#30363d;--border2:#3d444d;
+  --text:#e6edf3;--text2:#8b949e;--text3:#484f58;
+  --accent:#4493f8;--accent2:#6cb6ff;
+  --red:#f85149;--green:#3fb950;
   --safe-bottom:env(safe-area-inset-bottom,0px);
   --safe-top:env(safe-area-inset-top,0px);
   --r:12px;--rs:8px;
@@ -263,17 +263,17 @@ body{
 .tbl-sync.saved{background:var(--green)}
 
 /* Staff colors */
-[data-s="Kado"],.sc-Kado{background:rgba(170,187,218,.18);color:#aabbda;border-color:rgba(170,187,218,.5)}
-[data-s="Ercan"],.sc-Ercan{background:rgba(152,204,204,.18);color:#98cccc;border-color:rgba(152,204,204,.5)}
-[data-s="Rohith"],.sc-Rohith{background:rgba(168,204,158,.18);color:#a8cc9e;border-color:rgba(168,204,158,.5)}
-[data-s="Albert"],.sc-Albert{background:rgba(204,168,136,.18);color:#cca888;border-color:rgba(204,168,136,.5)}
-[data-s="Anu"],.sc-Anu{background:rgba(204,154,172,.18);color:#cc9aac;border-color:rgba(204,154,172,.5)}
-[data-s="Abzar"],.sc-Abzar{background:rgba(152,184,204,.18);color:#98b8cc;border-color:rgba(152,184,204,.5)}
-[data-s="Aibal"],.sc-Aibal{background:rgba(176,160,204,.18);color:#b0a0cc;border-color:rgba(176,160,204,.5)}
-[data-s="Abuzar"],.sc-Abuzar{background:rgba(204,186,136,.18);color:#ccba88;border-color:rgba(204,186,136,.5)}
-[data-s="Abdul"],.sc-Abdul{background:rgba(142,204,158,.18);color:#8ecc9e;border-color:rgba(142,204,158,.5)}
-[data-s="Shami"],.sc-Shami{background:rgba(168,168,204,.18);color:#a8a8cc;border-color:rgba(168,168,204,.5)}
-[data-s="Asim"],.sc-Asim{background:rgba(192,174,136,.18);color:#c0ae88;border-color:rgba(192,174,136,.5)}
+[data-s="Kado"],.sc-Kado{background:rgba(96,165,250,.15);color:#60a5fa;border-color:rgba(96,165,250,.4)}
+[data-s="Ercan"],.sc-Ercan{background:rgba(52,211,153,.15);color:#34d399;border-color:rgba(52,211,153,.4)}
+[data-s="Rohith"],.sc-Rohith{background:rgba(167,139,250,.15);color:#a78bfa;border-color:rgba(167,139,250,.4)}
+[data-s="Albert"],.sc-Albert{background:rgba(251,146,60,.15);color:#fb923c;border-color:rgba(251,146,60,.4)}
+[data-s="Anu"],.sc-Anu{background:rgba(244,114,182,.15);color:#f472b6;border-color:rgba(244,114,182,.4)}
+[data-s="Abzar"],.sc-Abzar{background:rgba(56,189,248,.15);color:#38bdf8;border-color:rgba(56,189,248,.4)}
+[data-s="Aibal"],.sc-Aibal{background:rgba(129,140,248,.15);color:#818cf8;border-color:rgba(129,140,248,.4)}
+[data-s="Abuzar"],.sc-Abuzar{background:rgba(251,191,36,.15);color:#fbbf24;border-color:rgba(251,191,36,.4)}
+[data-s="Abdul"],.sc-Abdul{background:rgba(74,222,128,.15);color:#4ade80;border-color:rgba(74,222,128,.4)}
+[data-s="Shami"],.sc-Shami{background:rgba(192,132,252,.15);color:#c084fc;border-color:rgba(192,132,252,.4)}
+[data-s="Asim"],.sc-Asim{background:rgba(248,113,113,.15);color:#f87171;border-color:rgba(248,113,113,.4)}
 
 /* ─── Staff View ─────────────────────────────────── */
 .section-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text3);padding:4px 0 10px}
@@ -940,13 +940,13 @@ const COLOR_PALETTE=[
   '#c0ae88','#94b8d4','#c4a0b8','#94ccb4','#b4b4d0'
 ];
 const DEFAULT_STAFF_HEX={
-  'Kado':'#aabbda','Ercan':'#98cccc','Rohith':'#a8cc9e',
-  'Albert':'#cca888','Anu':'#cc9aac','Abzar':'#98b8cc',
-  'Aibal':'#b0a0cc','Abuzar':'#ccba88','Abdul':'#8ecc9e',
-  'Shami':'#a8a8cc','Asim':'#c0ae88'
+  'Kado':'#60a5fa','Ercan':'#34d399','Rohith':'#a78bfa',
+  'Albert':'#fb923c','Anu':'#f472b6','Abzar':'#38bdf8',
+  'Aibal':'#818cf8','Abuzar':'#fbbf24','Abdul':'#4ade80',
+  'Shami':'#c084fc','Asim':'#f87171'
 };
-// Version bump resets cached colours to light pastel palette
-const _COLOR_VER='v7-pastel';
+// Version bump resets cached colours to vivid palette
+const _COLOR_VER='v8-vivid';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
