@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="CC Manager">
 <meta name="theme-color" content="#0e0e0e">
-<title>Chicken Cottage Manager</title>
+<title>CC Chelmsford Manager</title>
 <link rel="icon" type="image/png" href="./favicon.png">
 <link rel="apple-touch-icon" href="./icon-192.png"><link rel="apple-touch-icon" sizes="512x512" href="./icon-512.png">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -528,7 +528,7 @@ body{
 <!-- Auth Screen -->
 <div id="auth-screen" style="display:none">
   <div class="auth-logo">🍗</div>
-  <div class="auth-title">Chicken Cottage</div>
+  <div class="auth-title">CC Chelmsford</div>
   <div class="auth-sub">Sign in to manage your shifts</div>
   <div class="auth-card">
     <div class="auth-error" id="auth-error"></div>
@@ -563,7 +563,7 @@ body{
 
   <div id="header">
     <img class="logo" id="app-logo" src="" alt="CC" style="width:32px;height:32px;border-radius:50%;object-fit:cover;flex-shrink:0">
-    <h1>Chicken Cottage</h1>
+    <h1>CC Chelmsford</h1>
     <div class="week-nav">
       <button onclick="changeWeek(-1)">‹</button>
       <div id="week-label">This week</div>
@@ -657,7 +657,7 @@ body{
         <div class="sg-label">App</div>
         <div class="si">
           <div class="si-icon" style="background:rgba(255,255,255,.08);overflow:hidden;padding:0"><img src="" id="settings-logo" alt="CC" style="width:34px;height:34px;object-fit:cover;border-radius:7px"></div>
-          <div><strong>Chicken Cottage Manager</strong><span>Version 3.0 • Cloud sync</span></div>
+          <div><strong>CC Chelmsford Manager</strong><span>Version 3.0 • Cloud sync</span></div>
         </div>
       </div>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)">
@@ -920,7 +920,7 @@ let state = {
   staff:{inside:[...DEFAULT_STAFF.inside],delivery:[...DEFAULT_STAFF.delivery]},
   schedules:{}
 };
-let viewMode = localStorage.getItem('cc_view') || 'cards';
+let viewMode = localStorage.getItem('cc_view') || 'table';
 let modalCtx = null;
 let modalSel = [];
 let authMode = 'signin';
@@ -978,9 +978,10 @@ async function seedDefaultStaff(){
 
 async function loadSchedules(){
   const wks=[weekKey(-1),weekKey(0),weekKey(1)];
+  // Load BOTH types at once — no type filter — so switching is instant
   const {data}=await db.from('schedules')
     .select('*').eq('user_id',user.id)
-    .in('week_key',wks).eq('schedule_type',state.type);
+    .in('week_key',wks);
   if(data){
     data.forEach(row=>{
       const k=`${row.schedule_type}|${row.week_key}|${row.day}|${row.shift_col}`;
@@ -1134,7 +1135,7 @@ function setType(t){
   state.type=t;
   document.querySelectorAll('.type-tab').forEach((el,i)=>
     el.classList.toggle('active',(i===0&&t==='inside')||(i===1&&t==='delivery')));
-  loadSchedules().then(renderRota);
+  renderRota(); // data already cached — instant switch, no network call
 }
 
 function changeWeek(d){
@@ -1365,7 +1366,7 @@ async function shareRota(){
   ctx.textAlign='left'; ctx.textBaseline='alphabetic';
   ctx.fillStyle='#f0f0f0';
   ctx.font=`bold 17px -apple-system,sans-serif`;
-  ctx.fillText('Chicken Cottage',TEXT_X,HDR_Y+30);
+  ctx.fillText('CC Chelmsford',TEXT_X,HDR_Y+30);
   ctx.fillStyle='#888888';
   ctx.font=`13px -apple-system,sans-serif`;
   const typeLabel=state.type==='inside'?'Inside Staff':'Delivery';
@@ -1501,7 +1502,7 @@ async function shareRota(){
     const file=new File([blob],fname,{type:'image/png'});
     if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){
       try{
-        await navigator.share({files:[file],title:'Chicken Cottage Rota'});
+        await navigator.share({files:[file],title:'CC Chelmsford Rota'});
       }catch(e){
         if(e.name!=='AbortError')downloadBlob(blob,fname);
       }
@@ -1956,7 +1957,7 @@ init();
     <div id="rcp-wages"></div>
     <hr class="rcp-divider">
   </div>
-  <div style="text-align:center;font-size:10px;color:#666;margin-top:3mm">Chicken Cottage Manager</div>
+  <div style="text-align:center;font-size:10px;color:#666;margin-top:3mm">CC Chelmsford Manager</div>
 </div>
 
 <!-- Colour Picker Sheet -->
