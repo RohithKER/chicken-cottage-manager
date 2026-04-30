@@ -179,7 +179,7 @@ body{
 .vt-btn.active{background:var(--surface2);color:var(--text);font-weight:600}
 
 /* ─── Content ────────────────────────────────────── */
-#content{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding-bottom:calc(56px + var(--safe-bottom))}
+#content{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding-bottom:calc(50px + var(--safe-bottom))}
 .view{display:none;padding:10px 10px 6px}
 .view.active{display:block}
 #view-rota{padding:0}
@@ -375,16 +375,17 @@ body{
   position:fixed;bottom:0;left:50%;transform:translateX(-50%);
   width:100%;max-width:480px;
   display:flex;
-  background:var(--bg);border-top:1px solid var(--border);
+  background:rgba(25,25,25,0.95);border-top:1px solid var(--border);
   padding:0 0 var(--safe-bottom);
   z-index:20;
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
 }
 .nav-btn{
-  flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;
-  padding:6px 4px 5px;background:none;border:none;cursor:pointer;
-  color:var(--text3);font-size:9px;font-weight:500;transition:color .15s;letter-spacing:0.2px;
+  flex:1;display:flex;flex-direction:column;align-items:center;gap:1px;
+  padding:5px 4px 4px;background:none;border:none;cursor:pointer;
+  color:var(--text3);font-size:8px;font-weight:600;transition:color .15s;letter-spacing:0.3px;text-transform:uppercase;
 }
-.nav-icon{font-size:20px;line-height:1}
+.nav-icon{font-size:19px;line-height:1}
 .nav-btn.active{color:var(--text)}
 
 /* ─── Modal / Bottom Sheet ───────────────────────── */
