@@ -1706,7 +1706,7 @@ function clearWeek(){
   const wk=weekKey();
   Object.keys(state.schedules).forEach(k=>{if(k.startsWith(`${state.type}|${wk}|`))delete state.schedules[k];});
   db.from('schedules').delete()
-    .eq('user_id',user.id).eq('schedule_type',state.type).eq('week_key',wk)
+    .eq('schedule_type',state.type).eq('week_key',wk)
     .then(()=>toast('Week cleared'));
   renderRota();
 }
