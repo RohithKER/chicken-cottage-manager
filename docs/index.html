@@ -984,18 +984,15 @@ const DEFAULT_STAFF = {
 
 // ── Staff color system (editable, persisted) ─────────────────────────────────
 const COLOR_PALETTE=[
-  // Reds → Oranges → Yellows
-  '#FF5555','#FF7040','#FF9030','#FFB828','#FFD820',
-  // Yellows → Greens
-  '#C8D020','#8CCC28','#4CC840','#28C868','#28C898',
-  // Teals → Blues
-  '#28C8C0','#28AADC','#3888F8','#4868F0','#5850E8',
-  // Blues → Purples
-  '#7840E8','#9830D8','#B828C8','#D028A8','#E02888',
-  // Pinks → Reds
-  '#F03070','#F04860','#E86868','#D49040','#A0C040',
-  // Extra distinct
-  '#28D0A8','#5090F8','#A050D8','#E84070','#FF6848'
+  // Same vibe as the badge colours — medium saturation, vivid but not neon
+  '#E07070','#E85575','#D83888','#C038A0',  // reds → pinks
+  '#A035B8','#8845D8','#6855E8','#5060F0',  // purples → indigo
+  '#5B9CF5','#4888F0','#48B8E8','#28B8D0',  // blues → cyan
+  '#4CC4A0','#40C888','#52C068','#78C048',  // teals → greens
+  '#A8C030','#D4C028','#E8A830','#E8903D',  // yellows → amber
+  '#E87550','#E86060','#9B85F0','#7882E5',  // orange-red, purples
+  '#B07AE0','#C870D0','#4DC090','#D4A83C',  // lavender, mint, gold
+  '#38C0B0','#6868E8'                        // teal, blue-purple
 ];
 const DEFAULT_STAFF_HEX={
   'Kado':'#5B9CF5','Ercan':'#4CC4A0','Rohith':'#9B85F0',
@@ -1004,7 +1001,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v27-blacklist-abzar-fix';
+const _COLOR_VER='v28-vivid-palette';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
