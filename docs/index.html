@@ -1941,10 +1941,10 @@ async function approveUser(uid,role){
 }
 
 async function revokeUser(uid,email){
-  if(!confirm(`Remove access for ${email}?`))return;
-  const{error}=await db.from('user_profiles').update({status:'rejected',updated_at:new Date().toISOString()}).eq('id',uid);
+  if(!confirm(`Remove ${email} from the user list?`))return;
+  const{error}=await db.from('user_profiles').delete().eq('id',uid);
   if(error){toast('Error: '+error.message);return;}
-  toast('Access removed');
+  toast('User removed');
   loadAdminPanel();
 }
 
