@@ -179,7 +179,7 @@ body{
 .vt-btn.active{background:var(--surface2);color:var(--text);font-weight:600}
 
 /* ─── Content ────────────────────────────────────── */
-#content{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding-bottom:calc(44px + var(--safe-bottom))}
+#content{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding-bottom:calc(42px + env(safe-area-inset-bottom,0px))}
 .view{display:none;padding:10px 10px 6px}
 .view.active{display:block}
 #view-rota{padding:0}
@@ -375,14 +375,15 @@ body{
   position:fixed;bottom:0;left:50%;transform:translateX(-50%);
   width:100%;max-width:480px;
   display:flex;
-  background:rgba(25,25,25,0.95);border-top:1px solid var(--border);
-  padding:0 0 min(var(--safe-bottom),6px);
+  background:rgba(25,25,25,0.96);border-top:1px solid var(--border);
+  /* sit tight to bottom: respect home indicator but nothing extra */
+  padding-bottom:env(safe-area-inset-bottom,0px);
   z-index:20;
   backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
 }
 .nav-btn{
   flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;
-  padding:6px 4px 5px;background:none;border:none;cursor:pointer;
+  padding:6px 4px 4px;background:none;border:none;cursor:pointer;
   color:var(--text3);font-size:9px;font-weight:500;transition:color .15s;letter-spacing:0.2px;
 }
 .nav-icon{font-size:20px;line-height:1}
@@ -978,7 +979,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v14-nav-gap';
+const _COLOR_VER='v15-nav-tight';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
