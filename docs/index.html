@@ -1064,7 +1064,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v47-sales-save-fix';
+const _COLOR_VER='v48-sales-realtime';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -2604,6 +2604,23 @@ function setupRealtime(){
         localStorage.setItem(`cc_cols_${type}`,JSON.stringify(row.value));
         renderRota();
       }
+    })
+    .subscribe();
+
+  // Sales changes — update sales table live (just like rota)
+  db.channel('cc-sales')
+    .on('postgres_changes',{event:'*',schema:'public',table:'daily_sales'},payload=>{
+      const row=payload.new;
+      if(!row||!row.sale_date)return;
+      // Check if this date falls in the currently viewed sales week
+      const weekDates=getSalesWeekDates(salesWeekOffset).map(d=>fmt(d));
+      if(!weekDates.includes(row.sale_date))return;
+      // Merge into local data and re-render
+      salesWeekData[row.sale_date]=row;
+      const merged={..._loadSalesCache(),[row.sale_date]:row};
+      _saveSalesCache(merged);
+      renderSalesTable();
+      logActivity(`Sales ${row.sale_date} updated live ✓`,'success');
     })
     .subscribe();
 }
