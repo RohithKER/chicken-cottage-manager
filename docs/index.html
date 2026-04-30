@@ -673,6 +673,9 @@ body{
 .save-cloud-btn.saving{color:var(--accent);border-color:var(--accent);animation:pulse-save .8s ease-in-out infinite}
 .save-cloud-btn.ok{color:var(--green);border-color:rgba(82,192,138,.4)}
 @keyframes pulse-save{0%,100%{opacity:1}50%{opacity:.5}}
+/* ─── Rota overflow menu ─────────────────────── */
+.rm-item{display:flex;align-items:center;gap:8px;padding:10px 12px;font-size:13px;color:var(--text);cursor:pointer;border-radius:9px;white-space:nowrap;transition:background .1s}
+.rm-item:active{background:var(--surface2)}
 /* ─── Sync-confirm overlay fix ───────────────── */
 #sync-confirm-overlay{position:fixed;inset:0;z-index:9400;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;padding:24px}
 </style>
@@ -749,8 +752,6 @@ body{
       <div id="week-label">This week</div>
       <button onclick="changeWeek(1)">›</button>
     </div>
-    <div class="icon-btn" onclick="shareRota()" title="Share rota as image">📤</div>
-    <div class="icon-btn" id="log-btn" onclick="openLog()" title="Activity log" style="font-size:14px">📋</div>
     <div class="icon-btn" id="sync-btn" onclick="confirmSyncAll()" title="Sync all data">↻</div>
     <div class="icon-btn" onclick="toggleUserMenu()">👤</div>
   </div>
@@ -759,10 +760,21 @@ body{
     <button class="type-tab active" onclick="setType('inside')">Staff</button>
     <button class="type-tab" onclick="setType('delivery')">Delivery</button>
     <div style="flex:1"></div>
-    <button class="save-cloud-btn" id="save-rota-btn" onclick="saveRotaStaffToCloud()" title="Save rota & staff to cloud">☁ Save</button>
-    <button class="cp-btn" onclick="copyWeek()" id="copy-btn" title="Copy this week" style="margin-left:4px">📋</button>
-    <button class="cp-btn" onclick="pasteWeek()" id="paste-btn" title="Paste to this week" style="display:none">📌</button>
-    <button class="cp-btn" onclick="clearWeek()" id="clear-btn" title="Clear this week">🗑️</button>
+    <!-- Save cloud icon -->
+    <button class="cp-btn" id="save-rota-btn" onclick="saveRotaStaffToCloud()" title="Save to cloud" style="font-size:17px;padding:0 9px">☁</button>
+    <!-- Overflow menu -->
+    <div style="position:relative">
+      <button class="cp-btn" id="rota-more-btn" onclick="toggleRotaMenu()" title="More" style="font-size:16px;padding:0 9px;letter-spacing:2px">···</button>
+      <div id="rota-menu" style="display:none;position:absolute;top:calc(100% + 6px);right:0;z-index:600;background:var(--surface);border:1px solid var(--border2);border-radius:14px;padding:6px;min-width:168px;box-shadow:0 8px 28px rgba(0,0,0,.6)">
+        <div class="rm-item" onclick="shareRota();closeRotaMenu()">📤 Share Rota</div>
+        <div class="rm-item" onclick="openLog();closeRotaMenu()">📋 Activity Log</div>
+        <div style="height:1px;background:var(--border);margin:4px 0"></div>
+        <div class="rm-item" onclick="copyWeek();closeRotaMenu()">🗐 Copy Week</div>
+        <div class="rm-item" id="rm-paste" onclick="pasteWeek();closeRotaMenu()" style="display:none">📌 Paste Week</div>
+        <div class="rm-item" onclick="clearWeek();closeRotaMenu()">🗑 Clear Week</div>
+      </div>
+    </div>
+    <!-- View toggle -->
     <div class="view-toggle">
       <button class="vt-btn active" id="vt-cards" onclick="setViewMode('cards')">☰</button>
       <button class="vt-btn" id="vt-table" onclick="setViewMode('table')">⊞</button>
@@ -1050,7 +1062,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v42-bt-print';
+const _COLOR_VER='v43-clean-header';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -1388,7 +1400,7 @@ function closeSyncConfirm(){
 async function saveRotaStaffToCloud(){
   if(!user){toast('Sign in to save');return;}
   const btn=document.getElementById('save-rota-btn');
-  if(btn){btn.classList.add('saving');btn.textContent='☁ Saving…';}
+  if(btn){btn.textContent='⏳';btn.disabled=true;}
   try{
     // Push all local schedule rows
     const pushRows=Object.entries(state.schedules).map(([key,names])=>{
@@ -1415,12 +1427,12 @@ async function saveRotaStaffToCloud(){
     }
     logActivity(`Rota & staff saved to cloud (${pushRows.length} shifts, ${staffRows.length} staff) ✓`, 'success');
     toast('Rota & staff saved ✓');
-    if(btn){btn.classList.remove('saving');btn.classList.add('ok');btn.textContent='✓ Saved';}
-    setTimeout(()=>{if(btn){btn.classList.remove('ok');btn.textContent='☁ Save';}},2500);
+    if(btn){btn.textContent='✓';btn.style.color='var(--green)';}
+    setTimeout(()=>{if(btn){btn.textContent='☁';btn.style.color='';btn.disabled=false;}},2000);
   }catch(e){
     logActivity('Save rota/staff failed: '+e.message, 'error');
     toast('Save failed: '+e.message);
-    if(btn){btn.classList.remove('saving');btn.textContent='☁ Save';}
+    if(btn){btn.textContent='☁';btn.disabled=false;}
   }
 }
 
@@ -2144,9 +2156,26 @@ function selectNewStaffColor(hex){
 let weekClipboard = JSON.parse(localStorage.getItem('cc_week_clipboard')||'null');
 
 function updatePasteBtn(){
+  // legacy btn (hidden in DOM but kept for compat)
   const btn = document.getElementById('paste-btn');
   if(btn) btn.style.display = weekClipboard ? 'flex' : 'none';
+  // overflow menu paste item
+  const rm = document.getElementById('rm-paste');
+  if(rm) rm.style.display = weekClipboard ? 'flex' : 'none';
 }
+function toggleRotaMenu(){
+  updatePasteBtn();
+  const m=document.getElementById('rota-menu');
+  m.style.display=m.style.display==='none'?'block':'none';
+}
+function closeRotaMenu(){
+  const m=document.getElementById('rota-menu');
+  if(m)m.style.display='none';
+}
+// Close rota menu on outside tap
+document.addEventListener('click',function(e){
+  if(!e.target.closest('#rota-more-btn')&&!e.target.closest('#rota-menu'))closeRotaMenu();
+});
 
 function copyWeek(){
   const type = state.type;
