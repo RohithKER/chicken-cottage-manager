@@ -718,7 +718,7 @@ function getStaffHex(name){
 }
 function getStaffCanvasColor(name){
   const hex=getStaffHex(name);const{r,g,b}=hexToRgb(hex);
-  return{bg:`rgba(${r},${g},${b},0.35)`,text:hex,border:`rgba(${r},${g},${b},0.55)`};
+  return{bg:`rgba(${r},${g},${b},0.18)`,text:hex,border:`rgba(${r},${g},${b},0.82)`};
 }
 function applyStaffColors(){
   const names=[...new Set([...Object.keys(DEFAULT_STAFF_HEX),...Object.keys(staffColors)])];
@@ -1184,26 +1184,50 @@ async function shareRota(){
   const ctx=canvas.getContext('2d');
   ctx.scale(scale,scale);
 
-  // ── Background ───────────────────────────────────────
-  ctx.fillStyle='#06060d';
+  // ── Background — deep indigo-black ──────────────────
+  const bgGrad=ctx.createLinearGradient(0,0,0,H);
+  bgGrad.addColorStop(0,'#06060f');
+  bgGrad.addColorStop(1,'#08081a');
+  ctx.fillStyle=bgGrad;
   ctx.fillRect(0,0,W,H);
 
   // ── Header Card ──────────────────────────────────────
-  // subtle drop shadow
-  ctx.fillStyle='rgba(0,0,0,0.4)';
-  roundRect(ctx,PAD+1,HDR_Y+3,W-PAD*2,HDR_H,CR);
+  // deep shadow
+  ctx.fillStyle='rgba(0,0,10,0.65)';
+  roundRect(ctx,PAD+1,HDR_Y+5,W-PAD*2,HDR_H,CR);
   ctx.fill();
-  // card body
-  ctx.fillStyle='#13131f';
+  // card gradient fill
+  const hdrGrad=ctx.createLinearGradient(PAD,HDR_Y,PAD,HDR_Y+HDR_H);
+  hdrGrad.addColorStop(0,'#1a1a38');
+  hdrGrad.addColorStop(1,'#0f0f26');
+  ctx.fillStyle=hdrGrad;
   roundRect(ctx,PAD,HDR_Y,W-PAD*2,HDR_H,CR);
   ctx.fill();
-  // card border
-  ctx.strokeStyle='#252542'; ctx.lineWidth=1;
+  // card border — subtle indigo glow
+  ctx.strokeStyle='rgba(100,100,200,0.25)'; ctx.lineWidth=1;
   roundRect(ctx,PAD,HDR_Y,W-PAD*2,HDR_H,CR);
   ctx.stroke();
+  // left accent stripe
+  ctx.save();
+  roundRect(ctx,PAD,HDR_Y,W-PAD*2,HDR_H,CR);
+  ctx.clip();
+  const accentGrad=ctx.createLinearGradient(PAD,HDR_Y,PAD,HDR_Y+HDR_H);
+  accentGrad.addColorStop(0,'#7c7cff');
+  accentGrad.addColorStop(1,'#5050cc');
+  ctx.fillStyle=accentGrad;
+  ctx.fillRect(PAD,HDR_Y,3,HDR_H);
+  ctx.restore();
 
-  // icon — crop just the circular badge from the 600×300 source image
-  // Badge sits at sx=162, sy=12, sw=276, sh=276 in the original PNG
+  // icon glow ring
+  ctx.save();
+  ctx.shadowColor='rgba(130,130,255,0.4)';
+  ctx.shadowBlur=14;
+  ctx.beginPath();
+  ctx.arc(ICON_X+ICON_SZ/2, ICON_Y+ICON_SZ/2, ICON_SZ/2+1, 0, Math.PI*2);
+  ctx.strokeStyle='rgba(120,120,240,0.5)'; ctx.lineWidth=2;
+  ctx.stroke();
+  ctx.restore();
+  // icon crop
   ctx.save();
   ctx.beginPath();
   ctx.arc(ICON_X+ICON_SZ/2, ICON_Y+ICON_SZ/2, ICON_SZ/2, 0, Math.PI*2);
@@ -1215,31 +1239,31 @@ async function shareRota(){
 
   // header text
   ctx.textAlign='left'; ctx.textBaseline='alphabetic';
-  ctx.fillStyle='#f0f0fa';
+  ctx.fillStyle='#f4f4ff';
   ctx.font=`bold 17px -apple-system,sans-serif`;
-  ctx.fillText('Chicken Cottage',TEXT_X,HDR_Y+28);
-  ctx.fillStyle='#9898b8';
-  ctx.font=`13px -apple-system,sans-serif`;
+  ctx.fillText('Chicken Cottage',TEXT_X,HDR_Y+30);
+  ctx.fillStyle='#a0a0d0';
+  ctx.font=`600 13px -apple-system,sans-serif`;
   const typeLabel=state.type==='inside'?'Inside Staff':'Delivery';
-  ctx.fillText(typeLabel,TEXT_X,HDR_Y+48);
+  ctx.fillText(typeLabel,TEXT_X,HDR_Y+50);
   const ws=weekStart(state.weekOffset);
   const we=new Date(ws); we.setDate(we.getDate()+6);
   const dateStr=`${ws.getDate()} ${MONTHS[ws.getMonth()]} – ${we.getDate()} ${MONTHS[we.getMonth()]}`;
-  ctx.fillStyle='#505070';
+  ctx.fillStyle='#5a5a8a';
   ctx.font=`12px -apple-system,sans-serif`;
-  ctx.fillText(dateStr,TEXT_X,HDR_Y+66);
+  ctx.fillText(dateStr,TEXT_X,HDR_Y+68);
 
   // ── Table Card ───────────────────────────────────────
-  // shadow
-  ctx.fillStyle='rgba(0,0,0,0.4)';
-  roundRect(ctx,PAD+1,TBL_Y+3,W-PAD*2,TBL_H,CR);
+  // deep shadow
+  ctx.fillStyle='rgba(0,0,10,0.65)';
+  roundRect(ctx,PAD+1,TBL_Y+5,W-PAD*2,TBL_H,CR);
   ctx.fill();
   // card body
-  ctx.fillStyle='#0f0f1a';
+  ctx.fillStyle='#0a0a1c';
   roundRect(ctx,PAD,TBL_Y,W-PAD*2,TBL_H,CR);
   ctx.fill();
-  // border
-  ctx.strokeStyle='#1e1e35'; ctx.lineWidth=1;
+  // border — faint indigo line
+  ctx.strokeStyle='rgba(80,80,160,0.2)'; ctx.lineWidth=1;
   roundRect(ctx,PAD,TBL_Y,W-PAD*2,TBL_H,CR);
   ctx.stroke();
 
@@ -1248,24 +1272,27 @@ async function shareRota(){
   roundRect(ctx,PAD,TBL_Y,W-PAD*2,TBL_H,CR);
   ctx.clip();
 
-  // column header row
-  ctx.fillStyle='#1a1a2e';
+  // column header row — gradient
+  const thGrad=ctx.createLinearGradient(PAD,TBL_Y,PAD,TBL_Y+TH_H);
+  thGrad.addColorStop(0,'#141430');
+  thGrad.addColorStop(1,'#0f0f26');
+  ctx.fillStyle=thGrad;
   ctx.fillRect(PAD,TBL_Y,W-PAD*2,TH_H);
-  // header bottom border
-  ctx.fillStyle='#252540';
+  // header bottom border — accent line
+  ctx.fillStyle='rgba(80,80,180,0.35)';
   ctx.fillRect(PAD,TBL_Y+TH_H-1,W-PAD*2,1);
 
   // column header labels
   ctx.textAlign='left'; ctx.textBaseline='middle';
-  ctx.fillStyle='#555575';
+  ctx.fillStyle='#6868a8';
   ctx.font=`bold 10px -apple-system,sans-serif`;
   ctx.fillText('DAY',PAD+10,TBL_Y+TH_H/2);
   cols.forEach((c,i)=>{
     ctx.fillText(c.toUpperCase(),PAD+DAY_W+i*COL_W+10,TBL_Y+TH_H/2);
   });
 
-  // day column divider header
-  ctx.fillStyle='#252540';
+  // day column divider in header
+  ctx.fillStyle='rgba(80,80,160,0.25)';
   ctx.fillRect(PAD+DAY_W,TBL_Y,1,TH_H);
 
   // data rows
@@ -1275,47 +1302,45 @@ async function shareRota(){
     const ROW_H=rowHeights[di];
     _rowY+=ROW_H;
 
-    // row background (alternating)
-    ctx.fillStyle=di%2===0?'#0f0f1a':'#13132a';
+    // row background — deeper alternation with indigo tint
+    ctx.fillStyle=di%2===0?'#0a0a1c':'#0f0f28';
     ctx.fillRect(PAD,rowY,W-PAD*2,ROW_H);
 
-    // row bottom border — visible separator
-    ctx.fillStyle='#2d2d50';
+    // row separator
+    ctx.fillStyle='rgba(70,70,160,0.2)';
     ctx.fillRect(PAD,rowY+ROW_H-1,W-PAD*2,1);
 
-    // day column divider — thicker, more visible
-    ctx.fillStyle='#2d2d50';
-    ctx.fillRect(PAD+DAY_W,rowY,2,ROW_H);
+    // day column divider
+    ctx.fillStyle='rgba(80,80,160,0.22)';
+    ctx.fillRect(PAD+DAY_W,rowY,1,ROW_H);
 
-    // day name + date — pin to vertical centre of row
+    // day name + date
     const midY=rowY+Math.round(ROW_H/2);
     ctx.textAlign='left'; ctx.textBaseline='alphabetic';
-    ctx.fillStyle='#e8e8f2';
+    ctx.fillStyle='#e0e0f8';
     ctx.font=`bold 13px -apple-system,sans-serif`;
     ctx.fillText(day.slice(0,3),PAD+11,midY-2);
     const actualDay=new Date(ws); actualDay.setDate(ws.getDate()+di);
-    ctx.fillStyle='#505070';
+    ctx.fillStyle='#5858a0';
     ctx.font=`11px -apple-system,sans-serif`;
     ctx.fillText(`${actualDay.getDate()} ${MONTHS[actualDay.getMonth()]}`,PAD+11,midY+12);
 
     // shift cells
-    const CELL_PAD_X=12; // horizontal padding inside each cell
-    const CELL_PAD_Y=10; // top padding above first pill
-    const PILL_H=22;     // pill height
-    const PILL_GAP=5;    // gap between pills
+    const CELL_PAD_X=10;
+    const CELL_PAD_Y=9;
+    const PILL_H=21;
+    const PILL_GAP=4;
     cols.forEach((col,ci)=>{
       const cellX=PAD+DAY_W+ci*COL_W;
-      // column dividers
-      if(ci>0){ctx.fillStyle='#252548';ctx.fillRect(cellX,rowY,1,ROW_H);}
+      if(ci>0){ctx.fillStyle='rgba(60,60,140,0.18)';ctx.fillRect(cellX,rowY,1,ROW_H);}
 
       const staff=getShift(state.type,state.weekOffset,day,col);
       if(staff.length===0){
-        ctx.fillStyle='#2a2a42';
-        ctx.font=`12px -apple-system,sans-serif`;
+        ctx.fillStyle='#2e2e58';
+        ctx.font=`13px -apple-system,sans-serif`;
         ctx.textBaseline='middle'; ctx.textAlign='left';
         ctx.fillText('—',cellX+CELL_PAD_X,rowY+ROW_H/2);
       } else {
-        // Pills flow horizontally, wrapping to next row when cell width exceeded
         const PILL_GAP_X=5;
         const maxPW=COL_W-CELL_PAD_X*2;
         let curX=cellX+CELL_PAD_X, curY=rowY+CELL_PAD_Y;
@@ -1325,20 +1350,22 @@ async function shareRota(){
           const displayName=name.length>9?name.slice(0,8)+'…':name;
           const tw=ctx.measureText(displayName).width;
           const pw=Math.min(tw+18,maxPW);
-          // Wrap if pill won't fit on current line
           if(si>0 && curX+pw>cellX+COL_W-CELL_PAD_X){
             curX=cellX+CELL_PAD_X;
             curY+=PILL_H+PILL_GAP;
           }
+          // pill fill — more transparent for depth
           ctx.fillStyle=c.bg;
           roundRect(ctx,curX,curY,pw,PILL_H,PILL_H/2);
           ctx.fill();
-          ctx.strokeStyle=c.border; ctx.lineWidth=1;
+          // pill border — stronger, vivid
+          ctx.strokeStyle=c.border; ctx.lineWidth=1.5;
           roundRect(ctx,curX,curY,pw,PILL_H,PILL_H/2);
           ctx.stroke();
+          // pill text
           ctx.fillStyle=c.text;
           ctx.textAlign='left'; ctx.textBaseline='alphabetic';
-          ctx.fillText(displayName,curX+9,curY+15);
+          ctx.fillText(displayName,curX+9,curY+14);
           curX+=pw+PILL_GAP_X;
         });
       }
