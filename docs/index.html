@@ -1815,10 +1815,13 @@ async function checkUserProfile(u){
   const{data,error}=await db.from('user_profiles').select('*').eq('id',u.id).single();
   if(error&&error.code==='PGRST116'){
     // No profile — create pending entry
+    const adminEmails=['rohithkrishna.mm@gmail.com','rohithkrishna.erumbhapurath@gmail.com'];
+    const isAdmin=adminEmails.includes(u.email);
     const np={
       id:u.id,email:u.email,
       display_name:u.user_metadata?.full_name||u.email.split('@')[0],
-      role:'viewer',status:'pending'
+      role:isAdmin?'admin':'viewer',
+      status:isAdmin?'approved':'pending'
     };
     await db.from('user_profiles').insert(np);
     userProfile=np;currentRole=null;
