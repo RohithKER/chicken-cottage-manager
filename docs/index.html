@@ -162,10 +162,19 @@ body{
 .cp-btn:active{opacity:1;transform:scale(1.2)}
 .cp-swatch{
   aspect-ratio:1;border-radius:50%;cursor:pointer;
-  border:3px solid transparent;transition:border-color .15s,transform .1s;
-  min-height:44px;
+  border:3px solid transparent;transition:box-shadow .15s,transform .12s;
+  min-height:44px;position:relative;
 }
-.cp-swatch.active{border-color:#fff;transform:scale(1.15)}
+.cp-swatch.active{
+  box-shadow:0 0 0 3px #fff, 0 0 0 5px rgba(255,255,255,0.35);
+  transform:scale(1.18);
+}
+.cp-swatch.active::after{
+  content:'✓';position:absolute;inset:0;
+  display:flex;align-items:center;justify-content:center;
+  font-size:18px;font-weight:800;color:rgba(0,0,0,0.55);
+  pointer-events:none;
+}
 .cp-swatch:active{transform:scale(1.05)}
 .view-toggle{
   display:flex;background:var(--surface);border:1px solid var(--border);
@@ -979,9 +988,18 @@ const DEFAULT_STAFF = {
 
 // ── Staff color system (editable, persisted) ─────────────────────────────────
 const COLOR_PALETTE=[
-  '#aabbda','#98cccc','#a8cc9e','#cca888','#cc9aac',
-  '#98b8cc','#b0a0cc','#ccba88','#8ecc9e','#a8a8cc',
-  '#c0ae88','#94b8d4','#c4a0b8','#94ccb4','#b4b4d0'
+  // Reds → Oranges → Yellows
+  '#FF5555','#FF7040','#FF9030','#FFB828','#FFD820',
+  // Yellows → Greens
+  '#C8D020','#8CCC28','#4CC840','#28C868','#28C898',
+  // Teals → Blues
+  '#28C8C0','#28AADC','#3888F8','#4868F0','#5850E8',
+  // Blues → Purples
+  '#7840E8','#9830D8','#B828C8','#D028A8','#E02888',
+  // Pinks → Reds
+  '#F03070','#F04860','#E86868','#D49040','#A0C040',
+  // Extra distinct
+  '#28D0A8','#5090F8','#A050D8','#E84070','#FF6848'
 ];
 const DEFAULT_STAFF_HEX={
   'Kado':'#5B9CF5','Ercan':'#4CC4A0','Rohith':'#9B85F0',
@@ -990,7 +1008,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v25-unique-per-day-setting';
+const _COLOR_VER='v26-better-colours';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -2423,7 +2441,7 @@ init();
   <div style="width:100%;max-width:480px;background:#1a1a2e;border-radius:18px 18px 0 0;padding:20px 20px 32px;box-shadow:0 -4px 24px rgba(0,0,0,.6)">
     <div style="width:36px;height:4px;background:#333;border-radius:2px;margin:0 auto 18px"></div>
     <div style="font-size:13px;color:var(--text2);text-align:center;margin-bottom:16px">Choose colour for <strong id="cp-title" style="color:var(--text)"></strong></div>
-    <div id="cp-swatches" style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:20px"></div>
+    <div id="cp-swatches" style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:20px"></div>
     <button onclick="closeColorSheet()" style="width:100%;padding:13px;background:var(--accent);border:none;color:#fff;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer">Done</button>
   </div>
 </div>
