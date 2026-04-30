@@ -179,7 +179,7 @@ body{
 .vt-btn.active{background:var(--surface2);color:var(--text);font-weight:600}
 
 /* ─── Content ────────────────────────────────────── */
-#content{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding-bottom:44px}
+#content{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding-bottom:38px}
 .view{display:none;padding:10px 10px 6px}
 .view.active{display:block}
 #view-rota{padding:0}
@@ -381,11 +381,11 @@ body{
   backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
 }
 .nav-btn{
-  flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;
-  padding:6px 4px 6px;background:none;border:none;cursor:pointer;
-  color:var(--text3);font-size:9px;font-weight:500;transition:color .15s;letter-spacing:0.2px;
+  flex:1;display:flex;flex-direction:column;align-items:center;gap:1px;
+  padding:4px 4px 4px;background:none;border:none;cursor:pointer;
+  color:var(--text3);font-size:8px;font-weight:600;transition:color .15s;letter-spacing:0.3px;
 }
-.nav-icon{font-size:20px;line-height:1}
+.nav-icon{font-size:17px;line-height:1}
 .nav-btn.active{color:var(--text)}
 
 /* ─── Modal / Bottom Sheet ───────────────────────── */
@@ -978,7 +978,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v16-nav-compact';
+const _COLOR_VER='v17-nav-slim';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
