@@ -985,7 +985,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v22-default-next-week';
+const _COLOR_VER='v23-rename-staff';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -1257,7 +1257,7 @@ function renderStaff(){
     }
     el.innerHTML=state.staff[t].map(n=>`<div class="staff-item">
       <div class="staff-color-dot" onclick="pickStaffColor('${n}')" style="width:28px;height:28px;border-radius:50%;background:${getStaffHex(n)};flex-shrink:0;cursor:pointer;border:2px solid rgba(255,255,255,.2)"></div>
-      <span class="pill sc-${n}" style="cursor:pointer;user-select:none" onclick="pickStaffColor('${n}')">${n}</span>
+      <span class="pill sc-${n}" style="cursor:pointer;user-select:none" onclick="renameStaff('${t}','${n}')" title="Tap to rename">${n}</span>
       <div style="flex:1"></div>
       <button class="btn-del" onclick="removeStaff('${t}','${n}')">×</button>
     </div>`).join('');
@@ -1380,13 +1380,30 @@ async function addStaff(){
   renderStaff();toast(`${name} added`);
 }
 
-async function removeStaff(type,name){
+function removeStaff(type,name){
   state.staff[type]=state.staff[type].filter(n=>n!==name);
+  renderStaff();toast(`${name} removed`);
+  // cloud sync in background — don't block UI
   const inInside=state.staff.inside.includes(name);
   const inDelivery=state.staff.delivery.includes(name);
-  if(!inInside&&!inDelivery)await deleteStaffFromCloud(name);
-  else await saveStaffToCloud(name,inInside&&inDelivery?'both':inInside?'inside':'delivery');
-  renderStaff();toast(`${name} removed`);
+  if(!inInside&&!inDelivery) deleteStaffFromCloud(name).catch(e=>console.warn('Cloud delete failed:',e));
+  else saveStaffToCloud(name,inInside&&inDelivery?'both':inInside?'inside':'delivery').catch(e=>console.warn('Cloud save failed:',e));
+}
+
+function renameStaff(type,oldName){
+  const newName=(prompt(`Rename "${oldName}":`,oldName)||'').trim();
+  if(!newName||newName===oldName)return;
+  // Update staff list in both types (person might be in both)
+  ['inside','delivery'].forEach(t=>{
+    state.staff[t]=state.staff[t].map(n=>n===oldName?newName:n);
+  });
+  // Update colour mapping
+  if(staffColors[oldName]){staffColors[newName]=staffColors[oldName];delete staffColors[oldName];}
+  localStorage.setItem('cc_staff_colors',JSON.stringify(staffColors));
+  renderStaff();renderRota();toast(`Renamed to ${newName}`);
+  // cloud: add new, remove old
+  saveStaffToCloud(newName,type).catch(()=>{});
+  deleteStaffFromCloud(oldName).catch(()=>{});
 }
 
 /* ─── Column Editor ──────────────────────────────────── */
