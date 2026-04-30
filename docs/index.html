@@ -181,6 +181,7 @@ body{
 .view{display:none;padding:10px 10px calc(10px + var(--safe-bottom))}
 .view.active{display:block}
 #view-rota{padding:0}
+#view-sales.active{display:flex;flex-direction:column;padding:0;height:100%}
 
 /* ─── Day Cards ──────────────────────────────────── */
 #cards-wrap{padding:10px}
@@ -459,33 +460,81 @@ body{
 ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px}
 
 /* ─── Sales View ─────────────────────────────────── */
-.sales-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);margin-bottom:12px;overflow:hidden}
-.sales-section-hdr{padding:12px 14px 10px;border-bottom:1px solid var(--border);font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.7px}
-.sales-row{display:flex;align-items:center;padding:10px 14px;gap:10px;border-bottom:1px solid rgba(255,255,255,.04)}
-.sales-row:last-child{border-bottom:none}
-.sales-row label{font-size:14px;color:var(--text2);flex:1;min-width:0}
-.sales-row input[type=number]{width:96px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:15px;font-weight:600;padding:7px 10px;text-align:right;outline:none;-moz-appearance:textfield}
-.sales-row input[type=number]::-webkit-inner-spin-button{display:none}
-.sales-row input[type=number]:focus{border-color:var(--accent)}
-.sales-total-row{display:flex;align-items:center;padding:11px 14px;gap:10px;background:var(--surface2)}
-.sales-total-row label{font-size:14px;color:var(--text);font-weight:600;flex:1}
-.sales-total-val{font-size:16px;font-weight:700;color:var(--text)}
-.wage-row{display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid rgba(255,255,255,.04)}
-.wage-row:last-child{border-bottom:none}
-.wage-name{flex:1;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:14px;padding:7px 10px;outline:none}
-.wage-name:focus{border-color:var(--accent)}
-.wage-amt{width:80px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:14px;font-weight:600;padding:7px 10px;text-align:right;outline:none;-moz-appearance:textfield}
-.wage-amt::-webkit-inner-spin-button{display:none}
-.wage-amt:focus{border-color:var(--accent)}
-.wage-paid{display:flex;align-items:center;gap:4px;font-size:12px;color:var(--text2);cursor:pointer;user-select:none}
-.wage-paid input{accent-color:var(--green)}
-.wage-del{background:none;border:none;color:var(--text3);font-size:18px;cursor:pointer;padding:0 4px;line-height:1}
-.sales-add-btn{display:block;width:100%;padding:10px;background:none;border:none;color:var(--accent);font-size:14px;font-weight:600;cursor:pointer;text-align:center}
+#sales-week-nav{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 14px;border-bottom:1px solid var(--border);flex-shrink:0;
+}
+#sales-week-nav button{
+  background:none;border:none;color:var(--text2);
+  width:32px;height:32px;border-radius:6px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:20px;cursor:pointer;
+}
+#sales-week-nav button:active{background:var(--surface2)}
+#sales-week-label{font-size:14px;font-weight:600;color:var(--text)}
+
+/* Weekly Sales Table */
+.stbl{width:100%;border-collapse:collapse;font-size:13px}
+.stbl thead th{
+  background:var(--surface2);color:var(--text3);
+  font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;
+  padding:8px 6px;text-align:right;border:1px solid var(--border);
+}
+.stbl thead th:first-child{text-align:left}
+.stbl tbody tr{cursor:pointer;transition:background .1s}
+.stbl tbody tr:active{background:var(--surface2)}
+.stbl td{padding:11px 8px;border:1px solid var(--border2);vertical-align:middle}
+.stbl-day{font-size:12px;font-weight:600;color:var(--text);white-space:nowrap}
+.stbl-val{text-align:right;color:var(--text2);font-size:13px}
+.stbl-total{text-align:right;font-weight:700;font-size:13px;color:var(--text)}
+.stbl tr.row-filled .stbl-val{color:var(--text)}
+.stbl tr.row-filled .stbl-total{color:var(--green)}
+.stbl tr.row-empty td{color:var(--text3)}
+.stbl tr.stbl-grand td{
+  background:var(--surface2);font-weight:700;font-size:13px;
+  border-top:2px solid var(--border2);
+}
+.stbl tr.stbl-grand .stbl-total{color:var(--green);font-size:15px}
+.stbl-tap-hint{text-align:center;color:var(--text3);font-size:12px;margin-top:12px;padding-bottom:4px}
+
+/* Day Entry Sheet */
+#sales-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.65);
+  backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
+  z-index:50;display:none;align-items:flex-end;justify-content:center;
+  opacity:0;transition:opacity .2s;
+}
+#sales-overlay.open{display:flex;opacity:1}
+#sales-sheet{
+  width:100%;max-width:480px;background:var(--surface);
+  border-radius:20px 20px 0 0;border-top:1px solid var(--border2);
+  padding:0 0 calc(20px + var(--safe-bottom));
+  transform:translateY(100%);
+  transition:transform .25s cubic-bezier(.32,.72,0,1);
+  max-height:88dvh;display:flex;flex-direction:column;
+}
+#sales-overlay.open #sales-sheet{transform:translateY(0)}
+.ss-handle{width:36px;height:4px;background:var(--border2);border-radius:2px;margin:10px auto 0;flex-shrink:0}
+.ss-hdr{display:flex;align-items:center;justify-content:space-between;padding:12px 16px 10px;flex-shrink:0;border-bottom:1px solid var(--border)}
+.ss-title{font-size:16px;font-weight:700}
+.ss-close{background:var(--surface2);border:none;width:28px;height:28px;border-radius:50%;color:var(--text2);font-size:15px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.ss-body{overflow-y:auto;flex:1;padding:12px 14px}
+.ss-section{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);margin-bottom:10px;overflow:hidden}
+.ss-section-hdr{padding:9px 13px;border-bottom:1px solid var(--border);font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.7px}
+.ss-row{display:flex;align-items:center;padding:9px 13px;gap:10px;border-bottom:1px solid rgba(255,255,255,.04)}
+.ss-row:last-child{border-bottom:none}
+.ss-row label{font-size:13px;color:var(--text2);flex:1}
+.ss-row input[type=number]{width:88px;background:var(--surface);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-size:15px;font-weight:600;padding:6px 9px;text-align:right;outline:none;-moz-appearance:textfield}
+.ss-row input[type=number]::-webkit-inner-spin-button{display:none}
+.ss-row input[type=number]:focus{border-color:var(--accent)}
+.ss-total-row{display:flex;align-items:center;padding:10px 13px;gap:10px;background:rgba(99,102,241,.08)}
+.ss-total-row label{font-size:13px;color:var(--text);font-weight:600;flex:1}
+.ss-total-val{font-size:15px;font-weight:700}
+.ss-foot{padding:10px 14px 0;flex-shrink:0;border-top:1px solid var(--border);display:flex;gap:8px}
+
+/* Legacy — keep for print receipt */
 .sales-btn-row{display:flex;gap:10px;padding:4px 0 12px}
-.sales-hist-item{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);margin-bottom:10px;padding:12px 14px;cursor:pointer}
-.sales-hist-date{font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px}
-.sales-hist-sub{font-size:12px;color:var(--text2)}
-.sales-hist-del{float:right;background:none;border:none;color:var(--text3);font-size:16px;cursor:pointer;padding:0 2px}
+.wage-row,.wage-name,.wage-amt,.wage-paid,.wage-del,.sales-add-btn{display:none}
 
 /* ─── Pending / Access Screen ────────────────────── */
 #pending-screen,#rejected-screen{
@@ -742,86 +791,19 @@ body{
     </div>
 
     <!-- ══ SALES VIEW ═══════════════════════════════ -->
-    <div id="view-sales" class="view" style="padding:12px 10px 24px;overflow-y:auto">
+    <div id="view-sales" class="view" style="padding:0;display:flex;flex-direction:column;height:100%">
 
-      <!-- Toggle: Form / History -->
-      <div style="display:flex;gap:8px;margin-bottom:14px">
-        <button id="sales-tab-form" onclick="salesTab('form')" style="flex:1;padding:9px;background:var(--accent);border:none;color:#fff;border-radius:9px;font-size:14px;font-weight:600;cursor:pointer">New Entry</button>
-        <button id="sales-tab-hist" onclick="salesTab('hist')" style="flex:1;padding:9px;background:var(--surface);border:1px solid var(--border);color:var(--text2);border-radius:9px;font-size:14px;font-weight:600;cursor:pointer">History</button>
+      <!-- Week Nav -->
+      <div id="sales-week-nav">
+        <button onclick="changeSalesWeek(-1)">‹</button>
+        <div id="sales-week-label">Loading…</div>
+        <button onclick="changeSalesWeek(1)">›</button>
       </div>
 
-      <!-- ── Form Panel ── -->
-      <div id="sales-form-panel">
-        <!-- Date -->
-        <div class="sales-section">
-          <div class="sales-section-hdr">Date</div>
-          <div class="sales-row">
-            <label>Sale Date</label>
-            <input type="date" id="s-date" style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:14px;padding:7px 10px;outline:none">
-          </div>
-        </div>
-
-        <!-- Delivery Platforms -->
-        <div class="sales-section">
-          <div class="sales-section-hdr">Delivery Platforms</div>
-          <div class="sales-row">
-            <label>Just Eat</label>
-            <input type="number" id="s-je" placeholder="0.00" step="0.01" min="0" oninput="calcSales()">
-          </div>
-          <div class="sales-row">
-            <label>CC App</label>
-            <input type="number" id="s-cc" placeholder="0.00" step="0.01" min="0" oninput="calcSales()">
-          </div>
-          <div class="sales-row">
-            <label>Uber Eats</label>
-            <input type="number" id="s-ue" placeholder="0.00" step="0.01" min="0" oninput="calcSales()">
-          </div>
-          <div class="sales-row">
-            <label>Deliveroo</label>
-            <input type="number" id="s-dr" placeholder="0.00" step="0.01" min="0" oninput="calcSales()">
-          </div>
-          <div class="sales-total-row">
-            <label>Total Delivery</label>
-            <div class="sales-total-val" id="s-del-total">£0.00</div>
-          </div>
-        </div>
-
-        <!-- Payments -->
-        <div class="sales-section">
-          <div class="sales-section-hdr">Payments</div>
-          <div class="sales-row">
-            <label>Cash</label>
-            <input type="number" id="s-cash" placeholder="0.00" step="0.01" min="0" oninput="calcSales()">
-          </div>
-          <div class="sales-row">
-            <label>Card</label>
-            <input type="number" id="s-card" placeholder="0.00" step="0.01" min="0" oninput="calcSales()">
-          </div>
-          <div class="sales-total-row">
-            <label>Total Sales</label>
-            <div class="sales-total-val" id="s-total" style="color:var(--green)">£0.00</div>
-          </div>
-        </div>
-
-        <!-- Staff Wages -->
-        <div class="sales-section">
-          <div class="sales-section-hdr">Staff Wages</div>
-          <div id="wage-rows"></div>
-          <button class="sales-add-btn" onclick="addWageRow()">+ Add Staff Member</button>
-        </div>
-
-        <!-- Action Buttons -->
-        <div class="sales-btn-row">
-          <button class="btn-sm ghost" style="flex:1;padding:13px;font-size:14px" onclick="printSales()">🖨 Print</button>
-          <button class="btn-sm primary" style="flex:1;padding:13px;font-size:14px" onclick="saveSales()">Save</button>
-        </div>
-      </div>
-
-      <!-- ── History Panel ── -->
-      <div id="sales-hist-panel" style="display:none">
-        <div id="sales-hist-list" style="padding-bottom:8px">
-          <div style="text-align:center;color:var(--text3);font-size:14px;padding:40px 0">Loading...</div>
-        </div>
+      <!-- Weekly Table -->
+      <div style="flex:1;overflow-y:auto;padding:10px 10px 20px">
+        <div id="sales-week-table"></div>
+        <div class="stbl-tap-hint">Tap a day to enter sales</div>
       </div>
 
     </div><!-- /view-sales -->
@@ -844,6 +826,39 @@ body{
   </div>
 
 </div><!-- /main-app -->
+
+<!-- Day Entry Bottom Sheet -->
+<div id="sales-overlay" onclick="handleSalesOverlay(event)">
+  <div id="sales-sheet">
+    <div class="ss-handle"></div>
+    <div class="ss-hdr">
+      <div class="ss-title" id="ss-title">Monday</div>
+      <button class="ss-close" onclick="closeDayEntry()">✕</button>
+    </div>
+    <div class="ss-body">
+      <!-- Delivery section -->
+      <div class="ss-section">
+        <div class="ss-section-hdr">Delivery Platforms</div>
+        <div class="ss-row"><label>Just Eat</label><input type="number" id="sd-je" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
+        <div class="ss-row"><label>CC App</label><input type="number" id="sd-cc" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
+        <div class="ss-row"><label>Uber Eats</label><input type="number" id="sd-ue" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
+        <div class="ss-row"><label>Deliveroo</label><input type="number" id="sd-dr" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
+        <div class="ss-total-row"><label>Delivery Total</label><div class="ss-total-val" id="sd-del-total" style="color:var(--accent2)">£0.00</div></div>
+      </div>
+      <!-- Payments section -->
+      <div class="ss-section">
+        <div class="ss-section-hdr">Payments</div>
+        <div class="ss-row"><label>Cash</label><input type="number" id="sd-cash" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
+        <div class="ss-row"><label>Card</label><input type="number" id="sd-card" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
+        <div class="ss-total-row"><label>Day Total</label><div class="ss-total-val" id="sd-day-total" style="color:var(--green)">£0.00</div></div>
+      </div>
+    </div>
+    <div class="ss-foot">
+      <button class="btn-sm ghost" style="flex:1;padding:11px" onclick="closeDayEntry()">Cancel</button>
+      <button class="btn-sm primary" style="flex:1;padding:11px" onclick="saveDaySales()">Save</button>
+    </div>
+  </div>
+</div>
 
 <!-- User Menu -->
 <div id="user-menu">
@@ -1223,7 +1238,7 @@ function showView(v){
   document.getElementById(`nav-${v}`).classList.add('active');
   document.getElementById('type-tabs').style.display=v==='rota'?'flex':'none';
   if(v==='staff'){renderStaff();populateNewStaffPalette();}
-  if(v==='sales'){initSalesView();}
+  if(v==='sales'){loadSalesWeek();}
   if(v==='settings'){loadAdminPanel();}
   closeUserMenu();
 }
@@ -2025,186 +2040,165 @@ async function init(){
   });
 }
 
-/* ─── Sales / Total Section ──────────────────────── */
-let salesCurrentTab='form';
+/* ─── Sales / Weekly View ────────────────────────── */
+let salesWeekOffset=0;       // 0 = current week, -1 = last week, etc.
+let salesWeekData={};        // key: 'YYYY-MM-DD' → row object from DB
+let salesOpenDate=null;      // date string currently open in sheet
 
-function initSalesView(){
-  // Set today's date if not already set
-  const d=document.getElementById('s-date');
-  if(!d.value){
-    const now=new Date();
-    d.value=now.toISOString().slice(0,10);
-  }
-  calcSales();
-  // Ensure at least one wage row
-  if(!document.getElementById('wage-rows').children.length) addWageRow();
-  salesTab(salesCurrentTab);
+const DAY_NAMES=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+
+function getSalesWeekDates(offset){
+  // Returns array of 7 Date objects Mon–Sun for the week at offset
+  const now=new Date();
+  const dow=now.getDay(); // 0=Sun
+  const mondayDiff=dow===0?-6:1-dow;
+  const monday=new Date(now);
+  monday.setDate(now.getDate()+mondayDiff+offset*7);
+  monday.setHours(0,0,0,0);
+  return Array.from({length:7},(_,i)=>{const d=new Date(monday);d.setDate(monday.getDate()+i);return d;});
 }
 
-function salesTab(t){
-  salesCurrentTab=t;
-  document.getElementById('sales-form-panel').style.display=t==='form'?'block':'none';
-  document.getElementById('sales-hist-panel').style.display=t==='hist'?'block':'none';
-  const fBtn=document.getElementById('sales-tab-form');
-  const hBtn=document.getElementById('sales-tab-hist');
-  fBtn.style.background=t==='form'?'var(--accent)':'var(--surface)';
-  fBtn.style.color=t==='form'?'#fff':'var(--text2)';
-  fBtn.style.border=t==='form'?'none':'1px solid var(--border)';
-  hBtn.style.background=t==='hist'?'var(--accent)':'var(--surface)';
-  hBtn.style.color=t==='hist'?'#fff':'var(--text2)';
-  hBtn.style.border=t==='hist'?'none':'1px solid var(--border)';
-  if(t==='hist') loadSalesHistory();
+function fmt(d){return d.toISOString().slice(0,10);}
+
+function salesWeekLabel(dates){
+  const s=dates[0],e=dates[6];
+  const so=s.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+  const eo=e.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+  return `${so} – ${eo}`;
 }
 
-function getVal(id){return parseFloat(document.getElementById(id).value)||0;}
+async function loadSalesWeek(){
+  const dates=getSalesWeekDates(salesWeekOffset);
+  document.getElementById('sales-week-label').textContent=salesWeekLabel(dates);
+  const el=document.getElementById('sales-week-table');
+  el.innerHTML='<div style="text-align:center;color:var(--text3);font-size:13px;padding:30px 0">Loading…</div>';
 
-function calcSales(){
-  const je=getVal('s-je'), cc=getVal('s-cc'), ue=getVal('s-ue'), dr=getVal('s-dr');
-  const cash=getVal('s-cash'), card=getVal('s-card');
+  if(!user){el.innerHTML='<div style="text-align:center;color:var(--text3);font-size:13px;padding:30px 0">Not signed in</div>';return;}
+
+  const from=fmt(dates[0]),to=fmt(dates[6]);
+  const{data,error}=await db.from('daily_sales').select('*').gte('sale_date',from).lte('sale_date',to);
+  salesWeekData={};
+  if(data) data.forEach(r=>{salesWeekData[r.sale_date]=r;});
+  renderSalesTable(dates);
+}
+
+function renderSalesTable(dates){
+  if(!dates) dates=getSalesWeekDates(salesWeekOffset);
+  const el=document.getElementById('sales-week-table');
+
+  let gCard=0,gCash=0,gDel=0,gTotal=0;
+
+  let html=`<table class="stbl"><thead><tr>
+    <th>Day</th><th>Card</th><th>Cash</th><th>Delivery</th><th>Total</th>
+  </tr></thead><tbody>`;
+
+  dates.forEach((d,i)=>{
+    const key=fmt(d);
+    const r=salesWeekData[key];
+    const dayLabel=DAY_NAMES[i];
+    const dateLabel=d.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+    if(r){
+      const del=(r.just_eat||0)+(r.cc_app||0)+(r.uber_eats||0)+(r.deliveroo||0);
+      const total=del+(r.cash||0)+(r.card||0);
+      gCard+=(r.card||0); gCash+=(r.cash||0); gDel+=del; gTotal+=total;
+      html+=`<tr class="row-filled" onclick="openDayEntry('${key}')">
+        <td><div class="stbl-day">${dayLabel}</div><div style="font-size:10px;color:var(--text3)">${dateLabel}</div></td>
+        <td class="stbl-val">£${(r.card||0).toFixed(2)}</td>
+        <td class="stbl-val">£${(r.cash||0).toFixed(2)}</td>
+        <td class="stbl-val">£${del.toFixed(2)}</td>
+        <td class="stbl-total">£${total.toFixed(2)}</td>
+      </tr>`;
+    } else {
+      html+=`<tr class="row-empty" onclick="openDayEntry('${key}')">
+        <td><div class="stbl-day">${dayLabel}</div><div style="font-size:10px;color:var(--text3)">${dateLabel}</div></td>
+        <td class="stbl-val">—</td><td class="stbl-val">—</td>
+        <td class="stbl-val">—</td><td class="stbl-total">—</td>
+      </tr>`;
+    }
+  });
+
+  html+=`</tbody><tfoot><tr class="stbl-grand">
+    <td class="stbl-day">Total</td>
+    <td class="stbl-total">£${gCard.toFixed(2)}</td>
+    <td class="stbl-total">£${gCash.toFixed(2)}</td>
+    <td class="stbl-total">£${gDel.toFixed(2)}</td>
+    <td class="stbl-total">£${gTotal.toFixed(2)}</td>
+  </tr></tfoot></table>`;
+
+  el.innerHTML=html;
+}
+
+function changeSalesWeek(dir){
+  salesWeekOffset+=dir;
+  loadSalesWeek();
+}
+
+function openDayEntry(dateStr){
+  salesOpenDate=dateStr;
+  const d=new Date(dateStr+'T12:00:00');
+  const dow=d.getDay();
+  const dayName=DAY_NAMES[dow===0?6:dow-1];
+  const dateLabel=d.toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});
+  document.getElementById('ss-title').textContent=`${dayName}, ${dateLabel}`;
+
+  // Populate fields
+  const r=salesWeekData[dateStr]||{};
+  document.getElementById('sd-je').value=r.just_eat||'';
+  document.getElementById('sd-cc').value=r.cc_app||'';
+  document.getElementById('sd-ue').value=r.uber_eats||'';
+  document.getElementById('sd-dr').value=r.deliveroo||'';
+  document.getElementById('sd-cash').value=r.cash||'';
+  document.getElementById('sd-card').value=r.card||'';
+  calcDaySales();
+
+  const ov=document.getElementById('sales-overlay');
+  ov.style.display='flex';
+  requestAnimationFrame(()=>ov.classList.add('open'));
+}
+
+function closeDayEntry(){
+  const ov=document.getElementById('sales-overlay');
+  ov.classList.remove('open');
+  setTimeout(()=>{ov.style.display='none';},260);
+}
+
+function handleSalesOverlay(e){
+  if(e.target===document.getElementById('sales-overlay')) closeDayEntry();
+}
+
+function getSdVal(id){return parseFloat(document.getElementById(id).value)||0;}
+
+function calcDaySales(){
+  const je=getSdVal('sd-je'),cc=getSdVal('sd-cc'),ue=getSdVal('sd-ue'),dr=getSdVal('sd-dr');
+  const cash=getSdVal('sd-cash'),card=getSdVal('sd-card');
   const del=je+cc+ue+dr;
   const total=del+cash+card;
-  document.getElementById('s-del-total').textContent='£'+del.toFixed(2);
-  document.getElementById('s-total').textContent='£'+total.toFixed(2);
+  document.getElementById('sd-del-total').textContent='£'+del.toFixed(2);
+  document.getElementById('sd-day-total').textContent='£'+total.toFixed(2);
 }
 
-function addWageRow(name='',amount='',paid=false){
-  const c=document.getElementById('wage-rows');
-  const div=document.createElement('div');
-  div.className='wage-row';
-  div.innerHTML=`
-    <input class="wage-name" type="text" placeholder="Staff name" value="${escHtml(name)}">
-    <input class="wage-amt" type="number" placeholder="0" min="0" value="${amount}">
-    <label class="wage-paid"><input type="checkbox" ${paid?'checked':''}> Paid</label>
-    <button class="wage-del" onclick="this.closest('.wage-row').remove()">×</button>`;
-  c.appendChild(div);
+async function saveDaySales(){
+  if(!salesOpenDate){closeDayEntry();return;}
+  const payload={
+    sale_date:salesOpenDate,
+    just_eat:getSdVal('sd-je'),
+    cc_app:getSdVal('sd-cc'),
+    uber_eats:getSdVal('sd-ue'),
+    deliveroo:getSdVal('sd-dr'),
+    cash:getSdVal('sd-cash'),
+    card:getSdVal('sd-card')
+  };
+  const{error}=await db.from('daily_sales')
+    .upsert(payload,{onConflict:'sale_date',ignoreDuplicates:false});
+  if(error){toast('Save failed: '+error.message);return;}
+  // Update local cache and re-render immediately
+  salesWeekData[salesOpenDate]=payload;
+  renderSalesTable();
+  toast('Saved ✓');
+  closeDayEntry();
 }
 
 function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-
-function getWages(){
-  return [...document.querySelectorAll('#wage-rows .wage-row')].map(r=>({
-    name:r.querySelector('.wage-name').value.trim(),
-    amount:parseFloat(r.querySelector('.wage-amt').value)||0,
-    paid:r.querySelector('input[type=checkbox]').checked
-  })).filter(w=>w.name);
-}
-
-async function saveSales(){
-  if(!user){toast('Please sign in first');return;}
-  const saleDate=document.getElementById('s-date').value;
-  if(!saleDate){toast('Please enter a date');return;}
-  const payload={
-    sale_date:saleDate,
-    just_eat:getVal('s-je'),
-    cc_app:getVal('s-cc'),
-    uber_eats:getVal('s-ue'),
-    deliveroo:getVal('s-dr'),
-    cash:getVal('s-cash'),
-    card:getVal('s-card'),
-    staff_wages:getWages()
-  };
-  // Upsert by date (shared record per day for the whole team)
-  const {error}=await db.from('daily_sales')
-    .upsert(payload,{onConflict:'sale_date',ignoreDuplicates:false});
-  if(error){
-    // Fallback: plain insert if upsert fails
-    const {error:e2}=await db.from('daily_sales').insert(payload);
-    if(e2){toast('Save failed: '+e2.message);return;}
-  }
-  toast('Saved ✓');
-}
-
-async function loadSalesHistory(){
-  const el=document.getElementById('sales-hist-list');
-  el.innerHTML='<div style="text-align:center;color:var(--text3);font-size:14px;padding:40px 0">Loading...</div>';
-  if(!user){el.innerHTML='<div style="text-align:center;color:var(--text3);font-size:14px;padding:40px 0">Not signed in</div>';return;}
-  const {data,error}=await db.from('daily_sales')
-    .select('*')
-    .order('sale_date',{ascending:false}).limit(60);
-  if(error){el.innerHTML='<div style="text-align:center;color:var(--red);font-size:14px;padding:40px 0">'+error.message+'</div>';return;}
-  if(!data||!data.length){el.innerHTML='<div style="text-align:center;color:var(--text3);font-size:14px;padding:40px 0">No records yet</div>';return;}
-  el.innerHTML='';
-  data.forEach(r=>{
-    const del=(r.just_eat||0)+(r.cc_app||0)+(r.uber_eats||0)+(r.deliveroo||0);
-    const total=del+(r.cash||0)+(r.card||0);
-    const d=document.createElement('div');
-    d.className='sales-hist-item';
-    const dateStr=new Date(r.sale_date+'T12:00:00').toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
-    d.innerHTML=`
-      <button class="sales-hist-del" onclick="deleteSale('${r.id}',event)">×</button>
-      <div class="sales-hist-date">${dateStr}</div>
-      <div class="sales-hist-sub">Delivery £${del.toFixed(2)} · Cash £${(r.cash||0).toFixed(2)} · Card £${(r.card||0).toFixed(2)}</div>
-      <div class="sales-hist-sub" style="color:var(--green);font-weight:600;margin-top:3px">Total £${total.toFixed(2)}</div>`;
-    d.addEventListener('click',e=>{if(e.target.classList.contains('sales-hist-del'))return;loadSaleIntoForm(r);});
-    el.appendChild(d);
-  });
-}
-
-function loadSaleIntoForm(r){
-  document.getElementById('s-date').value=r.sale_date;
-  document.getElementById('s-je').value=r.just_eat||'';
-  document.getElementById('s-cc').value=r.cc_app||'';
-  document.getElementById('s-ue').value=r.uber_eats||'';
-  document.getElementById('s-dr').value=r.deliveroo||'';
-  document.getElementById('s-cash').value=r.cash||'';
-  document.getElementById('s-card').value=r.card||'';
-  document.getElementById('wage-rows').innerHTML='';
-  (r.staff_wages||[]).forEach(w=>addWageRow(w.name,w.amount,w.paid));
-  if(!(r.staff_wages||[]).length) addWageRow();
-  calcSales();
-  salesTab('form');
-}
-
-async function deleteSale(id,e){
-  e.stopPropagation();
-  if(!confirm('Delete this record?'))return;
-  const{error}=await db.from('daily_sales').delete().eq('id',id);
-  if(error){toast('Delete failed');return;}
-  toast('Deleted');
-  loadSalesHistory();
-}
-
-function printSales(){
-  const saleDate=document.getElementById('s-date').value;
-  const now=new Date();
-  const dateLabel=saleDate
-    ? new Date(saleDate+'T12:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'})
-    : now.toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'});
-  const timeLabel=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',hour12:true}).toUpperCase();
-
-  const je=getVal('s-je'), cc=getVal('s-cc'), ue=getVal('s-ue'), dr=getVal('s-dr');
-  const cash=getVal('s-cash'), card=getVal('s-card');
-  const del=je+cc+ue+dr;
-  const total=del+cash+card;
-  const wages=getWages();
-
-  document.getElementById('rcp-logo').src=CC_LOGO;
-  document.getElementById('rcp-date').textContent=dateLabel+' '+timeLabel;
-  document.getElementById('rcp-je').textContent=je.toFixed(2);
-  document.getElementById('rcp-cc').textContent=cc.toFixed(2);
-  document.getElementById('rcp-ue').textContent=ue.toFixed(2);
-  document.getElementById('rcp-dr').textContent=dr.toFixed(2);
-  document.getElementById('rcp-del').textContent=del.toFixed(2);
-  document.getElementById('rcp-cash').textContent=cash.toFixed(2);
-  document.getElementById('rcp-card').textContent=card.toFixed(2);
-  document.getElementById('rcp-total').textContent=total.toFixed(2);
-
-  const ws=document.getElementById('rcp-wages-section');
-  const wr=document.getElementById('rcp-wages');
-  if(wages.length){
-    wr.innerHTML='';
-    wages.forEach(w=>{
-      const row=document.createElement('div');
-      row.className='rcp-staff-row';
-      row.innerHTML=`<span>${escHtml(w.name)}</span><span>£${w.amount.toFixed(0)}${w.paid?' (paid)':''}</span>`;
-      wr.appendChild(row);
-    });
-    ws.style.display='block';
-  } else {
-    ws.style.display='none';
-  }
-  window.print();
-}
 
 // Set logo images from embedded data URI
 (function(){
