@@ -985,7 +985,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v21-canvas-day-fix';
+const _COLOR_VER='v22-default-next-week';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -1069,7 +1069,7 @@ let user = null;
 let userProfile = null; // {id, email, display_name, role, status}
 let currentRole = null; // 'admin' | 'manager' | 'viewer'
 let state = {
-  type:'inside', weekOffset:0,
+  type:'inside', weekOffset:1,
   staff:{inside:[...DEFAULT_STAFF.inside],delivery:[...DEFAULT_STAFF.delivery]},
   schedules:{}
 };
