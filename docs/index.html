@@ -261,17 +261,17 @@ body{
 .tbl-sync.saved{background:var(--green)}
 
 /* Staff colors */
-[data-s="Kado"],.sc-Kado{background:rgba(123,127,196,.2);color:#7b7fc4;border-color:rgba(123,127,196,.35)}
-[data-s="Ercan"],.sc-Ercan{background:rgba(91,138,181,.2);color:#5b8ab5;border-color:rgba(91,138,181,.35)}
-[data-s="Rohith"],.sc-Rohith{background:rgba(74,158,128,.2);color:#4a9e80;border-color:rgba(74,158,128,.35)}
-[data-s="Albert"],.sc-Albert{background:rgba(196,122,66,.2);color:#c47a42;border-color:rgba(196,122,66,.35)}
-[data-s="Anu"],.sc-Anu{background:rgba(176,82,82,.2);color:#b05252;border-color:rgba(176,82,82,.35)}
-[data-s="Abzar"],.sc-Abzar{background:rgba(58,152,144,.2);color:#3a9890;border-color:rgba(58,152,144,.35)}
-[data-s="Aibal"],.sc-Aibal{background:rgba(155,111,192,.2);color:#9b6fc0;border-color:rgba(155,111,192,.35)}
-[data-s="Abuzar"],.sc-Abuzar{background:rgba(184,150,32,.2);color:#b89620;border-color:rgba(184,150,32,.35)}
-[data-s="Abdul"],.sc-Abdul{background:rgba(74,158,90,.2);color:#4a9e5a;border-color:rgba(74,158,90,.35)}
-[data-s="Shami"],.sc-Shami{background:rgba(138,116,204,.2);color:#8a74cc;border-color:rgba(138,116,204,.35)}
-[data-s="Asim"],.sc-Asim{background:rgba(196,148,32,.2);color:#c49420;border-color:rgba(196,148,32,.35)}
+[data-s="Kado"],.sc-Kado{background:rgba(120,130,220,.2);color:#7882dc;border-color:rgba(120,130,220,.42)}
+[data-s="Ercan"],.sc-Ercan{background:rgba(80,145,200,.2);color:#5091c8;border-color:rgba(80,145,200,.42)}
+[data-s="Rohith"],.sc-Rohith{background:rgba(48,175,130,.2);color:#30af82;border-color:rgba(48,175,130,.42)}
+[data-s="Albert"],.sc-Albert{background:rgba(215,110,50,.2);color:#d76e32;border-color:rgba(215,110,50,.42)}
+[data-s="Anu"],.sc-Anu{background:rgba(205,80,80,.2);color:#cd5050;border-color:rgba(205,80,80,.42)}
+[data-s="Abzar"],.sc-Abzar{background:rgba(30,175,165,.2);color:#1eafa5;border-color:rgba(30,175,165,.42)}
+[data-s="Aibal"],.sc-Aibal{background:rgba(170,100,220,.2);color:#aa64dc;border-color:rgba(170,100,220,.42)}
+[data-s="Abuzar"],.sc-Abuzar{background:rgba(200,155,20,.2);color:#c89b14;border-color:rgba(200,155,20,.42)}
+[data-s="Abdul"],.sc-Abdul{background:rgba(55,175,95,.2);color:#37af5f;border-color:rgba(55,175,95,.42)}
+[data-s="Shami"],.sc-Shami{background:rgba(140,110,210,.2);color:#8c6ed2;border-color:rgba(140,110,210,.42)}
+[data-s="Asim"],.sc-Asim{background:rgba(200,140,25,.2);color:#c88c19;border-color:rgba(200,140,25,.42)}
 
 /* ─── Staff View ─────────────────────────────────── */
 .section-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text3);padding:4px 0 10px}
@@ -838,18 +838,18 @@ const DEFAULT_STAFF = {
 
 // ── Staff color system (editable, persisted) ─────────────────────────────────
 const COLOR_PALETTE=[
-  '#7b7fc4','#5b8ab5','#4a9e80','#c47a42','#b05252',
-  '#3a9890','#9b6fc0','#b89620','#4a9e5a','#8a74cc',
-  '#c49420','#b05c8a','#4a8fb0','#905090','#4a9e6a'
+  '#7882dc','#5091c8','#30af82','#d76e32','#cd5050',
+  '#1eafa5','#aa64dc','#c89b14','#37af5f','#8c6ed2',
+  '#c88c19','#c05890','#4a8eb8','#9050b4','#30af6a'
 ];
 const DEFAULT_STAFF_HEX={
-  'Kado':'#7b7fc4','Ercan':'#5b8ab5','Rohith':'#4a9e80',
-  'Albert':'#c47a42','Anu':'#b05252','Abzar':'#3a9890',
-  'Aibal':'#9b6fc0','Abuzar':'#b89620','Abdul':'#4a9e5a',
-  'Shami':'#8a74cc','Asim':'#c49420'
+  'Kado':'#7882dc','Ercan':'#5091c8','Rohith':'#30af82',
+  'Albert':'#d76e32','Anu':'#cd5050','Abzar':'#1eafa5',
+  'Aibal':'#aa64dc','Abuzar':'#c89b14','Abdul':'#37af5f',
+  'Shami':'#8c6ed2','Asim':'#c88c19'
 };
-// Version bump resets cached colours to new muted palette
-const _COLOR_VER='v2-muted';
+// Version bump resets cached colours to medium-saturation palette
+const _COLOR_VER='v3-mid';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -869,14 +869,14 @@ function getStaffHex(name){
 }
 function getStaffCanvasColor(name){
   const hex=getStaffHex(name);const{r,g,b}=hexToRgb(hex);
-  return{bg:`rgba(${r},${g},${b},0.18)`,text:hex,border:`rgba(${r},${g},${b},0.4)`};
+  return{bg:`rgba(${r},${g},${b},0.18)`,text:hex,border:`rgba(${r},${g},${b},0.45)`};
 }
 function applyStaffColors(){
   const names=[...new Set([...Object.keys(DEFAULT_STAFF_HEX),...Object.keys(staffColors)])];
   let css='';
   names.forEach(n=>{
     const hex=getStaffHex(n);const{r,g,b}=hexToRgb(hex);
-    css+=`[data-s="${n}"],.sc-${n}{background:rgba(${r},${g},${b},.2);color:${hex};border-color:rgba(${r},${g},${b},.35)}\n`;
+    css+=`[data-s="${n}"],.sc-${n}{background:rgba(${r},${g},${b},.2);color:${hex};border-color:rgba(${r},${g},${b},.42)}\n`;
   });
   let st=document.getElementById('staff-colors-style');
   if(!st){st=document.createElement('style');st.id='staff-colors-style';document.head.appendChild(st);}
