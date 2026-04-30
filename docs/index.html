@@ -788,6 +788,11 @@ body{
           <div><strong>Edit Shift Columns</strong><span>Rename, add or remove shift types</span></div>
           <div class="si-arr">›</div>
         </div>
+        <div class="si" onclick="toggleUniquePerDay()" style="cursor:pointer">
+          <div class="si-icon" style="background:rgba(99,102,241,.15)">🔁</div>
+          <div><strong>One shift per person per day</strong><span>Assigning someone to a shift removes them from others that day</span></div>
+          <div class="um-switch" id="unique-switch-settings" style="flex-shrink:0"></div>
+        </div>
       </div>
       <div class="settings-group">
         <div class="sg-label">Data</div>
@@ -985,7 +990,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v24-remove-clears-rota';
+const _COLOR_VER='v25-unique-per-day-setting';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -1355,6 +1360,8 @@ function toggleUniquePerDay(){
   uniquePerDay=!uniquePerDay;
   localStorage.setItem('cc_unique_day',uniquePerDay?'1':'0');
   document.getElementById('unique-switch').classList.toggle('on',uniquePerDay);
+  const s2=document.getElementById('unique-switch-settings');
+  if(s2)s2.classList.toggle('on',uniquePerDay);
 }
 
 function closeModal(){
@@ -1907,6 +1914,8 @@ function toggleUserMenu(){document.getElementById('user-menu').classList.toggle(
 function closeUserMenu(){document.getElementById('user-menu').classList.remove('open');}
 // Apply saved unique-per-day state on load
 document.getElementById('unique-switch').classList.toggle('on',uniquePerDay);
+const _s2=document.getElementById('unique-switch-settings');
+if(_s2)_s2.classList.toggle('on',uniquePerDay);
 document.addEventListener('click',e=>{
   const menu=document.getElementById('user-menu');
   if(menu.classList.contains('open')&&!menu.contains(e.target)&&!e.target.closest('.icon-btn'))closeUserMenu();
