@@ -1005,7 +1005,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v37-shared-rls-fix';
+const _COLOR_VER='v38-local-first-sync';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -1130,10 +1130,14 @@ async function saveBlacklistToCloud(){
 let user = null;
 let userProfile = null; // {id, email, display_name, role, status}
 let currentRole = null; // 'admin' | 'manager' | 'viewer'
+const _SCHED_CACHE='cc_schedules_local';
+function _saveSchedCache(s){try{localStorage.setItem(_SCHED_CACHE,JSON.stringify(s));}catch{}}
+function _loadSchedCache(){try{return JSON.parse(localStorage.getItem(_SCHED_CACHE)||'{}');}catch{return{};}}
+
 let state = {
   type:'inside', weekOffset:1,
   staff:{inside:[...DEFAULT_STAFF.inside],delivery:[...DEFAULT_STAFF.delivery]},
-  schedules:{}
+  schedules:_loadSchedCache()   // seed from localStorage so changes survive restarts
 };
 let viewMode = localStorage.getItem('cc_view') || 'table';
 let modalCtx = null;
@@ -1199,9 +1203,18 @@ async function syncAll(){
       state.staff.inside=staffData.filter(s=>s.type==='inside'||s.type==='both').map(s=>s.name);
       state.staff.delivery=staffData.filter(s=>s.type==='delivery'||s.type==='both').map(s=>s.name);
     }
-    // 3. Rota schedules (current + adjacent weeks)
+    // 3. Push ALL local schedule changes to Supabase FIRST so nothing is lost
+    const pushRows=Object.entries(state.schedules).map(([key,names])=>{
+      const parts=key.split('|');
+      return{schedule_type:parts[0],week_key:parts[1],day:parts[2],shift_col:parts[3],
+             staff_names:names,updated_at:new Date().toISOString()};
+    });
+    if(pushRows.length>0){
+      await db.from('schedules').upsert(pushRows,{onConflict:'schedule_type,week_key,day,shift_col'});
+    }
+    // 4. Pull fresh merged data from Supabase (includes our push + other users' changes)
     await loadSchedules();
-    // 4. Sales data for currently viewed week
+    // 5. Sales data for currently viewed week
     await loadSalesWeek();
     // Re-render everything
     renderRota();
@@ -1239,10 +1252,12 @@ async function loadSchedules(){
   // Shared data — no user_id filter — load all types at once for instant switching
   const {data}=await db.from('schedules').select('*').in('week_key',wks);
   if(data){
+    // MERGE remote into local — never wipe local changes that remote may not have yet
     data.forEach(row=>{
       const k=`${row.schedule_type}|${row.week_key}|${row.day}|${row.shift_col}`;
       state.schedules[k]=row.staff_names||[];
     });
+    _saveSchedCache(state.schedules); // keep localStorage in sync with merged state
   }
 }
 
@@ -1250,16 +1265,24 @@ async function saveShiftToCloud(type,wk,day,col,names){
   if(!user)return;
   setSyncDot(day,col,'saving');
   try{
-    await db.from('schedules').upsert({
-      schedule_type:type,week_key:wk,day,shift_col:col,
-      staff_names:names,updated_at:new Date().toISOString()
-    },{onConflict:'schedule_type,week_key,day,shift_col'});
+    const _t=new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),8000));
+    await Promise.race([
+      db.from('schedules').upsert({
+        schedule_type:type,week_key:wk,day,shift_col:col,
+        staff_names:names,updated_at:new Date().toISOString()
+      },{onConflict:'schedule_type,week_key,day,shift_col'}),
+      _t
+    ]);
     setSyncDot(day,col,'saved');
     setTimeout(()=>setSyncDot(day,col,''),1500);
   }catch(e){
-    console.error('Save error:',e);
     setSyncDot(day,col,'');
-    toast('Save failed: '+e.message);
+    if(e.message==='timeout'){
+      toast('⚠ Saved locally — tap ↻ to sync when online');
+    } else {
+      console.error('Save error:',e);
+      toast('Save failed: '+e.message);
+    }
   }
 }
 
@@ -1289,6 +1312,7 @@ function getShift(type,off,day,col){
 function setShift(type,off,day,col,names){
   const k=`${type}|${weekKey(off)}|${day}|${col}`;
   if(names.length===0)delete state.schedules[k]; else state.schedules[k]=names;
+  _saveSchedCache(state.schedules); // persist immediately so sync never loses this
   saveShiftToCloud(type,weekKey(off),day,col,names);
 }
 
@@ -2029,6 +2053,7 @@ async function signOut(){
   await db.auth.signOut();
   user=null;userProfile=null;currentRole=null;
   state.schedules={};
+  _saveSchedCache({});
   showScreen('auth');closeUserMenu();
 }
 
