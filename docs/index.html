@@ -687,7 +687,7 @@ body{
   </div>
 
   <div id="type-tabs">
-    <button class="type-tab active" onclick="setType('inside')">Inside Staff</button>
+    <button class="type-tab active" onclick="setType('inside')">Staff</button>
     <button class="type-tab" onclick="setType('delivery')">Delivery</button>
     <div style="flex:1"></div>
     <button class="cp-btn" onclick="copyWeek()" id="copy-btn" title="Copy this week">📋</button>
@@ -709,7 +709,7 @@ body{
     </div>
 
     <div id="view-staff" class="view" style="padding:10px">
-      <div class="section-label">Inside Staff</div>
+      <div class="section-label">Staff</div>
       <div class="staff-list" id="sl-inside"></div>
       <div class="section-label">Delivery Staff</div>
       <div class="staff-list" id="sl-delivery"></div>
@@ -717,7 +717,7 @@ body{
         <label>Add Staff Member</label>
         <input class="input" id="ns-name" placeholder="Full name" style="margin-bottom:8px">
         <select class="input" id="ns-type">
-          <option value="inside">Inside Staff</option>
+          <option value="inside">Staff</option>
           <option value="delivery">Delivery</option>
           <option value="both">Both</option>
         </select>
@@ -897,7 +897,7 @@ body{
     </div>
     <div class="col-editor-body">
       <div class="col-type-tabs">
-        <button class="col-type-tab active" id="ct-inside" onclick="setColEditorType('inside')">Inside Staff</button>
+        <button class="col-type-tab active" id="ct-inside" onclick="setColEditorType('inside')">Staff</button>
         <button class="col-type-tab" id="ct-delivery" onclick="setColEditorType('delivery')">Delivery</button>
       </div>
       <div id="col-list"></div>
@@ -1487,7 +1487,7 @@ async function shareRota(){
   ctx.fillText('CC Chelmsford',TEXT_X,HDR_Y+30);
   ctx.fillStyle='#888888';
   ctx.font=`13px -apple-system,sans-serif`;
-  const typeLabel=state.type==='inside'?'Inside Staff':'Delivery';
+  const typeLabel=state.type==='inside'?'Staff':'Delivery';
   ctx.fillText(typeLabel,TEXT_X,HDR_Y+49);
   const ws=weekStart(state.weekOffset);
   const we=new Date(ws); we.setDate(we.getDate()+6);
