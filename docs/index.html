@@ -917,6 +917,21 @@ body{
   </div>
 </div>
 
+<!-- Receipt Preview Modal -->
+<div id="receipt-overlay" style="display:none;position:fixed;inset:0;z-index:9600;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);align-items:flex-end;justify-content:center">
+  <div style="width:100%;max-width:480px;background:var(--surface);border-radius:20px 20px 0 0;border-top:1px solid var(--border2);padding:16px 16px 32px;max-height:85dvh;display:flex;flex-direction:column;gap:12px">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div style="font-size:15px;font-weight:700;color:var(--text)">Receipt Preview</div>
+      <div onclick="closeReceiptModal()" style="cursor:pointer;font-size:20px;color:var(--text3);padding:4px 8px">×</div>
+    </div>
+    <pre id="receipt-text-preview" style="font-family:'Courier New',Courier,monospace;font-size:12px;color:var(--text2);background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;overflow-y:auto;flex:1;white-space:pre;line-height:1.5;margin:0"></pre>
+    <div style="display:flex;gap:8px;flex-shrink:0">
+      <button onclick="copyReceipt()" style="flex:1;padding:12px;border-radius:10px;border:1px solid var(--border2);background:var(--surface2);color:var(--text);font-size:14px;font-weight:600;cursor:pointer">📋 Copy</button>
+      <button onclick="shareReceipt()" id="rcp-share-btn" style="flex:1;padding:12px;border-radius:10px;border:1px solid var(--border2);background:var(--surface2);color:var(--text);font-size:14px;font-weight:600;cursor:pointer">📤 Share</button>
+    </div>
+  </div>
+</div>
+
 <!-- User Menu -->
 <div id="user-menu">
   <div class="um-email" id="um-email">Loading...</div>
@@ -1005,7 +1020,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v39-share-print';
+const _COLOR_VER='v40-receipt-modal';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -2578,7 +2593,10 @@ function _receiptText(dateLabel,timeLabel,je,cc,ue,dr,cash,card){
   return lines.join('\n');
 }
 
-async function printDaySales(){
+let _currentReceiptText='';
+let _currentReceiptTitle='';
+
+function printDaySales(){
   if(!salesOpenDate){toast('No day selected');return;}
   const je=getSdVal('sd-je'),cc=getSdVal('sd-cc'),ue=getSdVal('sd-ue'),dr=getSdVal('sd-dr');
   const cash=getSdVal('sd-cash'),card=getSdVal('sd-card');
@@ -2586,34 +2604,43 @@ async function printDaySales(){
   const now=new Date();
   const timeLabel=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',hour12:true}).toUpperCase();
 
-  const text=_receiptText(dateLabel,timeLabel,je,cc,ue,dr,cash,card);
+  _currentReceiptText=_receiptText(dateLabel,timeLabel,je,cc,ue,dr,cash,card);
+  _currentReceiptTitle='CC Chelmsford — '+dateLabel;
 
-  // Try Web Share API first (iOS share sheet → lets user pick thermal printer app)
-  if(navigator.share){
-    try{
-      await navigator.share({title:'CC Chelmsford — '+dateLabel,text});
-      return;
-    }catch(e){
-      if(e.name==='AbortError')return; // user cancelled share sheet — don't fallback to print
-    }
+  // Show preview modal — user picks how to send to their printer
+  document.getElementById('receipt-text-preview').textContent=_currentReceiptText;
+  // Hide Share button if Web Share not supported
+  const shareBtn=document.getElementById('rcp-share-btn');
+  if(shareBtn) shareBtn.style.display=navigator.share?'':'none';
+  document.getElementById('receipt-overlay').style.display='flex';
+}
+
+function closeReceiptModal(){
+  document.getElementById('receipt-overlay').style.display='none';
+}
+
+async function copyReceipt(){
+  try{
+    await navigator.clipboard.writeText(_currentReceiptText);
+    toast('Receipt copied — paste into your printer app ✓');
+    closeReceiptModal();
+  }catch{
+    // Clipboard API blocked — select the text manually
+    const pre=document.getElementById('receipt-text-preview');
+    const range=document.createRange();range.selectNodeContents(pre);
+    const sel=window.getSelection();sel.removeAllRanges();sel.addRange(range);
+    toast('Text selected — copy it and paste into your printer app');
   }
+}
 
-  // Desktop fallback: render the hidden receipt div and use browser print dialog
-  const logo=document.getElementById('rcp-logo');
-  if(logo)logo.src=CC_LOGO;
-  document.getElementById('rcp-date').textContent=dateLabel+' '+timeLabel;
-  document.getElementById('rcp-je').textContent=je.toFixed(2);
-  document.getElementById('rcp-cc').textContent=cc.toFixed(2);
-  document.getElementById('rcp-ue').textContent=ue.toFixed(2);
-  document.getElementById('rcp-dr').textContent=dr.toFixed(2);
-  const del=je+cc+ue+dr;
-  document.getElementById('rcp-del').textContent=del.toFixed(2);
-  document.getElementById('rcp-cash').textContent=cash.toFixed(2);
-  document.getElementById('rcp-card').textContent=card.toFixed(2);
-  document.getElementById('rcp-total').textContent=(del+cash+card).toFixed(2);
-  const ws=document.getElementById('rcp-wages-section');
-  if(ws)ws.style.display='none';
-  window.print();
+async function shareReceipt(){
+  if(!navigator.share)return;
+  try{
+    await navigator.share({title:_currentReceiptTitle,text:_currentReceiptText});
+    closeReceiptModal();
+  }catch(e){
+    if(e.name!=='AbortError') toast('Share failed — try Copy instead');
+  }
 }
 
 function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
