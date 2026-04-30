@@ -1001,7 +1001,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v28-vivid-palette';
+const _COLOR_VER='v29-cloud-sync-colours-blacklist';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -1048,6 +1048,7 @@ function selectStaffColor(hex){
   if(!_cpTarget)return;
   staffColors[_cpTarget]=hex;
   localStorage.setItem('cc_staff_colors',JSON.stringify(staffColors));
+  saveColorsToCloud();
   applyStaffColors();
   // update swatch highlights
   document.querySelectorAll('.cp-swatch').forEach(el=>
@@ -1065,19 +1066,44 @@ let COLS = {
   delivery: JSON.parse(localStorage.getItem('cc_cols_delivery') || 'null') || [...DEFAULT_COLS.delivery]
 };
 async function loadColsFromCloud(){
-  const {data}=await db.from('app_settings').select('key,value').in('key',['cols_inside','cols_delivery']);
+  const {data}=await db.from('app_settings').select('key,value').in('key',['cols_inside','cols_delivery','staff_colors','staff_blacklist']);
   if(!data)return;
   data.forEach(row=>{
-    const type=row.key.replace('cols_','');
-    if(row.value&&row.value.length){
-      COLS[type]=row.value;
-      localStorage.setItem(`cc_cols_${type}`,JSON.stringify(row.value));
+    if(row.key==='staff_colors'){
+      if(row.value&&typeof row.value==='object'){
+        staffColors={...DEFAULT_STAFF_HEX,...row.value};
+        localStorage.setItem('cc_staff_colors',JSON.stringify(staffColors));
+        applyStaffColors();
+      }
+    } else if(row.key==='staff_blacklist'){
+      if(Array.isArray(row.value)&&row.value.length){
+        row.value.forEach(n=>staffBlacklist.add(n));
+        localStorage.setItem('cc_staff_blacklist',JSON.stringify([...staffBlacklist]));
+      }
+    } else {
+      const type=row.key.replace('cols_','');
+      if(row.value&&row.value.length){
+        COLS[type]=row.value;
+        localStorage.setItem(`cc_cols_${type}`,JSON.stringify(row.value));
+      }
     }
   });
 }
 async function saveColsToCloud(type,cols){
   await db.from('app_settings')
     .upsert({key:`cols_${type}`,value:cols,updated_at:new Date().toISOString()},{onConflict:'key'});
+}
+function saveColorsToCloud(){
+  if(!user)return;
+  db.from('app_settings')
+    .upsert({key:'staff_colors',value:staffColors,updated_at:new Date().toISOString()},{onConflict:'key'})
+    .catch(e=>console.warn('Color sync failed:',e));
+}
+function saveBlacklistToCloud(){
+  if(!user)return;
+  db.from('app_settings')
+    .upsert({key:'staff_blacklist',value:[...staffBlacklist],updated_at:new Date().toISOString()},{onConflict:'key'})
+    .catch(e=>console.warn('Blacklist sync failed:',e));
 }
 
 /* ─── State ──────────────────────────────────────────── */
@@ -1393,6 +1419,7 @@ async function addStaff(){
   if(staffBlacklist.has(name)){
     staffBlacklist.delete(name);
     localStorage.setItem('cc_staff_blacklist',JSON.stringify([...staffBlacklist]));
+    saveBlacklistToCloud();
   }
   if(type==='inside'||type==='both'){if(!state.staff.inside.includes(name))state.staff.inside.push(name);}
   if(type==='delivery'||type==='both'){if(!state.staff.delivery.includes(name))state.staff.delivery.push(name);}
@@ -1400,6 +1427,7 @@ async function addStaff(){
   // save chosen colour
   staffColors[name]=newStaffColor;
   localStorage.setItem('cc_staff_colors',JSON.stringify(staffColors));
+  saveColorsToCloud();
   applyStaffColors();
   await saveStaffToCloud(name,type);
   renderStaff();toast(`${name} added`);
@@ -1407,9 +1435,10 @@ async function addStaff(){
 
 function removeStaff(type,name){
   state.staff[type]=state.staff[type].filter(n=>n!==name);
-  // Blacklist so they stay gone even if cloud re-loads stale data
+  // Blacklist so they stay gone even if cloud re-loads stale data — synced to cloud so mobile picks it up
   staffBlacklist.add(name);
   localStorage.setItem('cc_staff_blacklist',JSON.stringify([...staffBlacklist]));
+  saveBlacklistToCloud();
   // Also remove from all schedule slots so they disappear from the rota immediately
   Object.keys(state.schedules).forEach(k=>{
     if(state.schedules[k].includes(name)){
@@ -1440,6 +1469,7 @@ function renameStaff(type,oldName){
   // Update colour mapping
   if(staffColors[oldName]){staffColors[newName]=staffColors[oldName];delete staffColors[oldName];}
   localStorage.setItem('cc_staff_colors',JSON.stringify(staffColors));
+  saveColorsToCloud();
   renderStaff();renderRota();toast(`Renamed to ${newName}`);
   // cloud: add new, remove old
   saveStaffToCloud(newName,type).catch(()=>{});
