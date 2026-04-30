@@ -1327,9 +1327,10 @@ async function shareRota(){
 
     // shift cells
     const CELL_PAD_X=10;
-    const CELL_PAD_Y=9;
+    const CELL_PAD_Y=10; // minimum top/bottom margin
     const PILL_H=21;
-    const PILL_GAP=4;
+    const PILL_GAP=5;
+    const PILL_GAP_X=5;
     cols.forEach((col,ci)=>{
       const cellX=PAD+DAY_W+ci*COL_W;
       if(ci>0){ctx.fillStyle='rgba(60,60,140,0.18)';ctx.fillRect(cellX,rowY,1,ROW_H);}
@@ -1341,9 +1342,13 @@ async function shareRota(){
         ctx.textBaseline='middle'; ctx.textAlign='left';
         ctx.fillText('—',cellX+CELL_PAD_X,rowY+ROW_H/2);
       } else {
-        const PILL_GAP_X=5;
         const maxPW=COL_W-CELL_PAD_X*2;
-        let curX=cellX+CELL_PAD_X, curY=rowY+CELL_PAD_Y;
+        // Count actual pill rows for this cell (to vertically center)
+        const nRows=estPillRows(staff,COL_W,CELL_PAD_X);
+        const totalH=nRows*(PILL_H+PILL_GAP)-PILL_GAP;
+        // Vertically center the pill group; respect minimum top padding
+        const startY=rowY+Math.max(CELL_PAD_Y,Math.floor((ROW_H-totalH)/2));
+        let curX=cellX+CELL_PAD_X, curY=startY;
         staff.forEach((name,si)=>{
           const c=getStaffCanvasColor(name);
           ctx.font=`bold 11px -apple-system,sans-serif`;
@@ -1354,15 +1359,12 @@ async function shareRota(){
             curX=cellX+CELL_PAD_X;
             curY+=PILL_H+PILL_GAP;
           }
-          // pill fill — more transparent for depth
           ctx.fillStyle=c.bg;
           roundRect(ctx,curX,curY,pw,PILL_H,PILL_H/2);
           ctx.fill();
-          // pill border — stronger, vivid
           ctx.strokeStyle=c.border; ctx.lineWidth=1.5;
           roundRect(ctx,curX,curY,pw,PILL_H,PILL_H/2);
           ctx.stroke();
-          // pill text
           ctx.fillStyle=c.text;
           ctx.textAlign='left'; ctx.textBaseline='alphabetic';
           ctx.fillText(displayName,curX+9,curY+14);
