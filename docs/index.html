@@ -985,7 +985,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v23-rename-staff';
+const _COLOR_VER='v24-remove-clears-rota';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -1382,8 +1382,20 @@ async function addStaff(){
 
 function removeStaff(type,name){
   state.staff[type]=state.staff[type].filter(n=>n!==name);
-  renderStaff();toast(`${name} removed`);
-  // cloud sync in background — don't block UI
+  // Also remove from all schedule slots so they disappear from the rota immediately
+  Object.keys(state.schedules).forEach(k=>{
+    if(state.schedules[k].includes(name)){
+      state.schedules[k]=state.schedules[k].filter(n=>n!==name);
+      // sync that slot to cloud in background
+      const parts=k.split('|'); // "type|week_key|day|shift_col"
+      if(parts.length===4){
+        const[stype,wk,day,col]=parts;
+        saveShiftToCloud(stype,wk,parseInt(day),col,state.schedules[k]).catch(()=>{});
+      }
+    }
+  });
+  renderStaff();renderRota();toast(`${name} removed`);
+  // cloud sync staff in background
   const inInside=state.staff.inside.includes(name);
   const inDelivery=state.staff.delivery.includes(name);
   if(!inInside&&!inDelivery) deleteStaffFromCloud(name).catch(e=>console.warn('Cloud delete failed:',e));
