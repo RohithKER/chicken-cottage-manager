@@ -985,11 +985,26 @@ function closeColorSheet(){
   _cpTarget=null;
 }
 
-/* ─── Dynamic Columns (editable) ─────────────────────── */
+/* ─── Dynamic Columns (editable, synced to DB) ───────── */
 let COLS = {
   inside: JSON.parse(localStorage.getItem('cc_cols_inside') || 'null') || [...DEFAULT_COLS.inside],
   delivery: JSON.parse(localStorage.getItem('cc_cols_delivery') || 'null') || [...DEFAULT_COLS.delivery]
 };
+async function loadColsFromCloud(){
+  const {data}=await db.from('app_settings').select('key,value').in('key',['cols_inside','cols_delivery']);
+  if(!data)return;
+  data.forEach(row=>{
+    const type=row.key.replace('cols_','');
+    if(row.value&&row.value.length){
+      COLS[type]=row.value;
+      localStorage.setItem(`cc_cols_${type}`,JSON.stringify(row.value));
+    }
+  });
+}
+async function saveColsToCloud(type,cols){
+  await db.from('app_settings')
+    .upsert({key:`cols_${type}`,value:cols,updated_at:new Date().toISOString()},{onConflict:'key'});
+}
 
 /* ─── State ──────────────────────────────────────────── */
 let user = null;
@@ -1035,6 +1050,8 @@ function dayMonth(di,off){
 async function loadFromCloud(){
   if(!user)return;
   try{
+    // Load shared column config from DB first
+    await loadColsFromCloud();
     // Shared data — no user_id filter, all approved users see same rota
     const {data:staffData}=await db.from('staff').select('*');
     if(staffData&&staffData.length>0){
@@ -1343,7 +1360,6 @@ function removeColRow(i){
 }
 
 function saveColEditor(){
-  // Read current values from inputs
   const inputs=document.querySelectorAll('.col-input');
   const newCols=[];
   inputs.forEach(inp=>{
@@ -1353,6 +1369,7 @@ function saveColEditor(){
   if(!newCols.length){toast('Add at least 1 column');return;}
   COLS[colEditorType]=newCols;
   localStorage.setItem(`cc_cols_${colEditorType}`,JSON.stringify(newCols));
+  saveColsToCloud(colEditorType,newCols); // persist to DB for all users
   closeColEditor();
   renderRota();
   toast('Columns updated ✓');
@@ -1950,6 +1967,20 @@ function setupRealtime(){
       if(data&&data.length>0){
         state.staff.inside=data.filter(s=>s.type==='inside'||s.type==='both').map(s=>s.name);
         state.staff.delivery=data.filter(s=>s.type==='delivery'||s.type==='both').map(s=>s.name);
+        renderRota();
+      }
+    })
+    .subscribe();
+
+  // Settings changes — sync column config in real time
+  db.channel('cc-settings')
+    .on('postgres_changes',{event:'*',schema:'public',table:'app_settings'},payload=>{
+      const row=payload.new;
+      if(!row||!row.key)return;
+      const type=row.key.replace('cols_','');
+      if((type==='inside'||type==='delivery')&&row.value&&row.value.length){
+        COLS[type]=row.value;
+        localStorage.setItem(`cc_cols_${type}`,JSON.stringify(row.value));
         renderRota();
       }
     })
