@@ -179,8 +179,8 @@ body{
 .vt-btn.active{background:var(--surface2);color:var(--text);font-weight:600}
 
 /* ─── Content ────────────────────────────────────── */
-#content{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
-.view{display:none;padding:10px 10px calc(10px + var(--safe-bottom))}
+#content{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding-bottom:calc(56px + var(--safe-bottom))}
+.view{display:none;padding:10px 10px 6px}
 .view.active{display:block}
 #view-rota{padding:0}
 #view-sales.active{display:flex;flex-direction:column;padding:0;height:100%}
@@ -372,9 +372,12 @@ body{
 
 /* ─── Bottom Nav ─────────────────────────────────── */
 #bottom-nav{
-  flex-shrink:0;display:flex;
+  position:fixed;bottom:0;left:50%;transform:translateX(-50%);
+  width:100%;max-width:480px;
+  display:flex;
   background:var(--bg);border-top:1px solid var(--border);
-  padding:0 0 min(var(--safe-bottom),18px);
+  padding:0 0 var(--safe-bottom);
+  z-index:20;
 }
 .nav-btn{
   flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;
@@ -456,7 +459,7 @@ body{
 
 /* ─── Toast ──────────────────────────────────────── */
 #toast{
-  position:fixed;bottom:calc(66px + var(--safe-bottom));
+  position:fixed;bottom:calc(62px + var(--safe-bottom));
   left:50%;transform:translateX(-50%) translateY(12px);
   background:var(--surface2);border:1px solid var(--border2);
   border-radius:var(--rs);padding:9px 14px;
@@ -639,14 +642,14 @@ body{
 
 <!-- Loading -->
 <div id="loading-screen">
-  <div style="font-size:40px">🍗</div>
+  <img id="loading-logo" src="./favicon.png" style="width:72px;height:72px;border-radius:18px;box-shadow:0 4px 24px rgba(0,0,0,.5);opacity:0;transition:opacity .3s" onload="this.style.opacity=1" onerror="this.style.display='none'">
   <div class="spinner"></div>
   <div class="loading-text">Loading...</div>
 </div>
 
 <!-- Auth Screen -->
 <div id="auth-screen" style="display:none">
-  <div class="auth-logo">🍗</div>
+  <div class="auth-logo" style="padding:0;overflow:hidden"><img src="./favicon.png" style="width:64px;height:64px;object-fit:cover;border-radius:16px" onerror="this.parentElement.innerHTML='🍗';this.parentElement.style.fontSize='32px';this.parentElement.style.display='flex';this.parentElement.style.alignItems='center';this.parentElement.style.justifyContent='center'"></div>
   <div class="auth-title">CC Chelmsford</div>
   <div class="auth-sub">Sign in to manage your shifts</div>
   <div class="auth-card">
@@ -974,7 +977,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v11-unique-day';
+const _COLOR_VER='v12-nav-fixed';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -2152,10 +2155,20 @@ async function loadSalesWeek(){
   if(!user){el.innerHTML='<div style="text-align:center;color:var(--text3);font-size:13px;padding:30px 0">Not signed in</div>';return;}
 
   const from=fmt(dates[0]),to=fmt(dates[6]);
-  const{data,error}=await db.from('daily_sales').select('*').gte('sale_date',from).lte('sale_date',to);
-  salesWeekData={};
-  if(data) data.forEach(r=>{salesWeekData[r.sale_date]=r;});
-  renderSalesTable(dates);
+  try{
+    const timeoutP=new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),8000));
+    const queryP=db.from('daily_sales').select('*').gte('sale_date',from).lte('sale_date',to);
+    const{data,error}=await Promise.race([queryP,timeoutP]);
+    if(error) throw error;
+    salesWeekData={};
+    if(data) data.forEach(r=>{salesWeekData[r.sale_date]=r;});
+    renderSalesTable(dates);
+  }catch(err){
+    el.innerHTML=`<div style="text-align:center;padding:40px 16px">
+      <div style="font-size:13px;color:var(--red);margin-bottom:14px">Failed to load sales</div>
+      <button onclick="loadSalesWeek()" style="padding:9px 20px;border-radius:8px;border:1px solid var(--border2);background:var(--surface2);color:var(--text2);font-size:13px;cursor:pointer">↺ Retry</button>
+    </div>`;
+  }
 }
 
 function renderSalesTable(dates){
