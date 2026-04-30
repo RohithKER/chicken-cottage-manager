@@ -1001,7 +1001,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v29-cloud-sync-colours-blacklist';
+const _COLOR_VER='v30-nonblocking-addstaff';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -1429,8 +1429,8 @@ async function addStaff(){
   localStorage.setItem('cc_staff_colors',JSON.stringify(staffColors));
   saveColorsToCloud();
   applyStaffColors();
-  await saveStaffToCloud(name,type);
-  renderStaff();toast(`${name} added`);
+  renderStaff();toast(`${name} added`); // update UI immediately, don't wait for cloud
+  saveStaffToCloud(name,type).catch(e=>console.warn('Staff save failed:',e));
 }
 
 function removeStaff(type,name){
