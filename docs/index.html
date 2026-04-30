@@ -1001,7 +1001,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v30-nonblocking-addstaff';
+const _COLOR_VER='v31-confirm-purge-staff';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -1434,29 +1434,44 @@ async function addStaff(){
 }
 
 function removeStaff(type,name){
+  showConfirm(
+    `Remove ${name}?`,
+    `This will delete ${name} from the staff list and all rota shifts permanently.`,
+    ()=>_doRemoveStaff(type,name)
+  );
+}
+function _doRemoveStaff(type,name){
   state.staff[type]=state.staff[type].filter(n=>n!==name);
-  // Blacklist so they stay gone even if cloud re-loads stale data — synced to cloud so mobile picks it up
+  // Blacklist — synced to cloud so mobile picks it up
   staffBlacklist.add(name);
   localStorage.setItem('cc_staff_blacklist',JSON.stringify([...staffBlacklist]));
   saveBlacklistToCloud();
-  // Also remove from all schedule slots so they disappear from the rota immediately
+  // Remove from local schedule cache
   Object.keys(state.schedules).forEach(k=>{
-    if(state.schedules[k].includes(name)){
+    if(state.schedules[k].includes(name))
       state.schedules[k]=state.schedules[k].filter(n=>n!==name);
-      // sync that slot to cloud in background
-      const parts=k.split('|'); // "type|week_key|day|shift_col"
-      if(parts.length===4){
-        const[stype,wk,day,col]=parts;
-        saveShiftToCloud(stype,wk,parseInt(day),col,state.schedules[k]).catch(()=>{});
-      }
-    }
   });
   renderStaff();renderRota();toast(`${name} removed`);
-  // cloud sync staff in background
+  // Purge from ALL Supabase schedule rows (so they can't come back on reload)
+  purgeStaffFromCloud(name);
+  // Remove from staff table
   const inInside=state.staff.inside.includes(name);
   const inDelivery=state.staff.delivery.includes(name);
-  if(!inInside&&!inDelivery) deleteStaffFromCloud(name).catch(e=>console.warn('Cloud delete failed:',e));
-  else saveStaffToCloud(name,inInside&&inDelivery?'both':inInside?'inside':'delivery').catch(e=>console.warn('Cloud save failed:',e));
+  if(!inInside&&!inDelivery) deleteStaffFromCloud(name).catch(()=>{});
+  else saveStaffToCloud(name,inInside&&inDelivery?'both':inInside?'inside':'delivery').catch(()=>{});
+}
+async function purgeStaffFromCloud(name){
+  if(!user)return;
+  try{
+    const{data}=await db.from('schedules').select('*').contains('staff_names',[name]);
+    if(!data||!data.length)return;
+    const updates=data.map(row=>({
+      ...row,staff_names:row.staff_names.filter(n=>n!==name),
+      updated_at:new Date().toISOString()
+    }));
+    await db.from('schedules').upsert(updates,{onConflict:'schedule_type,week_key,day,shift_col'});
+    console.log(`Purged ${name} from ${data.length} schedule rows`);
+  }catch(e){console.warn('Purge failed:',e);}
 }
 
 function renameStaff(type,oldName){
@@ -2012,6 +2027,25 @@ function toast(msg){
   t.textContent=msg;t.classList.add('show');
   clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2200);
 }
+let _confirmCb=null;
+function showConfirm(title,body,onConfirm){
+  document.getElementById('cfm-title').textContent=title;
+  document.getElementById('cfm-body').textContent=body;
+  _confirmCb=onConfirm;
+  const ov=document.getElementById('confirm-overlay');
+  ov.style.display='flex';
+  requestAnimationFrame(()=>ov.classList.add('open'));
+}
+function _confirmYes(){
+  document.getElementById('confirm-overlay').classList.remove('open');
+  setTimeout(()=>{document.getElementById('confirm-overlay').style.display='none';},200);
+  if(_confirmCb){_confirmCb();_confirmCb=null;}
+}
+function _confirmNo(){
+  document.getElementById('confirm-overlay').classList.remove('open');
+  setTimeout(()=>{document.getElementById('confirm-overlay').style.display='none';},200);
+  _confirmCb=null;
+}
 
 /* ─── User Profile / Access Control ─────────────────── */
 async function checkUserProfile(u){
@@ -2466,6 +2500,18 @@ init();
     <hr class="rcp-divider">
   </div>
   <div style="text-align:center;font-size:10px;color:#666;margin-top:3mm">CC Chelmsford Manager</div>
+</div>
+
+<!-- Confirm Dialog -->
+<div id="confirm-overlay" style="display:none;position:fixed;inset:0;z-index:9500;align-items:center;justify-content:center;background:rgba(0,0,0,.6);padding:24px">
+  <div style="width:100%;max-width:320px;background:#252525;border-radius:16px;padding:24px;box-shadow:0 8px 32px rgba(0,0,0,.6)">
+    <div id="cfm-title" style="font-size:17px;font-weight:700;color:var(--text);margin-bottom:8px"></div>
+    <div id="cfm-body" style="font-size:13px;color:var(--text2);line-height:1.5;margin-bottom:20px"></div>
+    <div style="display:flex;gap:10px">
+      <button onclick="_confirmNo()" style="flex:1;padding:12px;background:var(--surface2);border:1px solid var(--border);color:var(--text2);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">Cancel</button>
+      <button onclick="_confirmYes()" style="flex:1;padding:12px;background:var(--red);border:none;color:#fff;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">Remove</button>
+    </div>
+  </div>
 </div>
 
 <!-- Colour Picker Sheet -->
