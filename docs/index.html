@@ -853,13 +853,13 @@ body{
         <div class="ss-total-row"><label>Day Total</label><div class="ss-total-val" id="sd-day-total" style="color:var(--green)">£0.00</div></div>
       </div>
     </div>
-    <div class="ss-foot" style="flex-wrap:wrap;gap:8px">
-      <div style="display:flex;gap:8px;flex:1;min-width:0">
-        <button class="btn-sm ghost" style="flex:1;padding:11px" onclick="closeDayEntry()">Cancel</button>
-        <button class="btn-sm ghost" style="flex:1;padding:11px;color:var(--red);border-color:rgba(255,107,122,.3)" onclick="clearDayEntry()">Clear</button>
-        <button class="btn-sm ghost" style="flex:1;padding:11px" onclick="printDaySales()">🖨 Print</button>
-      </div>
+    <div class="ss-foot" style="flex-direction:column;gap:8px">
       <button class="btn-sm primary" style="width:100%;padding:13px;font-size:15px" onclick="saveDaySales()">Save</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn-sm ghost" style="flex:1;padding:10px;font-size:13px" onclick="closeDayEntry()">Cancel</button>
+        <button class="btn-sm ghost" style="flex:1;padding:10px;font-size:13px;color:var(--red);border-color:rgba(255,107,122,.3)" onclick="clearDayEntry()">Clear</button>
+        <button class="btn-sm ghost" style="flex:1;padding:10px;font-size:13px" onclick="printDaySales()">🖨 Print</button>
+      </div>
     </div>
   </div>
 </div>
