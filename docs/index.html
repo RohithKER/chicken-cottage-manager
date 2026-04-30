@@ -855,6 +855,7 @@ body{
     </div>
     <div class="ss-foot">
       <button class="btn-sm ghost" style="flex:1;padding:11px" onclick="closeDayEntry()">Cancel</button>
+      <button class="btn-sm ghost" style="flex:1;padding:11px" onclick="printDaySales()">🖨 Print</button>
       <button class="btn-sm primary" style="flex:1;padding:11px" onclick="saveDaySales()">Save</button>
     </div>
   </div>
@@ -2201,6 +2202,33 @@ async function saveDaySales(){
   renderSalesTable();
   toast('Saved ✓');
   closeDayEntry();
+}
+
+function printDaySales(){
+  if(!salesOpenDate){toast('No day selected');return;}
+  const je=getSdVal('sd-je'),cc=getSdVal('sd-cc'),ue=getSdVal('sd-ue'),dr=getSdVal('sd-dr');
+  const cash=getSdVal('sd-cash'),card=getSdVal('sd-card');
+  const del=je+cc+ue+dr;
+  const total=del+cash+card;
+
+  const dateLabel=new Date(salesOpenDate+'T12:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'});
+  const now=new Date();
+  const timeLabel=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',hour12:true}).toUpperCase();
+
+  const logo=document.getElementById('rcp-logo');
+  if(logo) logo.src=CC_LOGO;
+  document.getElementById('rcp-date').textContent=dateLabel+' '+timeLabel;
+  document.getElementById('rcp-je').textContent=je.toFixed(2);
+  document.getElementById('rcp-cc').textContent=cc.toFixed(2);
+  document.getElementById('rcp-ue').textContent=ue.toFixed(2);
+  document.getElementById('rcp-dr').textContent=dr.toFixed(2);
+  document.getElementById('rcp-del').textContent=del.toFixed(2);
+  document.getElementById('rcp-cash').textContent=cash.toFixed(2);
+  document.getElementById('rcp-card').textContent=card.toFixed(2);
+  document.getElementById('rcp-total').textContent=total.toFixed(2);
+  const ws=document.getElementById('rcp-wages-section');
+  if(ws) ws.style.display='none';
+  window.print();
 }
 
 function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
