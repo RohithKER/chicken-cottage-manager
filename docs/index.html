@@ -382,7 +382,7 @@ body{
 }
 .nav-btn{
   flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;
-  padding:3px 4px 3px;background:none;border:none;cursor:pointer;
+  padding:6px 4px 2px;background:none;border:none;cursor:pointer;
   color:var(--text3);font-size:9px;font-weight:500;transition:color .15s;letter-spacing:0.2px;
 }
 .nav-icon{font-size:20px;line-height:1}
@@ -978,7 +978,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v18-nav-height';
+const _COLOR_VER='v19-nav-bottom-only';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
