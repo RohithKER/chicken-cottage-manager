@@ -952,10 +952,13 @@ body{
       <div onclick="closeReceiptModal()" style="cursor:pointer;font-size:20px;color:var(--text3);padding:4px 8px">×</div>
     </div>
     <pre id="receipt-text-preview" style="font-family:'Courier New',Courier,monospace;font-size:12px;color:var(--text2);background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;overflow-y:auto;flex:1;white-space:pre;line-height:1.5;margin:0"></pre>
+    <!-- BT Print button — shown on Android Chrome only -->
+    <button onclick="btPrintFromModal()" id="rcp-bt-btn" style="display:none;width:100%;padding:14px;border-radius:10px;border:none;background:var(--accent);color:#fff;font-size:15px;font-weight:700;cursor:pointer;letter-spacing:-0.2px">🖨 Print to Bluetooth Printer</button>
     <div style="display:flex;gap:8px;flex-shrink:0">
       <button onclick="copyReceipt()" style="flex:1;padding:12px;border-radius:10px;border:1px solid var(--border2);background:var(--surface2);color:var(--text);font-size:14px;font-weight:600;cursor:pointer">📋 Copy</button>
       <button onclick="shareReceipt()" id="rcp-share-btn" style="flex:1;padding:12px;border-radius:10px;border:1px solid var(--border2);background:var(--surface2);color:var(--text);font-size:14px;font-weight:600;cursor:pointer">📤 Share</button>
     </div>
+    <div style="text-align:center;margin-top:2px" id="rcp-bt-info"></div>
   </div>
 </div>
 
@@ -1047,7 +1050,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v41-abdul-fix-log';
+const _COLOR_VER='v42-bt-print';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -2785,7 +2788,18 @@ function printDaySales(){
 
   // Show preview modal — user picks how to send to their printer
   document.getElementById('receipt-text-preview').textContent=_currentReceiptText;
-  // Hide Share button if Web Share not supported
+  // BT Print button: only on Android Chrome (has navigator.bluetooth)
+  const btBtn=document.getElementById('rcp-bt-btn');
+  if(btBtn) btBtn.style.display=navigator.bluetooth?'':'none';
+  // Show saved printer name under BT button
+  const btInfo=document.getElementById('rcp-bt-info');
+  if(btInfo){
+    const saved=localStorage.getItem('cc_bt_printer_name');
+    btInfo.innerHTML=saved&&navigator.bluetooth
+      ?`<span style="font-size:11px;color:var(--text3)">Paired: ${saved} · <span onclick="forgetBtPrinter()" style="color:var(--accent);cursor:pointer;text-decoration:underline">Forget</span></span>`
+      :(navigator.bluetooth?'<span style="font-size:11px;color:var(--text3)">Will ask you to select a printer</span>':'');
+  }
+  // Share button: hide if not supported
   const shareBtn=document.getElementById('rcp-share-btn');
   if(shareBtn) shareBtn.style.display=navigator.share?'':'none';
   document.getElementById('receipt-overlay').style.display='flex';
@@ -2817,6 +2831,149 @@ async function shareReceipt(){
   }catch(e){
     if(e.name!=='AbortError') toast('Share failed — try Copy instead');
   }
+}
+
+/* ─── Bluetooth Printing (Android Chrome) ────────────── */
+// BLE service/characteristic pairs for common thermal printers
+const _BT_PROFILES=[
+  // Epson TM-m30 BLE (TM-m30-b001)
+  {svc:'000018f0-0000-1000-8000-00805f9b34fb',chr:'00002af1-0000-1000-8000-00805f9b34fb'},
+  // SUNMI / generic Chinese thermal printers (CloudPrint_0035)
+  {svc:'0000ff00-0000-1000-8000-00805f9b34fb',chr:'0000ff02-0000-1000-8000-00805f9b34fb'},
+  // Sewoo / another common BLE profile
+  {svc:'49535343-fe7d-4ae5-8fa9-9fafd205e455',chr:'49535343-8841-43f4-a8d4-ecbe34729bb3'},
+];
+const _BT_ALL_SVCS=_BT_PROFILES.map(p=>p.svc);
+const _BT_NAME_KEY='cc_bt_printer_name';
+let _btChar=null; // cached write characteristic
+
+function _buildEscPos(text){
+  // ESC @ = init printer, GS V A 5 = feed 5 lines + cut
+  const init=[0x1B,0x40];
+  const cut=[0x1D,0x56,0x41,0x05];
+  const encoded=new TextEncoder().encode(text);
+  const out=new Uint8Array(init.length+encoded.length+cut.length);
+  out.set(init,0);out.set(encoded,init.length);out.set(cut,init.length+encoded.length);
+  return out;
+}
+
+async function _connectBtPrinter(){
+  const savedName=localStorage.getItem(_BT_NAME_KEY)||'';
+  let device=null;
+  // Try to reuse a previously granted device (no picker needed)
+  if(navigator.bluetooth.getDevices&&savedName){
+    try{
+      const known=await navigator.bluetooth.getDevices();
+      device=known.find(d=>d.name===savedName)||null;
+      if(device)logActivity('Reconnecting to '+savedName+'…','saving');
+    }catch{}
+  }
+  if(!device){
+    // Show Bluetooth picker — filter to known printer services
+    try{
+      device=await navigator.bluetooth.requestDevice({
+        filters:_BT_PROFILES.map(p=>({services:[p.svc]})),
+        optionalServices:_BT_ALL_SVCS
+      });
+    }catch(e1){
+      if(e1.name==='NotFoundError'||e1.name==='AbortError')throw e1;
+      // Some Chrome versions don't support multiple service filters — try one
+      try{
+        device=await navigator.bluetooth.requestDevice({
+          filters:[{services:[_BT_PROFILES[0].svc]}],
+          optionalServices:_BT_ALL_SVCS
+        });
+      }catch(e2){
+        if(e2.name==='NotFoundError'||e2.name==='AbortError')throw e2;
+        // Last resort: show all BLE devices (user picks manually)
+        device=await navigator.bluetooth.requestDevice({
+          acceptAllDevices:true,
+          optionalServices:_BT_ALL_SVCS
+        });
+      }
+    }
+  }
+  if(!device)throw new Error('No printer selected');
+  localStorage.setItem(_BT_NAME_KEY,device.name||'');
+  // Update pairing info on modal
+  const btInfo=document.getElementById('rcp-bt-info');
+  if(btInfo&&device.name)btInfo.innerHTML=`<span style="font-size:11px;color:var(--text3)">Paired: ${device.name} · <span onclick="forgetBtPrinter()" style="color:var(--accent);cursor:pointer;text-decoration:underline">Forget</span></span>`;
+
+  toast('Connecting to '+device.name+'…');
+  const server=await device.gatt.connect();
+
+  // Try each known profile
+  for(const prof of _BT_PROFILES){
+    try{
+      const svc=await server.getPrimaryService(prof.svc);
+      const chr=await svc.getCharacteristic(prof.chr);
+      logActivity('Connected to '+(device.name||'printer')+' ✓','success');
+      return chr;
+    }catch{}
+  }
+  // Discovery fallback: find any writable characteristic
+  try{
+    const svcs=await server.getPrimaryServices();
+    for(const svc of svcs){
+      try{
+        const chars=await svc.getCharacteristics();
+        const wr=chars.find(c=>c.properties.writeWithoutResponse||c.properties.write);
+        if(wr){logActivity('Connected (discovered char) ✓','success');return wr;}
+      }catch{}
+    }
+  }catch{}
+  throw new Error('No print service found. Try the other printer from the list.');
+}
+
+async function printViaBluetooth(text){
+  // Check cached connection
+  if(_btChar){
+    try{
+      if(!_btChar.service.device.gatt.connected)await _btChar.service.device.gatt.connect();
+    }catch{_btChar=null;}
+  }
+  if(!_btChar){
+    try{_btChar=await _connectBtPrinter();}
+    catch(e){
+      if(e.name==='NotFoundError'||e.name==='AbortError')return false;
+      logActivity('BT connect failed: '+e.message,'error');
+      toast('❌ '+e.message);
+      return false;
+    }
+  }
+  const data=_buildEscPos(text);
+  const CHUNK=200;
+  const btBtn=document.getElementById('rcp-bt-btn');
+  if(btBtn){btBtn.textContent='Printing…';btBtn.disabled=true;}
+  try{
+    for(let i=0;i<data.length;i+=CHUNK){
+      const chunk=data.slice(i,i+CHUNK);
+      try{await _btChar.writeValueWithoutResponse(chunk);}
+      catch{await _btChar.writeValue(chunk);}
+      if(i+CHUNK<data.length)await new Promise(r=>setTimeout(r,30));
+    }
+    logActivity('Receipt printed via Bluetooth ✓','success');
+    toast('Printed ✓');
+    closeReceiptModal();
+    return true;
+  }catch(e){
+    _btChar=null;
+    logActivity('BT print error: '+e.message,'error');
+    toast('Print error: '+e.message);
+    return false;
+  }finally{
+    if(btBtn){btBtn.textContent='🖨 Print to Bluetooth Printer';btBtn.disabled=false;}
+  }
+}
+
+function btPrintFromModal(){printViaBluetooth(_currentReceiptText);}
+
+function forgetBtPrinter(){
+  localStorage.removeItem(_BT_NAME_KEY);
+  _btChar=null;
+  const btInfo=document.getElementById('rcp-bt-info');
+  if(btInfo)btInfo.innerHTML='<span style="font-size:11px;color:var(--text3)">Will ask you to select a printer</span>';
+  toast('Printer forgotten — next print will ask again');
 }
 
 function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
