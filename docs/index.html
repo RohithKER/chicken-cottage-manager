@@ -985,7 +985,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v20-nav-polish';
+const _COLOR_VER='v21-canvas-day-fix';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -1592,6 +1592,7 @@ async function shareRota(){
   // column header labels
   ctx.textAlign='left'; ctx.textBaseline='middle';
   ctx.font=`bold 10px -apple-system,sans-serif`;
+  ctx.fillStyle='#4a4a4a';
   ctx.fillText('DAY',PAD+10,TBL_Y+TH_H/2);
   ctx.fillStyle='#4a4a4a';
   cols.forEach((c,i)=>{
