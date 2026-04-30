@@ -655,6 +655,26 @@ body{
 .rcp-total{display:flex;justify-content:space-between;font-weight:bold;font-size:14px;margin:2mm 0}
 .rcp-staff-hdr{font-weight:bold;margin:2mm 0 1mm;font-size:12px}
 .rcp-staff-row{display:flex;justify-content:space-between;font-size:11px;margin:0.5mm 0}
+/* ─── Activity Log ───────────────────────────── */
+#log-overlay{position:fixed;inset:0;z-index:8500;background:rgba(0,0,0,.65);display:none;align-items:flex-end;justify-content:center}
+#log-panel{width:100%;max-width:480px;background:var(--surface);border-radius:20px 20px 0 0;border-top:1px solid var(--border2);padding:16px 16px 32px;max-height:65dvh;display:flex;flex-direction:column;gap:10px}
+#log-list{overflow-y:auto;flex:1;padding-right:2px}
+.log-entry{display:flex;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px;line-height:1.4}
+.log-entry:last-child{border-bottom:none}
+.log-time{color:var(--text3);font-size:11px;flex-shrink:0;padding-top:1px;min-width:64px;font-variant-numeric:tabular-nums}
+.log-msg{color:var(--text2);flex:1}
+.log-entry.success .log-msg{color:var(--green)}
+.log-entry.error .log-msg{color:var(--red)}
+.log-entry.saving .log-msg{color:var(--accent)}
+.log-empty{color:var(--text3);font-size:13px;padding:24px 0;text-align:center}
+/* ─── Save-cloud btn ─────────────────────────── */
+.save-cloud-btn{display:flex;align-items:center;justify-content:center;gap:5px;padding:7px 12px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text2);font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap}
+.save-cloud-btn:active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.save-cloud-btn.saving{color:var(--accent);border-color:var(--accent);animation:pulse-save .8s ease-in-out infinite}
+.save-cloud-btn.ok{color:var(--green);border-color:rgba(82,192,138,.4)}
+@keyframes pulse-save{0%,100%{opacity:1}50%{opacity:.5}}
+/* ─── Sync-confirm overlay fix ───────────────── */
+#sync-confirm-overlay{position:fixed;inset:0;z-index:9400;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;padding:24px}
 </style>
 </head>
 <body>
@@ -730,7 +750,8 @@ body{
       <button onclick="changeWeek(1)">›</button>
     </div>
     <div class="icon-btn" onclick="shareRota()" title="Share rota as image">📤</div>
-    <div class="icon-btn" id="sync-btn" onclick="syncAll()" title="Sync all data">↻</div>
+    <div class="icon-btn" id="log-btn" onclick="openLog()" title="Activity log" style="font-size:14px">📋</div>
+    <div class="icon-btn" id="sync-btn" onclick="confirmSyncAll()" title="Sync all data">↻</div>
     <div class="icon-btn" onclick="toggleUserMenu()">👤</div>
   </div>
 
@@ -738,7 +759,8 @@ body{
     <button class="type-tab active" onclick="setType('inside')">Staff</button>
     <button class="type-tab" onclick="setType('delivery')">Delivery</button>
     <div style="flex:1"></div>
-    <button class="cp-btn" onclick="copyWeek()" id="copy-btn" title="Copy this week">📋</button>
+    <button class="save-cloud-btn" id="save-rota-btn" onclick="saveRotaStaffToCloud()" title="Save rota & staff to cloud">☁ Save</button>
+    <button class="cp-btn" onclick="copyWeek()" id="copy-btn" title="Copy this week" style="margin-left:4px">📋</button>
     <button class="cp-btn" onclick="pasteWeek()" id="paste-btn" title="Paste to this week" style="display:none">📌</button>
     <button class="cp-btn" onclick="clearWeek()" id="clear-btn" title="Clear this week">🗑️</button>
     <div class="view-toggle">
@@ -851,6 +873,11 @@ body{
         <button onclick="changeSalesWeek(-1)">‹</button>
         <div id="sales-week-label">Loading…</div>
         <button onclick="changeSalesWeek(1)">›</button>
+      </div>
+      <!-- Sales save/sync row -->
+      <div style="display:flex;gap:8px;padding:0 10px 8px">
+        <button class="save-cloud-btn" id="save-sales-btn" onclick="saveSalesWeekToCloud()" style="flex:1">☁ Save Sales</button>
+        <button class="save-cloud-btn" id="sync-sales-btn" onclick="syncSalesOnly()" style="flex:1">↻ Sync Sales</button>
       </div>
 
       <!-- Weekly Table -->
@@ -1020,7 +1047,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v40-receipt-modal';
+const _COLOR_VER='v41-abdul-fix-log';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -1208,11 +1235,12 @@ async function syncAll(){
   const btn=document.getElementById('sync-btn');
   if(btn){btn.classList.add('syncing');btn.title='Syncing…';}
   let ok=false;
+  logActivity('Sync started…', 'saving');
   try{
     if(!user)throw new Error('Not signed in');
     // 1. Settings: colours, blacklist, column layouts
     await loadColsFromCloud();
-    // 2. Staff list
+    // 2. Staff list from cloud
     const{data:staffData}=await db.from('staff').select('*');
     if(staffData&&staffData.length>0){
       state.staff.inside=staffData.filter(s=>s.type==='inside'||s.type==='both').map(s=>s.name);
@@ -1225,19 +1253,21 @@ async function syncAll(){
              staff_names:names,updated_at:new Date().toISOString()};
     });
     if(pushRows.length>0){
-      await db.from('schedules').upsert(pushRows,{onConflict:'schedule_type,week_key,day,shift_col'});
+      const{error}=await db.from('schedules').upsert(pushRows,{onConflict:'schedule_type,week_key,day,shift_col'});
+      if(error)logActivity('Push schedules warning: '+error.message, 'error');
+      else logActivity(`Pushed ${pushRows.length} schedule rows ✓`, 'success');
     }
     // 4. Pull fresh merged data from Supabase (includes our push + other users' changes)
     await loadSchedules();
     // 5. Sales data for currently viewed week
     await loadSalesWeek();
     // Re-render everything
-    renderRota();
-    renderStaff();
-    applyStaffColors();
+    renderRota();renderStaff();applyStaffColors();
+    logActivity('Full sync complete ✓', 'success');
     ok=true;
   }catch(e){
     console.warn('Sync error:',e);
+    logActivity('Sync failed: '+e.message, 'error');
     toast('Sync failed — check connection');
   }finally{
     if(btn){
@@ -1289,14 +1319,17 @@ async function saveShiftToCloud(type,wk,day,col,names){
       _t
     ]);
     setSyncDot(day,col,'saved');
+    logActivity(`${day} ${col} saved to cloud ✓`, 'success');
     setTimeout(()=>setSyncDot(day,col,''),1500);
   }catch(e){
     setSyncDot(day,col,'');
     if(e.message==='timeout'){
       toast('⚠ Saved locally — tap ↻ to sync when online');
+      logActivity(`${day} ${col} — saved locally (cloud timeout)`, 'saving');
     } else {
       console.error('Save error:',e);
       toast('Save failed: '+e.message);
+      logActivity(`${day} ${col} save failed: ${e.message}`, 'error');
     }
   }
 }
@@ -1313,6 +1346,122 @@ function setSyncDot(day,col,status){
 async function saveStaffToCloud(name,type){
   if(!user)return;
   await db.from('staff').upsert({name,type},{onConflict:'name'});
+  logActivity(`Staff: ${name} (${type}) saved ✓`, 'success');
+}
+
+/* ─── Activity Log ───────────────────────────────────── */
+const _actLog=[];
+function logActivity(msg,type='info'){
+  const now=new Date();
+  const time=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  _actLog.unshift({time,msg,type});
+  if(_actLog.length>150)_actLog.pop();
+  // Update panel if open
+  const ov=document.getElementById('log-overlay');
+  if(ov&&ov.style.display!=='none')renderActivityLog();
+}
+function renderActivityLog(){
+  const el=document.getElementById('log-list');
+  if(!el)return;
+  el.innerHTML=_actLog.length?_actLog.map(e=>
+    `<div class="log-entry ${e.type}"><span class="log-time">${e.time}</span><span class="log-msg">${e.msg}</span></div>`
+  ).join(''):'<div class="log-empty">No activity yet</div>';
+}
+function openLog(){
+  renderActivityLog();
+  document.getElementById('log-overlay').style.display='flex';
+}
+function closeLog(){document.getElementById('log-overlay').style.display='none';}
+
+/* ─── Sync confirm ───────────────────────────────────── */
+function confirmSyncAll(){
+  document.getElementById('sync-confirm-overlay').style.display='flex';
+}
+function closeSyncConfirm(){
+  document.getElementById('sync-confirm-overlay').style.display='none';
+}
+
+/* ─── Save Rota + Staff to Cloud ─────────────────────── */
+async function saveRotaStaffToCloud(){
+  if(!user){toast('Sign in to save');return;}
+  const btn=document.getElementById('save-rota-btn');
+  if(btn){btn.classList.add('saving');btn.textContent='☁ Saving…';}
+  try{
+    // Push all local schedule rows
+    const pushRows=Object.entries(state.schedules).map(([key,names])=>{
+      const parts=key.split('|');
+      return{schedule_type:parts[0],week_key:parts[1],day:parts[2],shift_col:parts[3],
+             staff_names:names,updated_at:new Date().toISOString()};
+    });
+    if(pushRows.length>0){
+      const{error}=await db.from('schedules').upsert(pushRows,{onConflict:'schedule_type,week_key,day,shift_col'});
+      if(error)throw error;
+    }
+    // Push current staff list
+    const staffRows=[];
+    state.staff.inside.forEach(name=>{
+      const inDel=state.staff.delivery.includes(name);
+      staffRows.push({name,type:inDel?'both':'inside'});
+    });
+    state.staff.delivery.forEach(name=>{
+      if(!state.staff.inside.includes(name))staffRows.push({name,type:'delivery'});
+    });
+    if(staffRows.length>0){
+      const{error}=await db.from('staff').upsert(staffRows,{onConflict:'name'});
+      if(error)throw error;
+    }
+    logActivity(`Rota & staff saved to cloud (${pushRows.length} shifts, ${staffRows.length} staff) ✓`, 'success');
+    toast('Rota & staff saved ✓');
+    if(btn){btn.classList.remove('saving');btn.classList.add('ok');btn.textContent='✓ Saved';}
+    setTimeout(()=>{if(btn){btn.classList.remove('ok');btn.textContent='☁ Save';}},2500);
+  }catch(e){
+    logActivity('Save rota/staff failed: '+e.message, 'error');
+    toast('Save failed: '+e.message);
+    if(btn){btn.classList.remove('saving');btn.textContent='☁ Save';}
+  }
+}
+
+/* ─── Save Sales Week to Cloud ───────────────────────── */
+async function saveSalesWeekToCloud(){
+  if(!user){toast('Sign in to save');return;}
+  const btn=document.getElementById('save-sales-btn');
+  if(btn){btn.classList.add('saving');btn.textContent='☁ Saving…';}
+  try{
+    const cached=_loadSalesCache();
+    const dates=getSalesWeekDates(salesWeekOffset);
+    const rows=dates.map(d=>fmt(d)).filter(k=>cached[k]).map(k=>cached[k]);
+    if(!rows.length){toast('No sales data this week');if(btn){btn.classList.remove('saving');btn.textContent='☁ Save Sales';}return;}
+    for(const row of rows){
+      const{error}=await db.from('daily_sales').upsert(row,{onConflict:'sale_date',ignoreDuplicates:false});
+      if(error)throw error;
+    }
+    logActivity(`Sales week saved to cloud (${rows.length} days) ✓`, 'success');
+    toast(`${rows.length} days saved ✓`);
+    if(btn){btn.classList.remove('saving');btn.classList.add('ok');btn.textContent='✓ Saved';}
+    setTimeout(()=>{if(btn){btn.classList.remove('ok');btn.textContent='☁ Save Sales';}},2500);
+  }catch(e){
+    logActivity('Save sales failed: '+e.message, 'error');
+    toast('Save failed: '+e.message);
+    if(btn){btn.classList.remove('saving');btn.textContent='☁ Save Sales';}
+  }
+}
+
+/* ─── Sync Sales Only ────────────────────────────────── */
+async function syncSalesOnly(){
+  if(!user){toast('Sign in to sync');return;}
+  const btn=document.getElementById('sync-sales-btn');
+  if(btn){btn.classList.add('saving');btn.textContent='↻ Syncing…';}
+  try{
+    await loadSalesWeek();
+    logActivity('Sales synced from cloud ✓', 'success');
+    toast('Sales synced ✓');
+    if(btn){btn.classList.remove('saving');btn.classList.add('ok');btn.textContent='✓ Synced';}
+    setTimeout(()=>{if(btn){btn.classList.remove('ok');btn.textContent='↻ Sync Sales';}},2500);
+  }catch(e){
+    logActivity('Sales sync failed: '+e.message, 'error');
+    toast('Sync failed: '+e.message);
+    if(btn){btn.classList.remove('saving');btn.textContent='↻ Sync Sales';}
+  }
 }
 async function deleteStaffFromCloud(name){
   if(!user)return;
@@ -1520,13 +1669,25 @@ async function addStaff(){
   if(type==='inside'||type==='both'){if(!state.staff.inside.includes(name))state.staff.inside.push(name);}
   if(type==='delivery'||type==='both'){if(!state.staff.delivery.includes(name))state.staff.delivery.push(name);}
   document.getElementById('ns-name').value='';
-  // save chosen colour
-  staffColors[name]=newStaffColor;
+  // Save colour — use typed keys if in both lists so colours stay independent
+  if(type==='both'){
+    staffColors[name+'|inside']=newStaffColor;
+    staffColors[name+'|delivery']=newStaffColor;
+  } else {
+    // If they're also in the other list, use typed key; otherwise plain name
+    const inOther=(type==='inside'&&state.staff.delivery.includes(name))||(type==='delivery'&&state.staff.inside.includes(name));
+    if(inOther){staffColors[name+'|'+type]=newStaffColor;}
+    else{staffColors[name]=newStaffColor;}
+  }
   localStorage.setItem('cc_staff_colors',JSON.stringify(staffColors));
   saveColorsToCloud();
   applyStaffColors();
   renderStaff();toast(`${name} added`); // update UI immediately, don't wait for cloud
-  saveStaffToCloud(name,type).catch(e=>console.warn('Staff save failed:',e));
+  logActivity(`${name} added (${type})`, 'success');
+  saveStaffToCloud(name,type).catch(e=>{
+    console.warn('Staff save failed:',e);
+    logActivity(`Failed to save ${name} to cloud: ${e.message}`, 'error');
+  });
 }
 
 function removeStaff(type,name){
@@ -1538,23 +1699,33 @@ function removeStaff(type,name){
 }
 function _doRemoveStaff(type,name){
   state.staff[type]=state.staff[type].filter(n=>n!==name);
-  // Blacklist — synced to cloud so mobile picks it up
-  staffBlacklist.add(name);
-  localStorage.setItem('cc_staff_blacklist',JSON.stringify([...staffBlacklist]));
-  saveBlacklistToCloud();
-  // Remove from local schedule cache
-  Object.keys(state.schedules).forEach(k=>{
-    if(state.schedules[k].includes(name))
-      state.schedules[k]=state.schedules[k].filter(n=>n!==name);
-  });
-  renderStaff();renderRota();toast(`${name} removed`);
-  // Purge from ALL Supabase schedule rows (so they can't come back on reload)
-  purgeStaffFromCloud(name);
-  // Remove from staff table
-  const inInside=state.staff.inside.includes(name);
-  const inDelivery=state.staff.delivery.includes(name);
-  if(!inInside&&!inDelivery) deleteStaffFromCloud(name).catch(()=>{});
-  else saveStaffToCloud(name,inInside&&inDelivery?'both':inInside?'inside':'delivery').catch(()=>{});
+  // Check if person is still in another list
+  const stillInInside=state.staff.inside.includes(name);
+  const stillInDelivery=state.staff.delivery.includes(name);
+  const removedFromAll=!stillInInside&&!stillInDelivery;
+
+  if(removedFromAll){
+    // Only blacklist when completely gone — prevents cross-list hiding bug
+    staffBlacklist.add(name);
+    localStorage.setItem('cc_staff_blacklist',JSON.stringify([...staffBlacklist]));
+    saveBlacklistToCloud();
+    // Remove from local schedule cache
+    Object.keys(state.schedules).forEach(k=>{
+      if(state.schedules[k]&&state.schedules[k].includes(name))
+        state.schedules[k]=state.schedules[k].filter(n=>n!==name);
+    });
+    _saveSchedCache(state.schedules);
+    // Purge from cloud schedules and delete staff record
+    purgeStaffFromCloud(name);
+    deleteStaffFromCloud(name).catch(()=>{});
+    logActivity(`${name} removed from all lists`, 'error');
+  } else {
+    // Still in another list — just update their type, do NOT blacklist
+    const newType=stillInInside&&stillInDelivery?'both':stillInInside?'inside':'delivery';
+    saveStaffToCloud(name,newType).catch(()=>{});
+    logActivity(`${name} removed from ${type} (still in ${newType})`, 'info');
+  }
+  renderStaff();renderRota();toast(`${name} removed from ${type}`);
 }
 async function purgeStaffFromCloud(name){
   if(!user)return;
@@ -2548,12 +2719,17 @@ async function saveDaySales(){
   };
   const{error}=await db.from('daily_sales')
     .upsert(payload,{onConflict:'sale_date',ignoreDuplicates:false});
-  if(error){toast('Save failed: '+error.message);return;}
+  if(error){
+    toast('Save failed: '+error.message);
+    logActivity(`Sales ${salesOpenDate} save failed: ${error.message}`, 'error');
+    return;
+  }
   // Update local cache and re-render immediately
   salesWeekData[salesOpenDate]=payload;
   const merged={..._loadSalesCache(),[salesOpenDate]:payload};
   _saveSalesCache(merged);
   renderSalesTable();
+  logActivity(`Sales ${salesOpenDate} saved to cloud ✓`, 'success');
   toast('Saved ✓');
   closeDayEntry();
 }
@@ -2691,6 +2867,29 @@ init();
     <div style="display:flex;gap:10px">
       <button onclick="_confirmNo()" style="flex:1;padding:12px;background:var(--surface2);border:1px solid var(--border);color:var(--text2);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">Cancel</button>
       <button onclick="_confirmYes()" style="flex:1;padding:12px;background:var(--red);border:none;color:#fff;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">Remove</button>
+    </div>
+  </div>
+</div>
+
+<!-- Activity Log Panel -->
+<div id="log-overlay" onclick="if(event.target===this)closeLog()">
+  <div id="log-panel">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+      <div style="font-size:15px;font-weight:700;color:var(--text)">Activity Log</div>
+      <div onclick="closeLog()" style="cursor:pointer;font-size:20px;color:var(--text3);padding:4px 8px">×</div>
+    </div>
+    <div id="log-list"></div>
+  </div>
+</div>
+
+<!-- Sync Confirm Dialog -->
+<div id="sync-confirm-overlay">
+  <div style="width:100%;max-width:320px;background:#252525;border-radius:16px;padding:24px;box-shadow:0 8px 32px rgba(0,0,0,.6)">
+    <div style="font-size:17px;font-weight:700;color:var(--text);margin-bottom:8px">Sync All Data?</div>
+    <div style="font-size:13px;color:var(--text2);line-height:1.5;margin-bottom:20px">This will push your local changes to the cloud, then pull the latest rota, staff and sales from all users.</div>
+    <div style="display:flex;gap:10px">
+      <button onclick="closeSyncConfirm()" style="flex:1;padding:12px;background:var(--surface2);border:1px solid var(--border);color:var(--text2);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">Cancel</button>
+      <button onclick="closeSyncConfirm();syncAll()" style="flex:1;padding:12px;background:var(--accent);border:none;color:#fff;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">Sync</button>
     </div>
   </div>
 </div>
