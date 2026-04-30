@@ -916,10 +916,6 @@ body{
 <!-- User Menu -->
 <div id="user-menu">
   <div class="um-email" id="um-email">Loading...</div>
-  <div class="um-item um-toggle" onclick="toggleUniquePerDay()">
-    <span style="font-size:13px">One shift per person per day</span>
-    <div class="um-switch" id="unique-switch"></div>
-  </div>
   <div class="um-item danger" onclick="signOut()">🚪 Sign Out</div>
 </div>
 
@@ -1008,7 +1004,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v26-better-colours';
+const _COLOR_VER='v27-blacklist-abzar-fix';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -1102,6 +1098,8 @@ let modalSel = [];
 let authMode = 'signin';
 let colEditorType = 'inside';
 let uniquePerDay = localStorage.getItem('cc_unique_day') === '1';
+// Removed-staff blacklist: persists across reloads so cloud-lag can't bring them back
+let staffBlacklist = new Set(JSON.parse(localStorage.getItem('cc_staff_blacklist')||'[]'));
 
 /* ─── Week helpers ───────────────────────────────────── */
 function weekStart(off=0){
@@ -1206,7 +1204,8 @@ async function deleteStaffFromCloud(name){
 
 /* ─── Local state helpers ────────────────────────────── */
 function getShift(type,off,day,col){
-  return state.schedules[`${type}|${weekKey(off)}|${day}|${col}`]||[];
+  const raw=state.schedules[`${type}|${weekKey(off)}|${day}|${col}`]||[];
+  return staffBlacklist.size?raw.filter(n=>!staffBlacklist.has(n)):raw;
 }
 function setShift(type,off,day,col,names){
   const k=`${type}|${weekKey(off)}|${day}|${col}`;
@@ -1377,9 +1376,8 @@ function saveShift(){
 function toggleUniquePerDay(){
   uniquePerDay=!uniquePerDay;
   localStorage.setItem('cc_unique_day',uniquePerDay?'1':'0');
-  document.getElementById('unique-switch').classList.toggle('on',uniquePerDay);
-  const s2=document.getElementById('unique-switch-settings');
-  if(s2)s2.classList.toggle('on',uniquePerDay);
+  const sw=document.getElementById('unique-switch-settings');
+  if(sw)sw.classList.toggle('on',uniquePerDay);
 }
 
 function closeModal(){
@@ -1394,6 +1392,11 @@ async function addStaff(){
   const name=document.getElementById('ns-name').value.trim();
   const type=document.getElementById('ns-type').value;
   if(!name){toast('Enter a name');return;}
+  // Un-blacklist if they were previously removed
+  if(staffBlacklist.has(name)){
+    staffBlacklist.delete(name);
+    localStorage.setItem('cc_staff_blacklist',JSON.stringify([...staffBlacklist]));
+  }
   if(type==='inside'||type==='both'){if(!state.staff.inside.includes(name))state.staff.inside.push(name);}
   if(type==='delivery'||type==='both'){if(!state.staff.delivery.includes(name))state.staff.delivery.push(name);}
   document.getElementById('ns-name').value='';
@@ -1407,6 +1410,9 @@ async function addStaff(){
 
 function removeStaff(type,name){
   state.staff[type]=state.staff[type].filter(n=>n!==name);
+  // Blacklist so they stay gone even if cloud re-loads stale data
+  staffBlacklist.add(name);
+  localStorage.setItem('cc_staff_blacklist',JSON.stringify([...staffBlacklist]));
   // Also remove from all schedule slots so they disappear from the rota immediately
   Object.keys(state.schedules).forEach(k=>{
     if(state.schedules[k].includes(name)){
@@ -1931,9 +1937,8 @@ async function signOut(){
 function toggleUserMenu(){document.getElementById('user-menu').classList.toggle('open');}
 function closeUserMenu(){document.getElementById('user-menu').classList.remove('open');}
 // Apply saved unique-per-day state on load
-document.getElementById('unique-switch').classList.toggle('on',uniquePerDay);
-const _s2=document.getElementById('unique-switch-settings');
-if(_s2)_s2.classList.toggle('on',uniquePerDay);
+const _sw=document.getElementById('unique-switch-settings');
+if(_sw)_sw.classList.toggle('on',uniquePerDay);
 document.addEventListener('click',e=>{
   const menu=document.getElementById('user-menu');
   if(menu.classList.contains('open')&&!menu.contains(e.target)&&!e.target.closest('.icon-btn'))closeUserMenu();
