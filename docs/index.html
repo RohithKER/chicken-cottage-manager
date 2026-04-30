@@ -440,6 +440,19 @@ body{
 }
 .um-item:active{background:var(--surface2)}
 .um-item.danger{color:var(--red)}
+.um-item.um-toggle{justify-content:space-between;user-select:none}
+.um-switch{
+  width:34px;height:20px;border-radius:10px;
+  background:var(--surface2);border:1px solid var(--border2);
+  position:relative;transition:background .2s,border-color .2s;flex-shrink:0;
+}
+.um-switch::after{
+  content:'';position:absolute;top:2px;left:2px;
+  width:14px;height:14px;border-radius:50%;
+  background:#888;transition:transform .2s,background .2s;
+}
+.um-switch.on{background:rgba(91,156,245,0.25);border-color:rgba(91,156,245,0.5)}
+.um-switch.on::after{transform:translateX(14px);background:#5B9CF5}
 
 /* ─── Toast ──────────────────────────────────────── */
 #toast{
@@ -878,6 +891,10 @@ body{
 <!-- User Menu -->
 <div id="user-menu">
   <div class="um-email" id="um-email">Loading...</div>
+  <div class="um-item um-toggle" onclick="toggleUniquePerDay()">
+    <span style="font-size:13px">One shift per person per day</span>
+    <div class="um-switch" id="unique-switch"></div>
+  </div>
   <div class="um-item danger" onclick="signOut()">🚪 Sign Out</div>
 </div>
 
@@ -957,7 +974,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v10-off-red';
+const _COLOR_VER='v11-unique-day';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -1050,6 +1067,7 @@ let modalCtx = null;
 let modalSel = [];
 let authMode = 'signin';
 let colEditorType = 'inside';
+let uniquePerDay = localStorage.getItem('cc_unique_day') === '1';
 
 /* ─── Week helpers ───────────────────────────────────── */
 function weekStart(off=0){
@@ -1301,8 +1319,31 @@ function togglePick(el,name){
 
 function saveShift(){
   if(!modalCtx)return;
-  setShift(state.type,state.weekOffset,modalCtx.day,modalCtx.col,modalSel);
+  const {day,col}=modalCtx;
+
+  // ── Unique-per-day enforcement ────────────────────────
+  if(uniquePerDay){
+    const cols=COLS[state.type];
+    // For each person being added to this shift, remove them from every other shift on the same day
+    modalSel.forEach(name=>{
+      cols.forEach(otherCol=>{
+        if(otherCol===col)return;
+        const other=getShift(state.type,state.weekOffset,day,otherCol);
+        if(other.includes(name)){
+          setShift(state.type,state.weekOffset,day,otherCol,other.filter(n=>n!==name));
+        }
+      });
+    });
+  }
+
+  setShift(state.type,state.weekOffset,day,col,modalSel);
   closeModal();renderRota();toast('Shift saved ✓');
+}
+
+function toggleUniquePerDay(){
+  uniquePerDay=!uniquePerDay;
+  localStorage.setItem('cc_unique_day',uniquePerDay?'1':'0');
+  document.getElementById('unique-switch').classList.toggle('on',uniquePerDay);
 }
 
 function closeModal(){
@@ -1823,6 +1864,8 @@ async function signOut(){
 /* ─── User Menu ──────────────────────────────────────── */
 function toggleUserMenu(){document.getElementById('user-menu').classList.toggle('open');}
 function closeUserMenu(){document.getElementById('user-menu').classList.remove('open');}
+// Apply saved unique-per-day state on load
+document.getElementById('unique-switch').classList.toggle('on',uniquePerDay);
 document.addEventListener('click',e=>{
   const menu=document.getElementById('user-menu');
   if(menu.classList.contains('open')&&!menu.contains(e.target)&&!e.target.closest('.icon-btn'))closeUserMenu();
