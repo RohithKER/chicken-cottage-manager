@@ -456,6 +456,63 @@ body{
 ::-webkit-scrollbar{width:3px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px}
+
+/* ─── Sales View ─────────────────────────────────── */
+.sales-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);margin-bottom:12px;overflow:hidden}
+.sales-section-hdr{padding:12px 14px 10px;border-bottom:1px solid var(--border);font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.7px}
+.sales-row{display:flex;align-items:center;padding:10px 14px;gap:10px;border-bottom:1px solid rgba(255,255,255,.04)}
+.sales-row:last-child{border-bottom:none}
+.sales-row label{font-size:14px;color:var(--text2);flex:1;min-width:0}
+.sales-row input[type=number]{width:96px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:15px;font-weight:600;padding:7px 10px;text-align:right;outline:none;-moz-appearance:textfield}
+.sales-row input[type=number]::-webkit-inner-spin-button{display:none}
+.sales-row input[type=number]:focus{border-color:var(--accent)}
+.sales-total-row{display:flex;align-items:center;padding:11px 14px;gap:10px;background:var(--surface2)}
+.sales-total-row label{font-size:14px;color:var(--text);font-weight:600;flex:1}
+.sales-total-val{font-size:16px;font-weight:700;color:var(--text)}
+.wage-row{display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid rgba(255,255,255,.04)}
+.wage-row:last-child{border-bottom:none}
+.wage-name{flex:1;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:14px;padding:7px 10px;outline:none}
+.wage-name:focus{border-color:var(--accent)}
+.wage-amt{width:80px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:14px;font-weight:600;padding:7px 10px;text-align:right;outline:none;-moz-appearance:textfield}
+.wage-amt::-webkit-inner-spin-button{display:none}
+.wage-amt:focus{border-color:var(--accent)}
+.wage-paid{display:flex;align-items:center;gap:4px;font-size:12px;color:var(--text2);cursor:pointer;user-select:none}
+.wage-paid input{accent-color:var(--green)}
+.wage-del{background:none;border:none;color:var(--text3);font-size:18px;cursor:pointer;padding:0 4px;line-height:1}
+.sales-add-btn{display:block;width:100%;padding:10px;background:none;border:none;color:var(--accent);font-size:14px;font-weight:600;cursor:pointer;text-align:center}
+.sales-btn-row{display:flex;gap:10px;padding:4px 0 12px}
+.sales-hist-item{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);margin-bottom:10px;padding:12px 14px;cursor:pointer}
+.sales-hist-date{font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px}
+.sales-hist-sub{font-size:12px;color:var(--text2)}
+.sales-hist-del{float:right;background:none;border:none;color:var(--text3);font-size:16px;cursor:pointer;padding:0 2px}
+
+/* ─── Print / Thermal Receipt ────────────────────── */
+@media print{
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  body>*:not(#print-receipt){display:none!important}
+  #print-receipt{display:block!important}
+  @page{margin:0;size:80mm auto}
+}
+#print-receipt{
+  display:none;
+  font-family:'Courier New',Courier,monospace;
+  font-size:12px;
+  width:72mm;
+  padding:4mm 4mm 8mm;
+  color:#000;
+  background:#fff;
+  line-height:1.5;
+}
+.rcp-center{text-align:center}
+.rcp-logo{width:20mm;height:20mm;object-fit:contain;margin-bottom:2mm}
+.rcp-title{font-size:16px;font-weight:bold;text-align:center;margin-bottom:1mm}
+.rcp-date{font-size:11px;text-align:center;color:#444;margin-bottom:3mm}
+.rcp-divider{border:none;border-top:1px dashed #000;margin:3mm 0}
+.rcp-row{display:flex;justify-content:space-between;margin:1mm 0;font-size:12px}
+.rcp-row-bold{display:flex;justify-content:space-between;margin:1mm 0;font-weight:bold;font-size:13px}
+.rcp-total{display:flex;justify-content:space-between;font-weight:bold;font-size:14px;margin:2mm 0}
+.rcp-staff-hdr{font-weight:bold;margin:2mm 0 1mm;font-size:12px}
+.rcp-staff-row{display:flex;justify-content:space-between;font-size:11px;margin:0.5mm 0}
 </style>
 </head>
 <body>
@@ -606,6 +663,91 @@ body{
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)">
     </div>
 
+    <!-- ══ SALES VIEW ═══════════════════════════════ -->
+    <div id="view-sales" class="view" style="padding:12px 10px 24px;overflow-y:auto">
+
+      <!-- Toggle: Form / History -->
+      <div style="display:flex;gap:8px;margin-bottom:14px">
+        <button id="sales-tab-form" onclick="salesTab('form')" style="flex:1;padding:9px;background:var(--accent);border:none;color:#fff;border-radius:9px;font-size:14px;font-weight:600;cursor:pointer">New Entry</button>
+        <button id="sales-tab-hist" onclick="salesTab('hist')" style="flex:1;padding:9px;background:var(--surface);border:1px solid var(--border);color:var(--text2);border-radius:9px;font-size:14px;font-weight:600;cursor:pointer">History</button>
+      </div>
+
+      <!-- ── Form Panel ── -->
+      <div id="sales-form-panel">
+        <!-- Date -->
+        <div class="sales-section">
+          <div class="sales-section-hdr">Date</div>
+          <div class="sales-row">
+            <label>Sale Date</label>
+            <input type="date" id="s-date" style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:14px;padding:7px 10px;outline:none">
+          </div>
+        </div>
+
+        <!-- Delivery Platforms -->
+        <div class="sales-section">
+          <div class="sales-section-hdr">Delivery Platforms</div>
+          <div class="sales-row">
+            <label>Just Eat</label>
+            <input type="number" id="s-je" placeholder="0.00" step="0.01" min="0" oninput="calcSales()">
+          </div>
+          <div class="sales-row">
+            <label>CC App</label>
+            <input type="number" id="s-cc" placeholder="0.00" step="0.01" min="0" oninput="calcSales()">
+          </div>
+          <div class="sales-row">
+            <label>Uber Eats</label>
+            <input type="number" id="s-ue" placeholder="0.00" step="0.01" min="0" oninput="calcSales()">
+          </div>
+          <div class="sales-row">
+            <label>Deliveroo</label>
+            <input type="number" id="s-dr" placeholder="0.00" step="0.01" min="0" oninput="calcSales()">
+          </div>
+          <div class="sales-total-row">
+            <label>Total Delivery</label>
+            <div class="sales-total-val" id="s-del-total">£0.00</div>
+          </div>
+        </div>
+
+        <!-- Payments -->
+        <div class="sales-section">
+          <div class="sales-section-hdr">Payments</div>
+          <div class="sales-row">
+            <label>Cash</label>
+            <input type="number" id="s-cash" placeholder="0.00" step="0.01" min="0" oninput="calcSales()">
+          </div>
+          <div class="sales-row">
+            <label>Card</label>
+            <input type="number" id="s-card" placeholder="0.00" step="0.01" min="0" oninput="calcSales()">
+          </div>
+          <div class="sales-total-row">
+            <label>Total Sales</label>
+            <div class="sales-total-val" id="s-total" style="color:var(--green)">£0.00</div>
+          </div>
+        </div>
+
+        <!-- Staff Wages -->
+        <div class="sales-section">
+          <div class="sales-section-hdr">Staff Wages</div>
+          <div id="wage-rows"></div>
+          <button class="sales-add-btn" onclick="addWageRow()">+ Add Staff Member</button>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="sales-btn-row">
+          <button class="btn-sm ghost" style="flex:1;padding:13px;font-size:14px" onclick="printSales()">🖨 Print</button>
+          <button class="btn-sm primary" style="flex:1;padding:13px;font-size:14px" onclick="saveSales()">Save</button>
+        </div>
+      </div>
+
+      <!-- ── History Panel ── -->
+      <div id="sales-hist-panel" style="display:none">
+        <div id="sales-hist-list" style="padding-bottom:8px">
+          <div style="text-align:center;color:var(--text3);font-size:14px;padding:40px 0">Loading...</div>
+        </div>
+      </div>
+
+    </div><!-- /view-sales -->
+
   </div><!-- /content -->
 
   <div id="bottom-nav">
@@ -614,6 +756,9 @@ body{
     </button>
     <button class="nav-btn" onclick="showView('staff')" id="nav-staff">
       <span class="nav-icon">👥</span><span>Staff</span>
+    </button>
+    <button class="nav-btn" onclick="showView('sales')" id="nav-sales">
+      <span class="nav-icon">💷</span><span>Sales</span>
     </button>
     <button class="nav-btn" onclick="showView('settings')" id="nav-settings">
       <span class="nav-icon">⚙️</span><span>Settings</span>
@@ -975,6 +1120,7 @@ function showView(v){
   document.getElementById(`nav-${v}`).classList.add('active');
   document.getElementById('type-tabs').style.display=v==='rota'?'flex':'none';
   if(v==='staff'){renderStaff();populateNewStaffPalette();}
+  if(v==='sales'){initSalesView();}
   closeUserMenu();
 }
 
@@ -1161,7 +1307,7 @@ async function shareRota(){
     let cx=0,rows=1;
     names.forEach((n,i)=>{
       const dn=n.length>9?n.slice(0,8)+'…':n;
-      const pw=Math.min(dn.length*7+18,maxW);
+      const pw=Math.min(dn.length*8+18,maxW);
       if(i>0&&cx+pw>maxW){cx=0;rows++;}
       cx+=pw+PW_GAP;
     });
@@ -1316,23 +1462,23 @@ async function shareRota(){
         let curX=cellX+CELL_PAD_X, curY=startY;
         staff.forEach((name,si)=>{
           const c=getStaffCanvasColor(name);
-          ctx.font=`bold 11px -apple-system,sans-serif`;
+          ctx.font=`600 13px -apple-system,sans-serif`;
           const displayName=name.length>9?name.slice(0,8)+'…':name;
           const tw=ctx.measureText(displayName).width;
-          const pw=Math.min(tw+18,maxPW);
+          const pw=Math.min(tw+16,maxPW);
           if(si>0 && curX+pw>cellX+COL_W-CELL_PAD_X){
             curX=cellX+CELL_PAD_X;
             curY+=PILL_H+PILL_GAP;
           }
           ctx.fillStyle=c.bg;
-          roundRect(ctx,curX,curY,pw,PILL_H,PILL_H/2);
+          roundRect(ctx,curX,curY,pw,PILL_H,7);
           ctx.fill();
           ctx.strokeStyle=c.border; ctx.lineWidth=1.5;
-          roundRect(ctx,curX,curY,pw,PILL_H,PILL_H/2);
+          roundRect(ctx,curX,curY,pw,PILL_H,7);
           ctx.stroke();
           ctx.fillStyle=c.text;
           ctx.textAlign='left'; ctx.textBaseline='alphabetic';
-          ctx.fillText(displayName,curX+9,curY+14);
+          ctx.fillText(displayName,curX+8,curY+15);
           curX+=pw+PILL_GAP_X;
         });
       }
@@ -1585,6 +1731,190 @@ async function init(){
   });
 }
 
+/* ─── Sales / Total Section ──────────────────────── */
+let salesCurrentTab='form';
+
+function initSalesView(){
+  // Set today's date if not already set
+  const d=document.getElementById('s-date');
+  if(!d.value){
+    const now=new Date();
+    d.value=now.toISOString().slice(0,10);
+  }
+  calcSales();
+  // Ensure at least one wage row
+  if(!document.getElementById('wage-rows').children.length) addWageRow();
+  salesTab(salesCurrentTab);
+}
+
+function salesTab(t){
+  salesCurrentTab=t;
+  document.getElementById('sales-form-panel').style.display=t==='form'?'block':'none';
+  document.getElementById('sales-hist-panel').style.display=t==='hist'?'block':'none';
+  const fBtn=document.getElementById('sales-tab-form');
+  const hBtn=document.getElementById('sales-tab-hist');
+  fBtn.style.background=t==='form'?'var(--accent)':'var(--surface)';
+  fBtn.style.color=t==='form'?'#fff':'var(--text2)';
+  fBtn.style.border=t==='form'?'none':'1px solid var(--border)';
+  hBtn.style.background=t==='hist'?'var(--accent)':'var(--surface)';
+  hBtn.style.color=t==='hist'?'#fff':'var(--text2)';
+  hBtn.style.border=t==='hist'?'none':'1px solid var(--border)';
+  if(t==='hist') loadSalesHistory();
+}
+
+function getVal(id){return parseFloat(document.getElementById(id).value)||0;}
+
+function calcSales(){
+  const je=getVal('s-je'), cc=getVal('s-cc'), ue=getVal('s-ue'), dr=getVal('s-dr');
+  const cash=getVal('s-cash'), card=getVal('s-card');
+  const del=je+cc+ue+dr;
+  const total=del+cash+card;
+  document.getElementById('s-del-total').textContent='£'+del.toFixed(2);
+  document.getElementById('s-total').textContent='£'+total.toFixed(2);
+}
+
+function addWageRow(name='',amount='',paid=false){
+  const c=document.getElementById('wage-rows');
+  const div=document.createElement('div');
+  div.className='wage-row';
+  div.innerHTML=`
+    <input class="wage-name" type="text" placeholder="Staff name" value="${escHtml(name)}">
+    <input class="wage-amt" type="number" placeholder="0" min="0" value="${amount}">
+    <label class="wage-paid"><input type="checkbox" ${paid?'checked':''}> Paid</label>
+    <button class="wage-del" onclick="this.closest('.wage-row').remove()">×</button>`;
+  c.appendChild(div);
+}
+
+function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+function getWages(){
+  return [...document.querySelectorAll('#wage-rows .wage-row')].map(r=>({
+    name:r.querySelector('.wage-name').value.trim(),
+    amount:parseFloat(r.querySelector('.wage-amt').value)||0,
+    paid:r.querySelector('input[type=checkbox]').checked
+  })).filter(w=>w.name);
+}
+
+async function saveSales(){
+  const {data:{user}}=await db.auth.getUser();
+  if(!user){toast('Please sign in first');return;}
+  const saleDate=document.getElementById('s-date').value;
+  if(!saleDate){toast('Please enter a date');return;}
+  const payload={
+    user_id:user.id,
+    sale_date:saleDate,
+    just_eat:getVal('s-je'),
+    cc_app:getVal('s-cc'),
+    uber_eats:getVal('s-ue'),
+    deliveroo:getVal('s-dr'),
+    cash:getVal('s-cash'),
+    card:getVal('s-card'),
+    staff_wages:getWages()
+  };
+  // Upsert by user+date (replace if same date exists)
+  const {error}=await db.from('daily_sales')
+    .upsert(payload,{onConflict:'user_id,sale_date',ignoreDuplicates:false});
+  if(error){
+    // Fallback: plain insert if upsert fails (table may not have unique constraint yet)
+    const {error:e2}=await db.from('daily_sales').insert(payload);
+    if(e2){toast('Save failed: '+e2.message);return;}
+  }
+  toast('Saved ✓');
+}
+
+async function loadSalesHistory(){
+  const el=document.getElementById('sales-hist-list');
+  el.innerHTML='<div style="text-align:center;color:var(--text3);font-size:14px;padding:40px 0">Loading...</div>';
+  const {data:{user}}=await db.auth.getUser();
+  if(!user){el.innerHTML='<div style="text-align:center;color:var(--text3);font-size:14px;padding:40px 0">Not signed in</div>';return;}
+  const {data,error}=await db.from('daily_sales')
+    .select('*').eq('user_id',user.id)
+    .order('sale_date',{ascending:false}).limit(60);
+  if(error){el.innerHTML='<div style="text-align:center;color:var(--red);font-size:14px;padding:40px 0">'+error.message+'</div>';return;}
+  if(!data||!data.length){el.innerHTML='<div style="text-align:center;color:var(--text3);font-size:14px;padding:40px 0">No records yet</div>';return;}
+  el.innerHTML='';
+  data.forEach(r=>{
+    const del=(r.just_eat||0)+(r.cc_app||0)+(r.uber_eats||0)+(r.deliveroo||0);
+    const total=del+(r.cash||0)+(r.card||0);
+    const d=document.createElement('div');
+    d.className='sales-hist-item';
+    const dateStr=new Date(r.sale_date+'T12:00:00').toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
+    d.innerHTML=`
+      <button class="sales-hist-del" onclick="deleteSale('${r.id}',event)">×</button>
+      <div class="sales-hist-date">${dateStr}</div>
+      <div class="sales-hist-sub">Delivery £${del.toFixed(2)} · Cash £${(r.cash||0).toFixed(2)} · Card £${(r.card||0).toFixed(2)}</div>
+      <div class="sales-hist-sub" style="color:var(--green);font-weight:600;margin-top:3px">Total £${total.toFixed(2)}</div>`;
+    d.addEventListener('click',e=>{if(e.target.classList.contains('sales-hist-del'))return;loadSaleIntoForm(r);});
+    el.appendChild(d);
+  });
+}
+
+function loadSaleIntoForm(r){
+  document.getElementById('s-date').value=r.sale_date;
+  document.getElementById('s-je').value=r.just_eat||'';
+  document.getElementById('s-cc').value=r.cc_app||'';
+  document.getElementById('s-ue').value=r.uber_eats||'';
+  document.getElementById('s-dr').value=r.deliveroo||'';
+  document.getElementById('s-cash').value=r.cash||'';
+  document.getElementById('s-card').value=r.card||'';
+  document.getElementById('wage-rows').innerHTML='';
+  (r.staff_wages||[]).forEach(w=>addWageRow(w.name,w.amount,w.paid));
+  if(!(r.staff_wages||[]).length) addWageRow();
+  calcSales();
+  salesTab('form');
+}
+
+async function deleteSale(id,e){
+  e.stopPropagation();
+  if(!confirm('Delete this record?'))return;
+  const{error}=await db.from('daily_sales').delete().eq('id',id);
+  if(error){toast('Delete failed');return;}
+  toast('Deleted');
+  loadSalesHistory();
+}
+
+function printSales(){
+  const saleDate=document.getElementById('s-date').value;
+  const now=new Date();
+  const dateLabel=saleDate
+    ? new Date(saleDate+'T12:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'})
+    : now.toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'});
+  const timeLabel=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',hour12:true}).toUpperCase();
+
+  const je=getVal('s-je'), cc=getVal('s-cc'), ue=getVal('s-ue'), dr=getVal('s-dr');
+  const cash=getVal('s-cash'), card=getVal('s-card');
+  const del=je+cc+ue+dr;
+  const total=del+cash+card;
+  const wages=getWages();
+
+  document.getElementById('rcp-logo').src=CC_LOGO;
+  document.getElementById('rcp-date').textContent=dateLabel+' '+timeLabel;
+  document.getElementById('rcp-je').textContent=je.toFixed(2);
+  document.getElementById('rcp-cc').textContent=cc.toFixed(2);
+  document.getElementById('rcp-ue').textContent=ue.toFixed(2);
+  document.getElementById('rcp-dr').textContent=dr.toFixed(2);
+  document.getElementById('rcp-del').textContent=del.toFixed(2);
+  document.getElementById('rcp-cash').textContent=cash.toFixed(2);
+  document.getElementById('rcp-card').textContent=card.toFixed(2);
+  document.getElementById('rcp-total').textContent=total.toFixed(2);
+
+  const ws=document.getElementById('rcp-wages-section');
+  const wr=document.getElementById('rcp-wages');
+  if(wages.length){
+    wr.innerHTML='';
+    wages.forEach(w=>{
+      const row=document.createElement('div');
+      row.className='rcp-staff-row';
+      row.innerHTML=`<span>${escHtml(w.name)}</span><span>£${w.amount.toFixed(0)}${w.paid?' (paid)':''}</span>`;
+      wr.appendChild(row);
+    });
+    ws.style.display='block';
+  } else {
+    ws.style.display='none';
+  }
+  window.print();
+}
+
 // Set logo images from embedded data URI
 (function(){
   const al=document.getElementById('app-logo');if(al)al.src=CC_LOGO;
@@ -1595,6 +1925,34 @@ applyStaffColors();
 
 init();
 </script>
+<!-- Thermal Receipt (hidden, shown only during print) -->
+<div id="print-receipt">
+  <div class="rcp-center">
+    <img id="rcp-logo" class="rcp-logo" src="" alt="CC">
+    <div class="rcp-title">TOTAL SALES</div>
+    <div class="rcp-date" id="rcp-date"></div>
+  </div>
+  <hr class="rcp-divider">
+  <div class="rcp-row"><span>Just Eat</span><span id="rcp-je"></span></div>
+  <div class="rcp-row"><span>CC App</span><span id="rcp-cc"></span></div>
+  <div class="rcp-row"><span>Uber Eats</span><span id="rcp-ue"></span></div>
+  <div class="rcp-row"><span>Deliveroo</span><span id="rcp-dr"></span></div>
+  <hr class="rcp-divider">
+  <div class="rcp-row-bold"><span>Total Delivery</span><span id="rcp-del"></span></div>
+  <hr class="rcp-divider">
+  <div class="rcp-row"><span>Cash</span><span id="rcp-cash"></span></div>
+  <div class="rcp-row"><span>Card</span><span id="rcp-card"></span></div>
+  <hr class="rcp-divider">
+  <div class="rcp-total"><span>Total Sales</span><span id="rcp-total"></span></div>
+  <hr class="rcp-divider">
+  <div id="rcp-wages-section" style="display:none">
+    <div class="rcp-staff-hdr">Staff Wages</div>
+    <div id="rcp-wages"></div>
+    <hr class="rcp-divider">
+  </div>
+  <div style="text-align:center;font-size:10px;color:#666;margin-top:3mm">Chicken Cottage Manager</div>
+</div>
+
 <!-- Colour Picker Sheet -->
 <div id="color-sheet-overlay" style="display:none;position:fixed;inset:0;z-index:9000;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.55)" onclick="if(event.target===this)closeColorSheet()">
   <div style="width:100%;max-width:480px;background:#1a1a2e;border-radius:18px 18px 0 0;padding:20px 20px 32px;box-shadow:0 -4px 24px rgba(0,0,0,.6)">
