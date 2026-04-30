@@ -752,7 +752,7 @@ body{
       <div id="week-label">This week</div>
       <button onclick="changeWeek(1)">›</button>
     </div>
-    <div class="icon-btn" id="sync-btn" onclick="confirmSyncAll()" title="Sync all data">↻</div>
+    <div class="icon-btn" id="sync-btn" onclick="refreshFromCloud()" title="Refresh data from cloud">↻</div>
     <div class="icon-btn" onclick="toggleUserMenu()">👤</div>
   </div>
 
@@ -768,6 +768,8 @@ body{
       <div id="rota-menu" style="display:none;position:absolute;top:calc(100% + 6px);right:0;z-index:600;background:var(--surface);border:1px solid var(--border2);border-radius:14px;padding:6px;min-width:168px;box-shadow:0 8px 28px rgba(0,0,0,.6)">
         <div class="rm-item" onclick="shareRota();closeRotaMenu()">📤 Share Rota</div>
         <div class="rm-item" onclick="openLog();closeRotaMenu()">📋 Activity Log</div>
+        <div style="height:1px;background:var(--border);margin:4px 0"></div>
+        <div class="rm-item" onclick="closeSyncConfirm();syncAll();closeRotaMenu()">☁ Full Sync (push + pull)</div>
         <div style="height:1px;background:var(--border);margin:4px 0"></div>
         <div class="rm-item" onclick="copyWeek();closeRotaMenu()">🗐 Copy Week</div>
         <div class="rm-item" id="rm-paste" onclick="pasteWeek();closeRotaMenu()" style="display:none">📌 Paste Week</div>
@@ -1062,7 +1064,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v45-autosave-fix';
+const _COLOR_VER='v46-refresh-btn';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -1306,6 +1308,43 @@ async function syncAll(){
       btn.title='Sync all data';
     }
     if(ok)toast('All data synced ✓');
+  }
+}
+
+/* ─── Refresh from cloud (pull-only, no confirmation) ── */
+async function refreshFromCloud(){
+  const btn=document.getElementById('sync-btn');
+  if(btn){btn.classList.add('syncing');btn.style.color='';btn.title='Refreshing…';}
+  logActivity('Refreshing from cloud…','saving');
+  const _tout=ms=>new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),ms));
+  let ok=false;
+  try{
+    if(!user)throw new Error('Not signed in');
+    // Pull latest staff
+    const{data:staffData}=await Promise.race([db.from('staff').select('*'),_tout(6000)]);
+    if(staffData&&staffData.length>0){
+      state.staff.inside=staffData.filter(s=>s.type==='inside'||s.type==='both').map(s=>s.name);
+      state.staff.delivery=staffData.filter(s=>s.type==='delivery'||s.type==='both').map(s=>s.name);
+    }
+    // Pull latest schedules (merges with local — local always wins on conflict)
+    await Promise.race([loadSchedules(),_tout(6000)]);
+    // Pull latest sales
+    await Promise.race([loadSalesWeek(),_tout(6000)]);
+    renderRota();renderStaff();applyStaffColors();
+    logActivity('Refreshed from cloud ✓','success');
+    ok=true;
+  }catch(e){
+    const msg=e.message==='timeout'?'timed out':e.message;
+    logActivity('Refresh failed: '+msg,'error');
+    toast(e.message==='timeout'?'⚠ Refresh timed out':'Refresh failed');
+  }finally{
+    if(btn){
+      btn.classList.remove('syncing');
+      if(ok){btn.textContent='✓';btn.style.color='#4CC4A0';}
+      setTimeout(()=>{if(btn){btn.textContent='↻';_updateSaveIndicator();}},1800);
+      btn.title='Refresh data from cloud';
+    }
+    if(ok)toast('Data refreshed ✓');
   }
 }
 
