@@ -1001,7 +1001,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v33-type-aware-colours';
+const _COLOR_VER='v34-auto-split-dual-staff';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -1015,6 +1015,15 @@ function getStaffHex(name,type=null){
   // type-aware key takes priority (e.g. 'Abdul|inside' vs 'Abdul|delivery')
   const typedKey=type?name+'|'+type:null;
   if(typedKey&&staffColors[typedKey])return staffColors[typedKey];
+  // If this person is in BOTH lists, auto-assign a type-scoped colour
+  // so inside and delivery versions are visually distinct from day one
+  if(typedKey&&state.staff&&state.staff.inside&&state.staff.delivery
+     &&state.staff.inside.includes(name)&&state.staff.delivery.includes(name)){
+    let h=0;for(const c of name+'|'+type)h=(h*31+c.charCodeAt(0))&0xffff;
+    staffColors[typedKey]=COLOR_PALETTE[h%COLOR_PALETTE.length];
+    localStorage.setItem('cc_staff_colors',JSON.stringify(staffColors));
+    return staffColors[typedKey];
+  }
   if(!staffColors[name]){
     let h=0;for(const c of name)h=(h*31+c.charCodeAt(0))&0xffff;
     staffColors[name]=COLOR_PALETTE[h%COLOR_PALETTE.length];
