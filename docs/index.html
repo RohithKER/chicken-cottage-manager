@@ -376,16 +376,16 @@ body{
   width:100%;max-width:480px;
   display:flex;
   background:rgba(25,25,25,0.95);border-top:1px solid var(--border);
-  padding:0 0 var(--safe-bottom);
+  padding:0 0 min(var(--safe-bottom),6px);
   z-index:20;
   backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
 }
 .nav-btn{
-  flex:1;display:flex;align-items:center;justify-content:center;
-  padding:8px 4px;background:none;border:none;cursor:pointer;
-  color:var(--text3);transition:color .15s;
+  flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;
+  padding:6px 4px 5px;background:none;border:none;cursor:pointer;
+  color:var(--text3);font-size:9px;font-weight:500;transition:color .15s;letter-spacing:0.2px;
 }
-.nav-icon{font-size:24px;line-height:1;display:block}
+.nav-icon{font-size:20px;line-height:1}
 .nav-btn.active{color:var(--text)}
 
 /* ─── Modal / Bottom Sheet ───────────────────────── */
@@ -839,17 +839,17 @@ body{
   </div><!-- /content -->
 
   <div id="bottom-nav">
-    <button class="nav-btn active" onclick="showView('rota')" id="nav-rota" title="Rota">
-      <span class="nav-icon">📅</span>
+    <button class="nav-btn active" onclick="showView('rota')" id="nav-rota">
+      <span class="nav-icon">📅</span><span>Rota</span>
     </button>
-    <button class="nav-btn" onclick="showView('staff')" id="nav-staff" title="Staff">
-      <span class="nav-icon">👥</span>
+    <button class="nav-btn" onclick="showView('staff')" id="nav-staff">
+      <span class="nav-icon">👥</span><span>Staff</span>
     </button>
-    <button class="nav-btn" onclick="showView('sales')" id="nav-sales" title="Sales">
-      <span class="nav-icon">💷</span>
+    <button class="nav-btn" onclick="showView('sales')" id="nav-sales">
+      <span class="nav-icon">💷</span><span>Sales</span>
     </button>
-    <button class="nav-btn" onclick="showView('settings')" id="nav-settings" title="Settings">
-      <span class="nav-icon">⚙️</span>
+    <button class="nav-btn" onclick="showView('settings')" id="nav-settings">
+      <span class="nav-icon">⚙️</span><span>Settings</span>
     </button>
   </div>
 
@@ -978,7 +978,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v13-icon-nav';
+const _COLOR_VER='v14-nav-gap';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
