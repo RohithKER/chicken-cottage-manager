@@ -948,7 +948,7 @@ body{
       </div>
     </div>
     <div class="ss-foot" style="flex-direction:column;gap:8px">
-      <button class="btn-sm primary" style="width:100%;padding:13px;font-size:15px" onclick="saveDaySales()">Save</button>
+      <button class="btn-sm primary" id="day-save-btn" style="width:100%;padding:13px;font-size:15px" onclick="saveDaySales()">Save</button>
       <div style="display:flex;gap:8px">
         <button class="btn-sm ghost" style="flex:1;padding:10px;font-size:13px" onclick="closeDayEntry()">Cancel</button>
         <button class="btn-sm ghost" style="flex:1;padding:10px;font-size:13px;color:var(--red);border-color:rgba(255,107,122,.3)" onclick="clearDayEntry()">Clear</button>
@@ -1064,7 +1064,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v46-refresh-btn';
+const _COLOR_VER='v47-sales-save-fix';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -2850,21 +2850,32 @@ async function saveDaySales(){
     cash:getSdVal('sd-cash'),
     card:getSdVal('sd-card')
   };
-  const{error}=await db.from('daily_sales')
-    .upsert(payload,{onConflict:'sale_date',ignoreDuplicates:false});
-  if(error){
-    toast('Save failed: '+error.message);
-    logActivity(`Sales ${salesOpenDate} save failed: ${error.message}`, 'error');
-    return;
-  }
-  // Update local cache and re-render immediately
+  // Save locally first so data is never lost even if cloud fails
   salesWeekData[salesOpenDate]=payload;
   const merged={..._loadSalesCache(),[salesOpenDate]:payload};
   _saveSalesCache(merged);
   renderSalesTable();
-  logActivity(`Sales ${salesOpenDate} saved to cloud ✓`, 'success');
-  toast('Saved ✓');
-  closeDayEntry();
+  // Show loading state on button
+  const btn=document.getElementById('day-save-btn');
+  if(btn){btn.textContent='Saving…';btn.disabled=true;}
+  const _tout=new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),10000));
+  try{
+    if(!user)throw new Error('not signed in');
+    const{error}=await Promise.race([
+      db.from('daily_sales').upsert(payload,{onConflict:'sale_date',ignoreDuplicates:false}),
+      _tout
+    ]);
+    if(error)throw error;
+    logActivity(`Sales ${salesOpenDate} saved to cloud ✓`, 'success');
+    if(btn){btn.textContent='✓ Saved!';btn.style.background='var(--green)';}
+    setTimeout(()=>closeDayEntry(),700);
+  }catch(e){
+    logActivity(`Sales ${salesOpenDate} cloud save failed: ${e.message}`, 'error');
+    // Still close — data is safe locally, user can ☁ Save Sales later
+    if(btn){btn.textContent='Saved locally ✓';btn.style.background='#666';}
+    toast(e.message==='timeout'?'⚠ Saved locally — tap ☁ to push to cloud':'⚠ '+e.message+' — saved locally');
+    setTimeout(()=>closeDayEntry(),900);
+  }
 }
 
 function _fmtMoney(n){return'£'+n.toFixed(2);}
