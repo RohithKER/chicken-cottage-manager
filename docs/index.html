@@ -265,6 +265,14 @@ body{
 .tbl-sync.saving{background:#facc15}
 .tbl-sync.saved{background:var(--green)}
 
+/* ─── OFF column — subtle red tint ───────────────── */
+.shift-row.off-row{background:rgba(220,60,60,0.05)}
+.shift-row.off-row:active{background:rgba(220,60,60,0.10)}
+.shift-row.off-row .shift-label{color:rgba(232,110,110,0.75)}
+.rota-tbl th.off-th{background:rgba(220,60,60,0.10);color:rgba(232,110,110,0.8)}
+.rota-tbl td.off-cell{background:rgba(220,60,60,0.05)}
+.rota-tbl td.off-cell:active{background:rgba(220,60,60,0.10)}
+
 /* Staff colors — Notion-style: soft 10% bg, muted text, no border */
 [data-s="Kado"],.sc-Kado{background:rgba(91,156,245,0.11);color:#5B9CF5;border-color:transparent}
 [data-s="Ercan"],.sc-Ercan{background:rgba(76,196,160,0.11);color:#4CC4A0;border-color:transparent}
@@ -949,7 +957,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v9-notion';
+const _COLOR_VER='v10-off-red';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -1173,7 +1181,7 @@ function renderCards(){
     cols.forEach(col=>{
       const staff=getShift(state.type,state.weekOffset,day,col);
       const pills=staff.length?staff.map(pill).join(''):`<span class="empty-label">Tap to assign</span>`;
-      html+=`<div class="shift-row" onclick="openModal('${day}','${col}')">
+      html+=`<div class="shift-row${col==='OFF'?' off-row':''}" onclick="openModal('${day}','${col}')">
         <span class="shift-label">${col}</span>
         <div class="pills-wrap">${pills}</div>
         <div class="sync-dot" id="dot-${day}-${col}"></div>
@@ -1188,7 +1196,7 @@ function renderTable(){
   const cols=COLS[state.type];
   let html=`<table class="rota-tbl"><thead><tr>
     <th>Day</th>
-    ${cols.map(c=>`<th>${c}</th>`).join('')}
+    ${cols.map(c=>`<th${c==='OFF'?' class="off-th"':''}>${c}</th>`).join('')}
   </tr></thead><tbody>`;
   DAYS.forEach((day,di)=>{
     html+=`<tr>
@@ -1201,7 +1209,7 @@ function renderTable(){
       const pills=staff.length
         ?staff.map(n=>`<span class="pill sc-${n}">${n}</span>`).join('')
         :`<span class="td-empty">—</span>`;
-      html+=`<td class="shift-cell" onclick="openModal('${day}','${col}')">
+      html+=`<td class="shift-cell${col==='OFF'?' off-cell':''}" onclick="openModal('${day}','${col}')">
         <div class="td-pills">${pills}</div>
         <span class="tbl-sync" id="tdot-${day}-${col}"></span>
       </td>`;
@@ -1521,12 +1529,21 @@ async function shareRota(){
   ctx.fillStyle='rgba(255,255,255,0.06)';
   ctx.fillRect(PAD,TBL_Y+TH_H-1,W-PAD*2,1);
 
+  // Tint OFF column header background
+  const _offIdx=cols.indexOf('OFF');
+  if(_offIdx>=0){
+    const _offHdrX=PAD+DAY_W+_offIdx*COL_W;
+    ctx.fillStyle='rgba(220,60,60,0.12)';
+    ctx.fillRect(_offHdrX,TBL_Y,COL_W,TH_H);
+  }
+
   // column header labels
   ctx.textAlign='left'; ctx.textBaseline='middle';
-  ctx.fillStyle='#4a4a4a';
   ctx.font=`bold 10px -apple-system,sans-serif`;
   ctx.fillText('DAY',PAD+10,TBL_Y+TH_H/2);
+  ctx.fillStyle='#4a4a4a';
   cols.forEach((c,i)=>{
+    ctx.fillStyle=c==='OFF'?'rgba(232,100,100,0.75)':'#4a4a4a';
     ctx.fillText(c.toUpperCase(),PAD+DAY_W+i*COL_W+10,TBL_Y+TH_H/2);
   });
 
@@ -1573,6 +1590,8 @@ async function shareRota(){
     cols.forEach((col,ci)=>{
       const cellX=PAD+DAY_W+ci*COL_W;
       if(ci>0){ctx.fillStyle='rgba(255,255,255,0.04)';ctx.fillRect(cellX,rowY,1,ROW_H);}
+      // Red tint for OFF column
+      if(col==='OFF'){ctx.fillStyle='rgba(220,60,60,0.07)';ctx.fillRect(cellX,rowY,COL_W,ROW_H);}
 
       const staff=getShift(state.type,state.weekOffset,day,col);
       if(staff.length===0){
