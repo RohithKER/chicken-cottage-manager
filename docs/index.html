@@ -1001,7 +1001,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v34-auto-split-dual-staff';
+const _COLOR_VER='v35-sales-offline-cache';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -2266,6 +2266,14 @@ async function init(){
 let salesWeekOffset=0;       // 0 = current week, -1 = last week, etc.
 let salesWeekData={};        // key: 'YYYY-MM-DD' → row object from DB
 let salesOpenDate=null;      // date string currently open in sheet
+// Persist sales locally so the tab never gets stuck on "Loading..."
+const _SALES_CACHE_KEY='cc_sales_cache_v1';
+function _loadSalesCache(){
+  try{return JSON.parse(localStorage.getItem(_SALES_CACHE_KEY)||'{}')||{};}catch{return{};}
+}
+function _saveSalesCache(data){
+  try{localStorage.setItem(_SALES_CACHE_KEY,JSON.stringify(data));}catch{}
+}
 
 const DAY_NAMES=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 
@@ -2297,28 +2305,44 @@ function salesWeekLabel(dates){
 async function loadSalesWeek(){
   const dates=getSalesWeekDates(salesWeekOffset);
   document.getElementById('sales-week-label').textContent=salesWeekLabel(dates);
-  const el=document.getElementById('sales-week-table');
-  el.innerHTML='<div style="text-align:center;color:var(--text3);font-size:13px;padding:30px 0">Loading…</div>';
 
-  if(!user){el.innerHTML='<div style="text-align:center;color:var(--text3);font-size:13px;padding:30px 0">Not signed in</div>';return;}
-
+  // ── Step 1: render instantly from local cache (never block UI) ──
+  const allCached=_loadSalesCache();
   const from=fmt(dates[0]),to=fmt(dates[6]);
+  salesWeekData={};
+  dates.forEach(d=>{const k=fmt(d);if(allCached[k])salesWeekData[k]=allCached[k];});
+  renderSalesTable(dates);
+
+  if(!user)return; // stay on cached view if not signed in
+
+  // ── Step 2: refresh from Supabase in background ──
   let _settled=false;
-  const _bail=setTimeout(()=>{
-    if(!_settled){_settled=true;_salesErr(el,'Timed out — check your connection');}
-  },10000);
+  const _bail=setTimeout(()=>{_settled=true;},9000); // silent bail — cache already shown
   try{
     const{data,error}=await db.from('daily_sales').select('*').gte('sale_date',from).lte('sale_date',to);
     clearTimeout(_bail);
     if(_settled)return;
     _settled=true;
     if(error)throw error;
-    salesWeekData={};
-    if(data)data.forEach(r=>{salesWeekData[r.sale_date]=r;});
-    renderSalesTable(dates);
+    if(data){
+      salesWeekData={};
+      data.forEach(r=>{salesWeekData[r.sale_date]=r;});
+      // Merge fresh data back into full cache and persist
+      const merged={...allCached};
+      data.forEach(r=>{merged[r.sale_date]=r;});
+      _saveSalesCache(merged);
+      renderSalesTable(dates);
+    }
   }catch(err){
     clearTimeout(_bail);
-    if(!_settled){_settled=true;_salesErr(el,err&&err.message?err.message:'Connection error');}
+    // Cache is already showing — just add a subtle sync-failed indicator
+    const el=document.getElementById('sales-week-table');
+    if(el){
+      const note=document.createElement('div');
+      note.style.cssText='text-align:center;font-size:11px;color:var(--text3);padding:6px 0';
+      note.textContent='⚠ Offline — showing cached data';
+      el.appendChild(note);
+    }
   }
 }
 function _salesErr(el,msg){
@@ -2447,6 +2471,8 @@ async function saveDaySales(){
   if(error){toast('Save failed: '+error.message);return;}
   // Update local cache and re-render immediately
   salesWeekData[salesOpenDate]=payload;
+  const merged={..._loadSalesCache(),[salesOpenDate]:payload};
+  _saveSalesCache(merged);
   renderSalesTable();
   toast('Saved ✓');
   closeDayEntry();
