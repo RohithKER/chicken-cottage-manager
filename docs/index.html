@@ -718,7 +718,7 @@ function getStaffHex(name){
 }
 function getStaffCanvasColor(name){
   const hex=getStaffHex(name);const{r,g,b}=hexToRgb(hex);
-  return{bg:`rgba(${r},${g},${b},0.18)`,text:hex,border:`rgba(${r},${g},${b},0.82)`};
+  return{bg:`rgba(${r},${g},${b},0.12)`,text:hex,border:`rgba(${r},${g},${b},0.38)`};
 }
 function applyStaffColors(){
   const names=[...new Set([...Object.keys(DEFAULT_STAFF_HEX),...Object.keys(staffColors)])];
@@ -1184,50 +1184,22 @@ async function shareRota(){
   const ctx=canvas.getContext('2d');
   ctx.scale(scale,scale);
 
-  // ── Background — deep indigo-black ──────────────────
-  const bgGrad=ctx.createLinearGradient(0,0,0,H);
-  bgGrad.addColorStop(0,'#06060f');
-  bgGrad.addColorStop(1,'#08081a');
-  ctx.fillStyle=bgGrad;
+  // ── Background — clean neutral dark ─────────────────
+  ctx.fillStyle='#0e0e0e';
   ctx.fillRect(0,0,W,H);
 
   // ── Header Card ──────────────────────────────────────
-  // deep shadow
-  ctx.fillStyle='rgba(0,0,10,0.65)';
-  roundRect(ctx,PAD+1,HDR_Y+5,W-PAD*2,HDR_H,CR);
+  ctx.fillStyle='rgba(0,0,0,0.5)';
+  roundRect(ctx,PAD,HDR_Y+4,W-PAD*2,HDR_H,CR);
   ctx.fill();
-  // card gradient fill
-  const hdrGrad=ctx.createLinearGradient(PAD,HDR_Y,PAD,HDR_Y+HDR_H);
-  hdrGrad.addColorStop(0,'#1a1a38');
-  hdrGrad.addColorStop(1,'#0f0f26');
-  ctx.fillStyle=hdrGrad;
+  ctx.fillStyle='#1c1c1c';
   roundRect(ctx,PAD,HDR_Y,W-PAD*2,HDR_H,CR);
   ctx.fill();
-  // card border — subtle indigo glow
-  ctx.strokeStyle='rgba(100,100,200,0.25)'; ctx.lineWidth=1;
+  ctx.strokeStyle='rgba(255,255,255,0.07)'; ctx.lineWidth=1;
   roundRect(ctx,PAD,HDR_Y,W-PAD*2,HDR_H,CR);
   ctx.stroke();
-  // left accent stripe
-  ctx.save();
-  roundRect(ctx,PAD,HDR_Y,W-PAD*2,HDR_H,CR);
-  ctx.clip();
-  const accentGrad=ctx.createLinearGradient(PAD,HDR_Y,PAD,HDR_Y+HDR_H);
-  accentGrad.addColorStop(0,'#7c7cff');
-  accentGrad.addColorStop(1,'#5050cc');
-  ctx.fillStyle=accentGrad;
-  ctx.fillRect(PAD,HDR_Y,3,HDR_H);
-  ctx.restore();
 
-  // icon glow ring
-  ctx.save();
-  ctx.shadowColor='rgba(130,130,255,0.4)';
-  ctx.shadowBlur=14;
-  ctx.beginPath();
-  ctx.arc(ICON_X+ICON_SZ/2, ICON_Y+ICON_SZ/2, ICON_SZ/2+1, 0, Math.PI*2);
-  ctx.strokeStyle='rgba(120,120,240,0.5)'; ctx.lineWidth=2;
-  ctx.stroke();
-  ctx.restore();
-  // icon crop
+  // icon — clean circular crop, no glow
   ctx.save();
   ctx.beginPath();
   ctx.arc(ICON_X+ICON_SZ/2, ICON_Y+ICON_SZ/2, ICON_SZ/2, 0, Math.PI*2);
@@ -1239,31 +1211,28 @@ async function shareRota(){
 
   // header text
   ctx.textAlign='left'; ctx.textBaseline='alphabetic';
-  ctx.fillStyle='#f4f4ff';
+  ctx.fillStyle='#f0f0f0';
   ctx.font=`bold 17px -apple-system,sans-serif`;
   ctx.fillText('Chicken Cottage',TEXT_X,HDR_Y+30);
-  ctx.fillStyle='#a0a0d0';
-  ctx.font=`600 13px -apple-system,sans-serif`;
+  ctx.fillStyle='#888888';
+  ctx.font=`13px -apple-system,sans-serif`;
   const typeLabel=state.type==='inside'?'Inside Staff':'Delivery';
-  ctx.fillText(typeLabel,TEXT_X,HDR_Y+50);
+  ctx.fillText(typeLabel,TEXT_X,HDR_Y+49);
   const ws=weekStart(state.weekOffset);
   const we=new Date(ws); we.setDate(we.getDate()+6);
   const dateStr=`${ws.getDate()} ${MONTHS[ws.getMonth()]} – ${we.getDate()} ${MONTHS[we.getMonth()]}`;
-  ctx.fillStyle='#5a5a8a';
+  ctx.fillStyle='#555555';
   ctx.font=`12px -apple-system,sans-serif`;
-  ctx.fillText(dateStr,TEXT_X,HDR_Y+68);
+  ctx.fillText(dateStr,TEXT_X,HDR_Y+67);
 
   // ── Table Card ───────────────────────────────────────
-  // deep shadow
-  ctx.fillStyle='rgba(0,0,10,0.65)';
-  roundRect(ctx,PAD+1,TBL_Y+5,W-PAD*2,TBL_H,CR);
+  ctx.fillStyle='rgba(0,0,0,0.5)';
+  roundRect(ctx,PAD,TBL_Y+4,W-PAD*2,TBL_H,CR);
   ctx.fill();
-  // card body
-  ctx.fillStyle='#0a0a1c';
+  ctx.fillStyle='#161616';
   roundRect(ctx,PAD,TBL_Y,W-PAD*2,TBL_H,CR);
   ctx.fill();
-  // border — faint indigo line
-  ctx.strokeStyle='rgba(80,80,160,0.2)'; ctx.lineWidth=1;
+  ctx.strokeStyle='rgba(255,255,255,0.06)'; ctx.lineWidth=1;
   roundRect(ctx,PAD,TBL_Y,W-PAD*2,TBL_H,CR);
   ctx.stroke();
 
@@ -1272,27 +1241,23 @@ async function shareRota(){
   roundRect(ctx,PAD,TBL_Y,W-PAD*2,TBL_H,CR);
   ctx.clip();
 
-  // column header row — gradient
-  const thGrad=ctx.createLinearGradient(PAD,TBL_Y,PAD,TBL_Y+TH_H);
-  thGrad.addColorStop(0,'#141430');
-  thGrad.addColorStop(1,'#0f0f26');
-  ctx.fillStyle=thGrad;
+  // column header row — flat, clean
+  ctx.fillStyle='#1e1e1e';
   ctx.fillRect(PAD,TBL_Y,W-PAD*2,TH_H);
-  // header bottom border — accent line
-  ctx.fillStyle='rgba(80,80,180,0.35)';
+  ctx.fillStyle='rgba(255,255,255,0.06)';
   ctx.fillRect(PAD,TBL_Y+TH_H-1,W-PAD*2,1);
 
   // column header labels
   ctx.textAlign='left'; ctx.textBaseline='middle';
-  ctx.fillStyle='#6868a8';
+  ctx.fillStyle='#4a4a4a';
   ctx.font=`bold 10px -apple-system,sans-serif`;
   ctx.fillText('DAY',PAD+10,TBL_Y+TH_H/2);
   cols.forEach((c,i)=>{
     ctx.fillText(c.toUpperCase(),PAD+DAY_W+i*COL_W+10,TBL_Y+TH_H/2);
   });
 
-  // day column divider in header
-  ctx.fillStyle='rgba(80,80,160,0.25)';
+  // day column divider
+  ctx.fillStyle='rgba(255,255,255,0.06)';
   ctx.fillRect(PAD+DAY_W,TBL_Y,1,TH_H);
 
   // data rows
@@ -1302,42 +1267,42 @@ async function shareRota(){
     const ROW_H=rowHeights[di];
     _rowY+=ROW_H;
 
-    // row background — deeper alternation with indigo tint
-    ctx.fillStyle=di%2===0?'#0a0a1c':'#0f0f28';
+    // row background — very subtle alternation
+    ctx.fillStyle=di%2===0?'#161616':'#1a1a1a';
     ctx.fillRect(PAD,rowY,W-PAD*2,ROW_H);
 
-    // row separator
-    ctx.fillStyle='rgba(70,70,160,0.2)';
+    // row separator — barely visible
+    ctx.fillStyle='rgba(255,255,255,0.04)';
     ctx.fillRect(PAD,rowY+ROW_H-1,W-PAD*2,1);
 
     // day column divider
-    ctx.fillStyle='rgba(80,80,160,0.22)';
+    ctx.fillStyle='rgba(255,255,255,0.05)';
     ctx.fillRect(PAD+DAY_W,rowY,1,ROW_H);
 
     // day name + date
     const midY=rowY+Math.round(ROW_H/2);
     ctx.textAlign='left'; ctx.textBaseline='alphabetic';
-    ctx.fillStyle='#e0e0f8';
+    ctx.fillStyle='#e0e0e0';
     ctx.font=`bold 13px -apple-system,sans-serif`;
     ctx.fillText(day.slice(0,3),PAD+11,midY-2);
     const actualDay=new Date(ws); actualDay.setDate(ws.getDate()+di);
-    ctx.fillStyle='#5858a0';
+    ctx.fillStyle='#505050';
     ctx.font=`11px -apple-system,sans-serif`;
     ctx.fillText(`${actualDay.getDate()} ${MONTHS[actualDay.getMonth()]}`,PAD+11,midY+12);
 
     // shift cells
     const CELL_PAD_X=10;
-    const CELL_PAD_Y=10; // minimum top/bottom margin
+    const CELL_PAD_Y=10;
     const PILL_H=21;
     const PILL_GAP=5;
     const PILL_GAP_X=5;
     cols.forEach((col,ci)=>{
       const cellX=PAD+DAY_W+ci*COL_W;
-      if(ci>0){ctx.fillStyle='rgba(60,60,140,0.18)';ctx.fillRect(cellX,rowY,1,ROW_H);}
+      if(ci>0){ctx.fillStyle='rgba(255,255,255,0.04)';ctx.fillRect(cellX,rowY,1,ROW_H);}
 
       const staff=getShift(state.type,state.weekOffset,day,col);
       if(staff.length===0){
-        ctx.fillStyle='#2e2e58';
+        ctx.fillStyle='#333333';
         ctx.font=`13px -apple-system,sans-serif`;
         ctx.textBaseline='middle'; ctx.textAlign='left';
         ctx.fillText('—',cellX+CELL_PAD_X,rowY+ROW_H/2);
