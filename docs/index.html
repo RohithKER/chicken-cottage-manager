@@ -1005,7 +1005,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v36-sync-button';
+const _COLOR_VER='v37-shared-rls-fix';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -1251,7 +1251,6 @@ async function saveShiftToCloud(type,wk,day,col,names){
   setSyncDot(day,col,'saving');
   try{
     await db.from('schedules').upsert({
-      user_id:user.id,
       schedule_type:type,week_key:wk,day,shift_col:col,
       staff_names:names,updated_at:new Date().toISOString()
     },{onConflict:'schedule_type,week_key,day,shift_col'});
