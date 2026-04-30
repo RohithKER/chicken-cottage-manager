@@ -1062,7 +1062,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v43-clean-header';
+const _COLOR_VER='v44-save-timeout';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -1251,12 +1251,15 @@ async function syncAll(){
   if(btn){btn.classList.add('syncing');btn.title='Syncing…';}
   let ok=false;
   logActivity('Sync started…', 'saving');
+  const _tout=ms=>new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),ms));
+  // Kill the whole sync after 20s so the button never stays stuck
+  const _abort=_tout(20000);
   try{
     if(!user)throw new Error('Not signed in');
     // 1. Settings: colours, blacklist, column layouts
-    await loadColsFromCloud();
+    await Promise.race([loadColsFromCloud(),_tout(6000)]);
     // 2. Staff list from cloud
-    const{data:staffData}=await db.from('staff').select('*');
+    const{data:staffData}=await Promise.race([db.from('staff').select('*'),_tout(6000)]);
     if(staffData&&staffData.length>0){
       state.staff.inside=staffData.filter(s=>s.type==='inside'||s.type==='both').map(s=>s.name);
       state.staff.delivery=staffData.filter(s=>s.type==='delivery'||s.type==='both').map(s=>s.name);
@@ -1268,22 +1271,25 @@ async function syncAll(){
              staff_names:names,updated_at:new Date().toISOString()};
     });
     if(pushRows.length>0){
-      const{error}=await db.from('schedules').upsert(pushRows,{onConflict:'schedule_type,week_key,day,shift_col'});
+      const{error}=await Promise.race([
+        db.from('schedules').upsert(pushRows,{onConflict:'schedule_type,week_key,day,shift_col'}),
+        _tout(8000)
+      ]);
       if(error)logActivity('Push schedules warning: '+error.message, 'error');
       else logActivity(`Pushed ${pushRows.length} schedule rows ✓`, 'success');
     }
     // 4. Pull fresh merged data from Supabase (includes our push + other users' changes)
-    await loadSchedules();
+    await Promise.race([loadSchedules(),_tout(6000)]);
     // 5. Sales data for currently viewed week
-    await loadSalesWeek();
+    await Promise.race([loadSalesWeek(),_tout(6000)]);
     // Re-render everything
     renderRota();renderStaff();applyStaffColors();
     logActivity('Full sync complete ✓', 'success');
     ok=true;
   }catch(e){
     console.warn('Sync error:',e);
-    logActivity('Sync failed: '+e.message, 'error');
-    toast('Sync failed — check connection');
+    logActivity('Sync failed: '+(e.message==='timeout'?'timed out':e.message), 'error');
+    toast(e.message==='timeout'?'Sync timed out — check connection':'Sync failed — check connection');
   }finally{
     if(btn){
       btn.classList.remove('syncing');
@@ -1401,15 +1407,20 @@ async function saveRotaStaffToCloud(){
   if(!user){toast('Sign in to save');return;}
   const btn=document.getElementById('save-rota-btn');
   if(btn){btn.textContent='⏳';btn.disabled=true;}
+  const _tout=ms=>new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),ms));
+  let pushRows=[];
   try{
     // Push all local schedule rows
-    const pushRows=Object.entries(state.schedules).map(([key,names])=>{
+    pushRows=Object.entries(state.schedules).map(([key,names])=>{
       const parts=key.split('|');
       return{schedule_type:parts[0],week_key:parts[1],day:parts[2],shift_col:parts[3],
              staff_names:names,updated_at:new Date().toISOString()};
     });
     if(pushRows.length>0){
-      const{error}=await db.from('schedules').upsert(pushRows,{onConflict:'schedule_type,week_key,day,shift_col'});
+      const{error}=await Promise.race([
+        db.from('schedules').upsert(pushRows,{onConflict:'schedule_type,week_key,day,shift_col'}),
+        _tout(10000)
+      ]);
       if(error)throw error;
     }
     // Push current staff list
@@ -1422,7 +1433,10 @@ async function saveRotaStaffToCloud(){
       if(!state.staff.inside.includes(name))staffRows.push({name,type:'delivery'});
     });
     if(staffRows.length>0){
-      const{error}=await db.from('staff').upsert(staffRows,{onConflict:'name'});
+      const{error}=await Promise.race([
+        db.from('staff').upsert(staffRows,{onConflict:'name'}),
+        _tout(10000)
+      ]);
       if(error)throw error;
     }
     logActivity(`Rota & staff saved to cloud (${pushRows.length} shifts, ${staffRows.length} staff) ✓`, 'success');
@@ -1431,8 +1445,8 @@ async function saveRotaStaffToCloud(){
     setTimeout(()=>{if(btn){btn.textContent='☁';btn.style.color='';btn.disabled=false;}},2000);
   }catch(e){
     logActivity('Save rota/staff failed: '+e.message, 'error');
-    toast('Save failed: '+e.message);
-    if(btn){btn.textContent='☁';btn.disabled=false;}
+    toast(e.message==='timeout'?'⚠ Timed out — saved locally':'Save failed: '+e.message);
+    if(btn){btn.textContent='☁';btn.style.color='';btn.disabled=false;}
   }
 }
 
@@ -1441,22 +1455,25 @@ async function saveSalesWeekToCloud(){
   if(!user){toast('Sign in to save');return;}
   const btn=document.getElementById('save-sales-btn');
   if(btn){btn.classList.add('saving');btn.textContent='☁ Saving…';}
+  const _tout=ms=>new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),ms));
   try{
     const cached=_loadSalesCache();
     const dates=getSalesWeekDates(salesWeekOffset);
     const rows=dates.map(d=>fmt(d)).filter(k=>cached[k]).map(k=>cached[k]);
     if(!rows.length){toast('No sales data this week');if(btn){btn.classList.remove('saving');btn.textContent='☁ Save Sales';}return;}
-    for(const row of rows){
-      const{error}=await db.from('daily_sales').upsert(row,{onConflict:'sale_date',ignoreDuplicates:false});
-      if(error)throw error;
-    }
+    // Upsert all rows in one batch with timeout
+    const{error}=await Promise.race([
+      db.from('daily_sales').upsert(rows,{onConflict:'sale_date',ignoreDuplicates:false}),
+      _tout(10000)
+    ]);
+    if(error)throw error;
     logActivity(`Sales week saved to cloud (${rows.length} days) ✓`, 'success');
     toast(`${rows.length} days saved ✓`);
     if(btn){btn.classList.remove('saving');btn.classList.add('ok');btn.textContent='✓ Saved';}
     setTimeout(()=>{if(btn){btn.classList.remove('ok');btn.textContent='☁ Save Sales';}},2500);
   }catch(e){
     logActivity('Save sales failed: '+e.message, 'error');
-    toast('Save failed: '+e.message);
+    toast(e.message==='timeout'?'⚠ Timed out — check connection':'Save failed: '+e.message);
     if(btn){btn.classList.remove('saving');btn.textContent='☁ Save Sales';}
   }
 }
