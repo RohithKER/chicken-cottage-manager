@@ -1107,6 +1107,7 @@ async function saveShiftToCloud(type,wk,day,col,names){
   setSyncDot(day,col,'saving');
   try{
     await db.from('schedules').upsert({
+      user_id:user.id,
       schedule_type:type,week_key:wk,day,shift_col:col,
       staff_names:names,updated_at:new Date().toISOString()
     },{onConflict:'schedule_type,week_key,day,shift_col'});
@@ -1115,6 +1116,7 @@ async function saveShiftToCloud(type,wk,day,col,names){
   }catch(e){
     console.error('Save error:',e);
     setSyncDot(day,col,'');
+    toast('Save failed: '+e.message);
   }
 }
 
