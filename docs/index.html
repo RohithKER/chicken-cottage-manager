@@ -487,6 +487,51 @@ body{
 .sales-hist-sub{font-size:12px;color:var(--text2)}
 .sales-hist-del{float:right;background:none;border:none;color:var(--text3);font-size:16px;cursor:pointer;padding:0 2px}
 
+/* ─── Pending / Access Screen ────────────────────── */
+#pending-screen,#rejected-screen{
+  flex:1;display:flex;flex-direction:column;
+  justify-content:center;align-items:center;
+  padding:32px 24px;background:var(--bg);text-align:center;
+}
+.access-icon{font-size:48px;margin-bottom:16px}
+.access-title{font-size:22px;font-weight:700;margin-bottom:8px}
+.access-sub{font-size:14px;color:var(--text2);max-width:280px;line-height:1.5}
+.access-email{font-size:12px;color:var(--text3);margin-top:12px}
+.btn-signout{
+  margin-top:24px;padding:10px 24px;
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--rs);color:var(--text2);
+  font-size:14px;cursor:pointer;
+}
+
+/* ─── Admin Panel ─────────────────────────────────── */
+.admin-section{margin-bottom:20px}
+.admin-section-title{
+  font-size:11px;font-weight:700;text-transform:uppercase;
+  letter-spacing:0.6px;color:var(--text3);
+  padding:0 2px;margin-bottom:8px;
+}
+.user-row{
+  display:flex;align-items:center;gap:12px;
+  padding:11px 14px;
+  background:var(--surface);
+  border-bottom:1px solid var(--border);
+}
+.user-row:first-child{border-radius:var(--r) var(--r) 0 0}
+.user-row:last-child{border-radius:0 0 var(--r) var(--r);border-bottom:none}
+.user-row:only-child{border-radius:var(--r)}
+.user-info{flex:1;min-width:0}
+.user-email-lbl{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.user-meta-lbl{font-size:11px;color:var(--text3);margin-top:2px}
+.user-actions{display:flex;gap:6px;flex-shrink:0;align-items:center}
+.btn-approve{background:rgba(52,211,153,.15);color:#34d399;border:1px solid rgba(52,211,153,.3);padding:5px 10px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer}
+.btn-reject{background:rgba(248,113,113,.12);color:#f87171;border:1px solid rgba(248,113,113,.25);padding:5px 10px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer}
+.role-select{
+  background:var(--bg2);border:1px solid var(--border2);
+  color:var(--text);border-radius:6px;padding:4px 6px;
+  font-size:12px;
+}
+
 /* ─── Print / Thermal Receipt ────────────────────── */
 @media print{
   *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
@@ -559,6 +604,24 @@ body{
   </div>
 </div>
 
+<!-- Pending Approval Screen -->
+<div id="pending-screen" style="display:none">
+  <div class="access-icon">⏳</div>
+  <div class="access-title">Waiting for Approval</div>
+  <div class="access-sub">Your account has been created. An admin needs to approve your access before you can use the app.</div>
+  <div class="access-email" id="pending-email"></div>
+  <button class="btn-signout" onclick="signOut()">Sign Out</button>
+</div>
+
+<!-- Rejected Screen -->
+<div id="rejected-screen" style="display:none">
+  <div class="access-icon">🚫</div>
+  <div class="access-title">Access Denied</div>
+  <div class="access-sub">Your access request has been rejected. Contact the admin if you think this is a mistake.</div>
+  <div class="access-email" id="rejected-email"></div>
+  <button class="btn-signout" onclick="signOut()">Sign Out</button>
+</div>
+
 <!-- Main App -->
 <div id="main-app" style="display:none;flex-direction:column;height:100%;height:100dvh">
 
@@ -620,6 +683,20 @@ body{
     </div>
 
     <div id="view-settings" class="view" style="padding:10px">
+
+      <!-- Admin Panel (only shown to admins) -->
+      <div id="admin-panel" style="display:none;margin-bottom:4px">
+        <div class="admin-section">
+          <div class="admin-section-title">⏳ Pending Approvals</div>
+          <div id="admin-pending-list"></div>
+        </div>
+        <div class="admin-section">
+          <div class="admin-section-title">👥 All Users</div>
+          <div id="admin-all-users"></div>
+        </div>
+        <div style="height:1px;background:var(--border);margin:4px 0 16px"></div>
+      </div>
+
       <div class="settings-group">
         <div class="sg-label">Rota</div>
         <div class="si" onclick="openColEditor()">
@@ -916,6 +993,8 @@ let COLS = {
 
 /* ─── State ──────────────────────────────────────────── */
 let user = null;
+let userProfile = null; // {id, email, display_name, role, status}
+let currentRole = null; // 'admin' | 'manager' | 'viewer'
 let state = {
   type:'inside', weekOffset:0,
   staff:{inside:[...DEFAULT_STAFF.inside],delivery:[...DEFAULT_STAFF.delivery]},
@@ -956,7 +1035,8 @@ function dayMonth(di,off){
 async function loadFromCloud(){
   if(!user)return;
   try{
-    const {data:staffData}=await db.from('staff').select('*').eq('user_id',user.id);
+    // Shared data — no user_id filter, all approved users see same rota
+    const {data:staffData}=await db.from('staff').select('*');
     if(staffData&&staffData.length>0){
       state.staff.inside=staffData.filter(s=>s.type==='inside'||s.type==='both').map(s=>s.name);
       state.staff.delivery=staffData.filter(s=>s.type==='delivery'||s.type==='both').map(s=>s.name);
@@ -967,9 +1047,9 @@ async function loadFromCloud(){
 
 async function seedDefaultStaff(){
   const rows=[];
-  DEFAULT_STAFF.inside.forEach(name=>rows.push({user_id:user.id,name,type:'inside'}));
+  DEFAULT_STAFF.inside.forEach(name=>rows.push({name,type:'inside'}));
   DEFAULT_STAFF.delivery.forEach(name=>{
-    if(!rows.find(r=>r.name===name))rows.push({user_id:user.id,name,type:'delivery'});
+    if(!rows.find(r=>r.name===name))rows.push({name,type:'delivery'});
     else rows.find(r=>r.name===name).type='both';
   });
   const abdulRow=rows.find(r=>r.name==='Abdul'&&r.type==='inside');
@@ -979,10 +1059,8 @@ async function seedDefaultStaff(){
 
 async function loadSchedules(){
   const wks=[weekKey(-1),weekKey(0),weekKey(1)];
-  // Load BOTH types at once — no type filter — so switching is instant
-  const {data}=await db.from('schedules')
-    .select('*').eq('user_id',user.id)
-    .in('week_key',wks);
+  // Shared data — no user_id filter — load all types at once for instant switching
+  const {data}=await db.from('schedules').select('*').in('week_key',wks);
   if(data){
     data.forEach(row=>{
       const k=`${row.schedule_type}|${row.week_key}|${row.day}|${row.shift_col}`;
@@ -996,10 +1074,9 @@ async function saveShiftToCloud(type,wk,day,col,names){
   setSyncDot(day,col,'saving');
   try{
     await db.from('schedules').upsert({
-      user_id:user.id,schedule_type:type,
-      week_key:wk,day,shift_col:col,
+      schedule_type:type,week_key:wk,day,shift_col:col,
       staff_names:names,updated_at:new Date().toISOString()
-    },{onConflict:'user_id,schedule_type,week_key,day,shift_col'});
+    },{onConflict:'schedule_type,week_key,day,shift_col'});
     setSyncDot(day,col,'saved');
     setTimeout(()=>setSyncDot(day,col,''),1500);
   }catch(e){
@@ -1019,11 +1096,11 @@ function setSyncDot(day,col,status){
 
 async function saveStaffToCloud(name,type){
   if(!user)return;
-  await db.from('staff').upsert({user_id:user.id,name,type},{onConflict:'user_id,name'});
+  await db.from('staff').upsert({name,type},{onConflict:'name'});
 }
 async function deleteStaffFromCloud(name){
   if(!user)return;
-  await db.from('staff').delete().eq('user_id',user.id).eq('name',name);
+  await db.from('staff').delete().eq('name',name);
 }
 
 /* ─── Local state helpers ────────────────────────────── */
@@ -1122,6 +1199,7 @@ function setViewMode(mode){
 
 /* ─── Navigation ─────────────────────────────────────── */
 function showView(v){
+  if(v==='sales'&&currentRole==='viewer')return;
   document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(x=>x.classList.remove('active'));
   document.getElementById(`view-${v}`).classList.add('active');
@@ -1129,6 +1207,7 @@ function showView(v){
   document.getElementById('type-tabs').style.display=v==='rota'?'flex':'none';
   if(v==='staff'){renderStaff();populateNewStaffPalette();}
   if(v==='sales'){initSalesView();}
+  if(v==='settings'){loadAdminPanel();}
   closeUserMenu();
 }
 
@@ -1676,8 +1755,9 @@ async function doGoogleAuth(){
 
 async function signOut(){
   await db.auth.signOut();
-  user=null;state.schedules={};
-  showAuthScreen();closeUserMenu();
+  user=null;userProfile=null;currentRole=null;
+  state.schedules={};
+  showScreen('auth');closeUserMenu();
 }
 
 /* ─── User Menu ──────────────────────────────────────── */
@@ -1689,17 +1769,38 @@ document.addEventListener('click',e=>{
 });
 
 /* ─── Screens ────────────────────────────────────────── */
-function showAuthScreen(){
-  document.getElementById('auth-screen').style.display='flex';
-  document.getElementById('main-app').style.display='none';
+function showScreen(screen){
+  // Hide all top-level screens
   document.getElementById('loading-screen').style.display='none';
-}
-function showMainApp(){
   document.getElementById('auth-screen').style.display='none';
-  document.getElementById('main-app').style.display='flex';
-  document.getElementById('loading-screen').style.display='none';
-  // Apply saved view mode
-  setViewMode(viewMode);
+  document.getElementById('pending-screen').style.display='none';
+  document.getElementById('rejected-screen').style.display='none';
+  document.getElementById('main-app').style.display='none';
+  if(screen==='loading'){
+    document.getElementById('loading-screen').style.display='flex';
+  }else if(screen==='auth'){
+    document.getElementById('auth-screen').style.display='flex';
+  }else if(screen==='pending'){
+    document.getElementById('pending-screen').style.display='flex';
+  }else if(screen==='rejected'){
+    document.getElementById('rejected-screen').style.display='flex';
+  }else if(screen==='main'){
+    document.getElementById('main-app').style.display='flex';
+    setViewMode(viewMode);
+    applyRoleUI();
+  }
+}
+// Legacy aliases used by existing code
+function showAuthScreen(){showScreen('auth');}
+function showMainApp(){showScreen('main');}
+
+function applyRoleUI(){
+  const salesBtn=document.getElementById('nav-sales');
+  if(currentRole==='viewer'){
+    if(salesBtn) salesBtn.style.display='none';
+  }else{
+    if(salesBtn) salesBtn.style.display='';
+  }
 }
 
 /* ─── Toast ──────────────────────────────────────────── */
@@ -1707,6 +1808,100 @@ function toast(msg){
   const t=document.getElementById('toast');
   t.textContent=msg;t.classList.add('show');
   clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2200);
+}
+
+/* ─── User Profile / Access Control ─────────────────── */
+async function checkUserProfile(u){
+  const{data,error}=await db.from('user_profiles').select('*').eq('id',u.id).single();
+  if(error&&error.code==='PGRST116'){
+    // No profile — create pending entry
+    const np={
+      id:u.id,email:u.email,
+      display_name:u.user_metadata?.full_name||u.email.split('@')[0],
+      role:'viewer',status:'pending'
+    };
+    await db.from('user_profiles').insert(np);
+    userProfile=np;currentRole=null;
+    document.getElementById('pending-email').textContent=u.email;
+    showScreen('pending');
+    return false;
+  }
+  if(error){
+    // If RLS blocks the read entirely (e.g. during bootstrap), fall through to main
+    // This handles the first-ever admin before RLS is set
+    userProfile=null;currentRole='admin';
+    return true;
+  }
+  userProfile=data;currentRole=data.role;
+  if(data.status==='pending'){
+    document.getElementById('pending-email').textContent=u.email;
+    showScreen('pending');return false;
+  }
+  if(data.status==='rejected'){
+    document.getElementById('rejected-email').textContent=u.email;
+    showScreen('rejected');return false;
+  }
+  return true; // approved
+}
+
+async function loadAdminPanel(){
+  const panel=document.getElementById('admin-panel');
+  if(currentRole!=='admin'||!panel)return;
+  panel.style.display='block';
+  const{data:allUsers}=await db.from('user_profiles').select('*').order('created_at');
+  if(!allUsers)return;
+  const pending=allUsers.filter(u=>u.status==='pending');
+  const pendingEl=document.getElementById('admin-pending-list');
+  if(pending.length===0){
+    pendingEl.innerHTML='<div style="background:var(--surface);border-radius:var(--r);padding:12px 14px;color:var(--text3);font-size:13px">No pending requests</div>';
+  }else{
+    pendingEl.innerHTML=pending.map(u=>`
+      <div class="user-row" id="urow-${u.id}">
+        <div class="user-info">
+          <div class="user-email-lbl">${escHtml(u.email)}</div>
+          <div class="user-meta-lbl">Requested ${new Date(u.created_at).toLocaleDateString('en-GB')}</div>
+        </div>
+        <div class="user-actions">
+          <button class="btn-approve" onclick="approveUser('${u.id}','manager')">✓ Approve</button>
+          <button class="btn-reject" onclick="rejectUser('${u.id}')">✗ Reject</button>
+        </div>
+      </div>`).join('');
+  }
+  const allEl=document.getElementById('admin-all-users');
+  allEl.innerHTML=allUsers.map(u=>`
+    <div class="user-row" id="urow-all-${u.id}">
+      <div class="user-info">
+        <div class="user-email-lbl">${escHtml(u.email)}${u.id===user.id?'&nbsp;<span style="color:var(--accent);font-size:10px;font-weight:700">YOU</span>':''}</div>
+        <div class="user-meta-lbl">${u.status} · ${u.role}</div>
+      </div>
+      <div class="user-actions">
+        ${u.id!==user.id?`
+          <select class="role-select" onchange="changeUserRole('${u.id}',this.value)">
+            <option value="viewer"${u.role==='viewer'?' selected':''}>Viewer</option>
+            <option value="manager"${u.role==='manager'?' selected':''}>Manager</option>
+            <option value="admin"${u.role==='admin'?' selected':''}>Admin</option>
+          </select>
+          ${u.status!=='approved'?`<button class="btn-approve" onclick="approveUser('${u.id}','${u.role}')">Approve</button>`:''}
+        `:'<span style="color:var(--text3);font-size:11px">You</span>'}
+      </div>
+    </div>`).join('');
+}
+
+async function approveUser(uid,role){
+  await db.from('user_profiles').update({status:'approved',role,updated_at:new Date().toISOString()}).eq('id',uid);
+  toast('User approved ✓');
+  loadAdminPanel();
+}
+
+async function rejectUser(uid){
+  await db.from('user_profiles').update({status:'rejected',updated_at:new Date().toISOString()}).eq('id',uid);
+  toast('User rejected');
+  loadAdminPanel();
+}
+
+async function changeUserRole(uid,role){
+  await db.from('user_profiles').update({role,updated_at:new Date().toISOString()}).eq('id',uid);
+  toast('Role updated ✓');
 }
 
 /* ─── Init ───────────────────────────────────────────── */
@@ -1717,24 +1912,30 @@ async function init(){
     user=session.user;
     document.getElementById('um-email').textContent=user.email;
     document.getElementById('user-email-display').textContent=user.email;
-    await loadFromCloud();
-    document.getElementById('week-label').textContent=weekLabel(state.weekOffset);
-    renderRota();
-    showMainApp();
+    const approved=await checkUserProfile(user);
+    if(approved){
+      await loadFromCloud();
+      document.getElementById('week-label').textContent=weekLabel(state.weekOffset);
+      renderRota();
+      showScreen('main');
+    }
   }else{
-    showAuthScreen();
+    showScreen('auth');
   }
   db.auth.onAuthStateChange(async(event,session)=>{
     if(event==='SIGNED_IN'&&session){
       user=session.user;
       document.getElementById('um-email').textContent=user.email;
       document.getElementById('user-email-display').textContent=user.email;
-      await loadFromCloud();
-      document.getElementById('week-label').textContent=weekLabel(state.weekOffset);
-      renderRota();
-      showMainApp();
+      const approved=await checkUserProfile(user);
+      if(approved){
+        await loadFromCloud();
+        document.getElementById('week-label').textContent=weekLabel(state.weekOffset);
+        renderRota();
+        showScreen('main');
+      }
     }else if(event==='SIGNED_OUT'){
-      showAuthScreen();
+      showScreen('auth');
     }
   });
 }
@@ -1804,12 +2005,10 @@ function getWages(){
 }
 
 async function saveSales(){
-  const {data:{user}}=await db.auth.getUser();
   if(!user){toast('Please sign in first');return;}
   const saleDate=document.getElementById('s-date').value;
   if(!saleDate){toast('Please enter a date');return;}
   const payload={
-    user_id:user.id,
     sale_date:saleDate,
     just_eat:getVal('s-je'),
     cc_app:getVal('s-cc'),
@@ -1819,11 +2018,11 @@ async function saveSales(){
     card:getVal('s-card'),
     staff_wages:getWages()
   };
-  // Upsert by user+date (replace if same date exists)
+  // Upsert by date (shared record per day for the whole team)
   const {error}=await db.from('daily_sales')
-    .upsert(payload,{onConflict:'user_id,sale_date',ignoreDuplicates:false});
+    .upsert(payload,{onConflict:'sale_date',ignoreDuplicates:false});
   if(error){
-    // Fallback: plain insert if upsert fails (table may not have unique constraint yet)
+    // Fallback: plain insert if upsert fails
     const {error:e2}=await db.from('daily_sales').insert(payload);
     if(e2){toast('Save failed: '+e2.message);return;}
   }
@@ -1833,10 +2032,9 @@ async function saveSales(){
 async function loadSalesHistory(){
   const el=document.getElementById('sales-hist-list');
   el.innerHTML='<div style="text-align:center;color:var(--text3);font-size:14px;padding:40px 0">Loading...</div>';
-  const {data:{user}}=await db.auth.getUser();
   if(!user){el.innerHTML='<div style="text-align:center;color:var(--text3);font-size:14px;padding:40px 0">Not signed in</div>';return;}
   const {data,error}=await db.from('daily_sales')
-    .select('*').eq('user_id',user.id)
+    .select('*')
     .order('sale_date',{ascending:false}).limit(60);
   if(error){el.innerHTML='<div style="text-align:center;color:var(--red);font-size:14px;padding:40px 0">'+error.message+'</div>';return;}
   if(!data||!data.length){el.innerHTML='<div style="text-align:center;color:var(--text3);font-size:14px;padding:40px 0">No records yet</div>';return;}
