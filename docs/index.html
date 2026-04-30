@@ -1875,36 +1875,85 @@ async function loadAdminPanel(){
     <div class="user-row" id="urow-all-${u.id}">
       <div class="user-info">
         <div class="user-email-lbl">${escHtml(u.email)}${u.id===user.id?'&nbsp;<span style="color:var(--accent);font-size:10px;font-weight:700">YOU</span>':''}</div>
-        <div class="user-meta-lbl">${u.status} · ${u.role}</div>
+        <div class="user-meta-lbl">${u.status==='approved'?u.role:u.status}</div>
       </div>
       <div class="user-actions">
         ${u.id!==user.id?`
-          <select class="role-select" onchange="changeUserRole('${u.id}',this.value)">
-            <option value="viewer"${u.role==='viewer'?' selected':''}>Viewer</option>
-            <option value="manager"${u.role==='manager'?' selected':''}>Manager</option>
-            <option value="admin"${u.role==='admin'?' selected':''}>Admin</option>
-          </select>
-          ${u.status!=='approved'?`<button class="btn-approve" onclick="approveUser('${u.id}','${u.role}')">Approve</button>`:''}
+          ${u.status==='approved'?`
+            <select class="role-select" onchange="changeUserRole('${u.id}',this.value)">
+              <option value="viewer"${u.role==='viewer'?' selected':''}>Viewer</option>
+              <option value="manager"${u.role==='manager'?' selected':''}>Manager</option>
+              <option value="admin"${u.role==='admin'?' selected':''}>Admin</option>
+            </select>
+            <button class="btn-reject" onclick="revokeUser('${u.id}','${escHtml(u.email)}')">Remove</button>
+          `:`
+            <button class="btn-approve" onclick="approveUser('${u.id}','manager')">✓ Approve</button>
+            <button class="btn-reject" onclick="revokeUser('${u.id}','${escHtml(u.email)}')">✗ Deny</button>
+          `}
         `:'<span style="color:var(--text3);font-size:11px">You</span>'}
       </div>
     </div>`).join('');
 }
 
 async function approveUser(uid,role){
-  await db.from('user_profiles').update({status:'approved',role,updated_at:new Date().toISOString()}).eq('id',uid);
+  const{error}=await db.from('user_profiles').update({status:'approved',role,updated_at:new Date().toISOString()}).eq('id',uid);
+  if(error){toast('Error: '+error.message);return;}
   toast('User approved ✓');
   loadAdminPanel();
 }
 
-async function rejectUser(uid){
-  await db.from('user_profiles').update({status:'rejected',updated_at:new Date().toISOString()}).eq('id',uid);
-  toast('User rejected');
+async function revokeUser(uid,email){
+  if(!confirm(`Remove access for ${email}?`))return;
+  const{error}=await db.from('user_profiles').update({status:'rejected',updated_at:new Date().toISOString()}).eq('id',uid);
+  if(error){toast('Error: '+error.message);return;}
+  toast('Access removed');
   loadAdminPanel();
 }
 
 async function changeUserRole(uid,role){
-  await db.from('user_profiles').update({role,updated_at:new Date().toISOString()}).eq('id',uid);
+  const{error}=await db.from('user_profiles').update({role,updated_at:new Date().toISOString()}).eq('id',uid);
+  if(error){toast('Error: '+error.message);loadAdminPanel();return;}
   toast('Role updated ✓');
+  loadAdminPanel();
+}
+
+/* ─── Realtime Sync ──────────────────────────────────── */
+let _realtimeSetup=false;
+function setupRealtime(){
+  if(_realtimeSetup)return;
+  _realtimeSetup=true;
+
+  // Schedule changes — update local cache and re-render instantly
+  db.channel('cc-schedules')
+    .on('postgres_changes',{event:'*',schema:'public',table:'schedules'},payload=>{
+      if(payload.eventType==='INSERT'||payload.eventType==='UPDATE'){
+        const r=payload.new;
+        const k=`${r.schedule_type}|${r.week_key}|${r.day}|${r.shift_col}`;
+        if(r.staff_names&&r.staff_names.length>0) state.schedules[k]=r.staff_names;
+        else delete state.schedules[k];
+        renderRota();
+      }else if(payload.eventType==='DELETE'){
+        const r=payload.old;
+        if(r){
+          const k=`${r.schedule_type}|${r.week_key}|${r.day}|${r.shift_col}`;
+          delete state.schedules[k];
+          renderRota();
+        }
+      }
+    })
+    .subscribe();
+
+  // Staff changes — reload staff list and re-render
+  db.channel('cc-staff')
+    .on('postgres_changes',{event:'*',schema:'public',table:'staff'},async()=>{
+      const{data}=await db.from('staff').select('*');
+      if(data&&data.length>0){
+        state.staff.inside=data.filter(s=>s.type==='inside'||s.type==='both').map(s=>s.name);
+        state.staff.delivery=data.filter(s=>s.type==='delivery'||s.type==='both').map(s=>s.name);
+        renderRota();
+      }
+    })
+    .subscribe();
 }
 
 /* ─── Init ───────────────────────────────────────────── */
@@ -1921,6 +1970,7 @@ async function init(){
       document.getElementById('week-label').textContent=weekLabel(state.weekOffset);
       renderRota();
       showScreen('main');
+      setupRealtime();
     }
   }else{
     showScreen('auth');
@@ -1936,6 +1986,7 @@ async function init(){
         document.getElementById('week-label').textContent=weekLabel(state.weekOffset);
         renderRota();
         showScreen('main');
+        setupRealtime();
       }
     }else if(event==='SIGNED_OUT'){
       showScreen('auth');
