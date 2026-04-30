@@ -140,6 +140,9 @@ body{
   font-size:14px;cursor:pointer;flex-shrink:0;
 }
 .icon-btn:active{background:var(--border)}
+#sync-btn{font-size:18px;transition:color .2s}
+#sync-btn.syncing{animation:spin-sync .7s linear infinite}
+@keyframes spin-sync{to{transform:rotate(360deg)}}
 
 /* ─── Type Tabs ──────────────────────────────────── */
 #type-tabs{
@@ -727,6 +730,7 @@ body{
       <button onclick="changeWeek(1)">›</button>
     </div>
     <div class="icon-btn" onclick="shareRota()" title="Share rota as image">📤</div>
+    <div class="icon-btn" id="sync-btn" onclick="syncAll()" title="Sync all data">↻</div>
     <div class="icon-btn" onclick="toggleUserMenu()">👤</div>
   </div>
 
@@ -1001,7 +1005,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v35-sales-offline-cache';
+const _COLOR_VER='v36-sync-button';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -1179,6 +1183,43 @@ async function loadFromCloud(){
     }else{await seedDefaultStaff();}
     await loadSchedules();
   }catch(e){console.error('Load error:',e)}
+}
+
+async function syncAll(){
+  const btn=document.getElementById('sync-btn');
+  if(btn){btn.classList.add('syncing');btn.title='Syncing…';}
+  let ok=false;
+  try{
+    if(!user)throw new Error('Not signed in');
+    // 1. Settings: colours, blacklist, column layouts
+    await loadColsFromCloud();
+    // 2. Staff list
+    const{data:staffData}=await db.from('staff').select('*');
+    if(staffData&&staffData.length>0){
+      state.staff.inside=staffData.filter(s=>s.type==='inside'||s.type==='both').map(s=>s.name);
+      state.staff.delivery=staffData.filter(s=>s.type==='delivery'||s.type==='both').map(s=>s.name);
+    }
+    // 3. Rota schedules (current + adjacent weeks)
+    await loadSchedules();
+    // 4. Sales data for currently viewed week
+    await loadSalesWeek();
+    // Re-render everything
+    renderRota();
+    renderStaff();
+    applyStaffColors();
+    ok=true;
+  }catch(e){
+    console.warn('Sync error:',e);
+    toast('Sync failed — check connection');
+  }finally{
+    if(btn){
+      btn.classList.remove('syncing');
+      if(ok){btn.textContent='✓';btn.style.color='#4CC4A0';}
+      setTimeout(()=>{if(btn){btn.textContent='↻';btn.style.color='';}},1800);
+      btn.title='Sync all data';
+    }
+    if(ok)toast('All data synced ✓');
+  }
 }
 
 async function seedDefaultStaff(){
