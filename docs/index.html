@@ -384,9 +384,16 @@ body{
   flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;
   padding:6px 4px 2px;background:none;border:none;cursor:pointer;
   color:var(--text3);font-size:9px;font-weight:500;transition:color .15s;letter-spacing:0.2px;
+  position:relative;
 }
-.nav-icon{font-size:20px;line-height:1}
-.nav-btn.active{color:var(--text)}
+.nav-icon{font-size:22px;line-height:1}
+/* 📅 calendar renders visually larger than other emoji — scale it down to match */
+#nav-rota .nav-icon{font-size:18px}
+.nav-btn.active{color:var(--accent)}
+.nav-btn.active::after{
+  content:'';position:absolute;top:0;left:25%;right:25%;
+  height:2px;background:var(--accent);border-radius:0 0 3px 3px;
+}
 
 /* ─── Modal / Bottom Sheet ───────────────────────── */
 #overlay{
@@ -978,7 +985,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v19-nav-bottom-only';
+const _COLOR_VER='v20-nav-polish';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
