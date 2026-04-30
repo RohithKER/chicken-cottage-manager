@@ -1001,7 +1001,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v31-confirm-purge-staff';
+const _COLOR_VER='v32-fix-catch-on-thenable';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -1093,17 +1093,15 @@ async function saveColsToCloud(type,cols){
   await db.from('app_settings')
     .upsert({key:`cols_${type}`,value:cols,updated_at:new Date().toISOString()},{onConflict:'key'});
 }
-function saveColorsToCloud(){
+async function saveColorsToCloud(){
   if(!user)return;
-  db.from('app_settings')
-    .upsert({key:'staff_colors',value:staffColors,updated_at:new Date().toISOString()},{onConflict:'key'})
-    .catch(e=>console.warn('Color sync failed:',e));
+  try{await db.from('app_settings').upsert({key:'staff_colors',value:staffColors,updated_at:new Date().toISOString()},{onConflict:'key'});}
+  catch(e){console.warn('Color sync failed:',e);}
 }
-function saveBlacklistToCloud(){
+async function saveBlacklistToCloud(){
   if(!user)return;
-  db.from('app_settings')
-    .upsert({key:'staff_blacklist',value:[...staffBlacklist],updated_at:new Date().toISOString()},{onConflict:'key'})
-    .catch(e=>console.warn('Blacklist sync failed:',e));
+  try{await db.from('app_settings').upsert({key:'staff_blacklist',value:[...staffBlacklist],updated_at:new Date().toISOString()},{onConflict:'key'});}
+  catch(e){console.warn('Blacklist sync failed:',e);}
 }
 
 /* ─── State ──────────────────────────────────────────── */
