@@ -1062,7 +1062,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v44-save-timeout';
+const _COLOR_VER='v45-autosave-fix';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -1256,6 +1256,14 @@ async function syncAll(){
   const _abort=_tout(20000);
   try{
     if(!user)throw new Error('Not signed in');
+    // 0. Retry any shifts that failed to auto-save
+    if(_failedSaves.size>0){
+      logActivity(`Retrying ${_failedSaves.size} failed auto-save(s)…`,'saving');
+      const retries=[..._failedSaves.values()];
+      for(const s of retries){
+        await saveShiftToCloud(s.type,s.wk,s.day,s.col,s.names);
+      }
+    }
     // 1. Settings: colours, blacklist, column layouts
     await Promise.race([loadColsFromCloud(),_tout(6000)]);
     // 2. Staff list from cloud
@@ -1327,31 +1335,58 @@ async function loadSchedules(){
   }
 }
 
+/* ─── Pending-save tracking ──────────────────────────── */
+let _pendingSaves=0;
+const _failedSaves=new Map(); // key->'type|wk|day|col' → save args
+function _updateSaveIndicator(){
+  const btn=document.getElementById('sync-btn');
+  if(!btn)return;
+  if(_failedSaves.size>0){
+    btn.style.color='var(--red)';
+    btn.title=`${_failedSaves.size} shift(s) unsaved — tap ↻ to retry`;
+  }else if(_pendingSaves>0){
+    btn.style.color='#facc15';
+    btn.title='Auto-saving…';
+  }else{
+    btn.style.color='';
+    btn.title='Sync all data';
+  }
+}
+
 async function saveShiftToCloud(type,wk,day,col,names){
   if(!user)return;
+  const _key=`${type}|${wk}|${day}|${col}`;
   setSyncDot(day,col,'saving');
+  _pendingSaves++;
+  _updateSaveIndicator();
   try{
     const _t=new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),8000));
-    await Promise.race([
+    // Destructure to catch Supabase-level errors (RLS, constraint, etc.)
+    const{error}=await Promise.race([
       db.from('schedules').upsert({
         schedule_type:type,week_key:wk,day,shift_col:col,
         staff_names:names,updated_at:new Date().toISOString()
       },{onConflict:'schedule_type,week_key,day,shift_col'}),
       _t
     ]);
+    if(error)throw error;
+    _failedSaves.delete(_key);
     setSyncDot(day,col,'saved');
     logActivity(`${day} ${col} saved to cloud ✓`, 'success');
     setTimeout(()=>setSyncDot(day,col,''),1500);
   }catch(e){
+    // Queue for retry on next sync
+    _failedSaves.set(_key,{type,wk,day,col,names});
     setSyncDot(day,col,'');
     if(e.message==='timeout'){
-      toast('⚠ Saved locally — tap ↻ to sync when online');
-      logActivity(`${day} ${col} — saved locally (cloud timeout)`, 'saving');
-    } else {
+      logActivity(`${day} ${col} — saved locally (cloud timeout, will retry on ↻)`, 'saving');
+    }else{
       console.error('Save error:',e);
-      toast('Save failed: '+e.message);
       logActivity(`${day} ${col} save failed: ${e.message}`, 'error');
     }
+  }finally{
+    _pendingSaves--;
+    _updateSaveIndicator();
   }
 }
 
@@ -1366,8 +1401,18 @@ function setSyncDot(day,col,status){
 
 async function saveStaffToCloud(name,type){
   if(!user)return;
-  await db.from('staff').upsert({name,type},{onConflict:'name'});
-  logActivity(`Staff: ${name} (${type}) saved ✓`, 'success');
+  try{
+    const _t=new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),8000));
+    const{error}=await Promise.race([
+      db.from('staff').upsert({name,type},{onConflict:'name'}),
+      _t
+    ]);
+    if(error)throw error;
+    logActivity(`Staff: ${name} (${type}) saved ✓`, 'success');
+  }catch(e){
+    logActivity(`Staff save failed for ${name}: ${e.message}`, 'error');
+    console.error('saveStaffToCloud error:',e);
+  }
 }
 
 /* ─── Activity Log ───────────────────────────────────── */
