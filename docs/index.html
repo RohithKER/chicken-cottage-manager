@@ -853,10 +853,13 @@ body{
         <div class="ss-total-row"><label>Day Total</label><div class="ss-total-val" id="sd-day-total" style="color:var(--green)">£0.00</div></div>
       </div>
     </div>
-    <div class="ss-foot">
-      <button class="btn-sm ghost" style="flex:1;padding:11px" onclick="closeDayEntry()">Cancel</button>
-      <button class="btn-sm ghost" style="flex:1;padding:11px" onclick="printDaySales()">🖨 Print</button>
-      <button class="btn-sm primary" style="flex:1;padding:11px" onclick="saveDaySales()">Save</button>
+    <div class="ss-foot" style="flex-wrap:wrap;gap:8px">
+      <div style="display:flex;gap:8px;flex:1;min-width:0">
+        <button class="btn-sm ghost" style="flex:1;padding:11px" onclick="closeDayEntry()">Cancel</button>
+        <button class="btn-sm ghost" style="flex:1;padding:11px;color:var(--red);border-color:rgba(255,107,122,.3)" onclick="clearDayEntry()">Clear</button>
+        <button class="btn-sm ghost" style="flex:1;padding:11px" onclick="printDaySales()">🖨 Print</button>
+      </div>
+      <button class="btn-sm primary" style="width:100%;padding:13px;font-size:15px" onclick="saveDaySales()">Save</button>
     </div>
   </div>
 </div>
@@ -2175,6 +2178,13 @@ function handleSalesOverlay(e){
 }
 
 function getSdVal(id){return parseFloat(document.getElementById(id).value)||0;}
+
+function clearDayEntry(){
+  ['sd-je','sd-cc','sd-ue','sd-dr','sd-cash','sd-card'].forEach(id=>{
+    document.getElementById(id).value='';
+  });
+  calcDaySales();
+}
 
 function calcDaySales(){
   const je=getSdVal('sd-je'),cc=getSdVal('sd-cc'),ue=getSdVal('sd-ue'),dr=getSdVal('sd-dr');
