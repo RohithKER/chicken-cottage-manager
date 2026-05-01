@@ -564,7 +564,9 @@ body{
 }
 .stbl tr.stbl-grand .stbl-total{color:var(--green);font-size:14px}
 .stbl-tap-hint{text-align:center;color:var(--text3);font-size:12px;margin-top:16px;padding-bottom:4px;opacity:0.7}
-.breakdown-toggle{display:inline-flex;align-items:center;gap:5px;background:var(--surface2);border:1px solid var(--border);border-radius:20px;color:var(--text3);font-size:12px;font-weight:500;padding:5px 12px;margin:4px 14px 8px;cursor:pointer;transition:color .15s,border-color .15s,background .15s;white-space:nowrap}
+.ss-row-lbl{display:flex;flex-direction:column;align-items:flex-start;gap:5px;flex:1}
+.ss-row-lbl label{font-size:14px;color:var(--text2)}
+.breakdown-toggle{display:inline-flex;align-items:center;gap:4px;background:var(--surface2);border:1px solid var(--border);border-radius:20px;color:var(--text3);font-size:11px;font-weight:500;padding:4px 10px;cursor:pointer;transition:color .15s,border-color .15s,background .15s;white-space:nowrap}
 .breakdown-toggle.has-items{color:var(--accent2);border-color:rgba(91,156,245,.4);background:rgba(91,156,245,.07)}
 .breakdown-toggle svg{flex-shrink:0;transition:transform .2s}
 .breakdown-toggle.open svg{transform:rotate(180deg)}
@@ -605,6 +607,7 @@ body{
 .ss-row{display:flex;align-items:center;padding:11px 14px;gap:10px;border-bottom:1px solid rgba(255,255,255,.04);min-height:50px}
 .ss-row:last-child{border-bottom:none}
 .ss-row label{font-size:14px;color:var(--text2);flex:1}
+.ss-row:has(.ss-row-lbl){align-items:center}
 .ss-row input[type=number]{width:92px;background:var(--surface);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:16px;font-weight:600;padding:8px 10px;text-align:right;outline:none;-moz-appearance:textfield;transition:border-color .15s}
 .ss-row input[type=number]::-webkit-inner-spin-button{display:none}
 .ss-row input[type=number]:focus{border-color:var(--accent);background:rgba(91,156,245,.04)}
@@ -918,11 +921,9 @@ body{
         <div class="ss-section-hdr">Delivery Platforms</div>
         <div class="ss-row"><label>Just Eat</label><input type="number" id="sd-je" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
         <div class="ss-row"><label>CC App</label><input type="number" id="sd-cc" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
-        <div class="ss-row"><label>Uber Eats</label><input type="number" id="sd-ue" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
-        <button class="breakdown-toggle" id="ue-toggle" onclick="toggleBreakdown('ue')"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="ue-badge">Add breakdown</span></button>
+        <div class="ss-row"><div class="ss-row-lbl"><label>Uber Eats</label><button class="breakdown-toggle" id="ue-toggle" onclick="toggleBreakdown('ue')"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="ue-badge">Add breakdown</span></button></div><input type="number" id="sd-ue" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
         <div id="ue-panel" style="display:none" class="breakdown-panel"><div id="ue-items"></div><button class="breakdown-collapse" onclick="toggleBreakdown('ue')">▲ Collapse</button></div>
-        <div class="ss-row"><label>Deliveroo</label><input type="number" id="sd-dr" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
-        <button class="breakdown-toggle" id="dr-toggle" onclick="toggleBreakdown('dr')"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="dr-badge">Add breakdown</span></button>
+        <div class="ss-row"><div class="ss-row-lbl"><label>Deliveroo</label><button class="breakdown-toggle" id="dr-toggle" onclick="toggleBreakdown('dr')"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="dr-badge">Add breakdown</span></button></div><input type="number" id="sd-dr" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
         <div id="dr-panel" style="display:none" class="breakdown-panel"><div id="dr-items"></div><button class="breakdown-collapse" onclick="toggleBreakdown('dr')">▲ Collapse</button></div>
         <div class="ss-total-row"><label>Delivery Total</label><div class="ss-total-val" id="sd-del-total" style="color:var(--accent2)">£0.00</div></div>
       </div>
