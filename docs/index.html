@@ -1017,7 +1017,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v67-new-auth';
+const _COLOR_VER='v68-rls-fix';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -2595,6 +2595,16 @@ function setupRealtime(){
       logActivity(`Sales ${row.sale_date} updated live ✓`,'success');
     })
     .subscribe();
+
+  // Permissions changes — reload instantly when admin changes your permissions
+  if(user){
+    db.channel('cc-my-perms')
+      .on('postgres_changes',{event:'UPDATE',schema:'public',table:'user_permissions',filter:`user_id=eq.${user.id}`},async()=>{
+        await loadPermissions(user.id,user.email);
+        toast('🔑 Your permissions have been updated');
+      })
+      .subscribe();
+  }
 }
 
 /* ─── Init ───────────────────────────────────────────── */
