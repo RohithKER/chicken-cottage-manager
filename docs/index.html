@@ -570,6 +570,7 @@ body{
 .breakdown-item input{flex:1;background:var(--surface);border:1px solid var(--border2);border-radius:6px;padding:6px 10px;color:var(--text);font-size:14px;text-align:right;outline:none;-webkit-appearance:none}
 .breakdown-item input:focus{border-color:var(--accent)}
 .breakdown-rm{width:28px;height:28px;border-radius:50%;border:none;background:rgba(220,60,60,.15);color:#e05555;font-size:18px;line-height:28px;cursor:pointer;flex-shrink:0;padding:0;text-align:center}
+.breakdown-add{width:36px;height:36px;border-radius:50%;border:none;background:var(--accent);color:#fff;font-size:22px;line-height:36px;cursor:pointer;flex-shrink:0;padding:0;text-align:center}
 .breakdown-collapse{width:100%;margin-top:4px;background:none;border:1px solid var(--border);border-radius:6px;color:var(--text3);font-size:11px;padding:5px;cursor:pointer}
 
 /* Day Entry Sheet */
@@ -3058,10 +3059,11 @@ function _renderBdItems(f){
   const inp=document.createElement('input');
   inp.type='number';inp.inputMode='decimal';inp.step='0.01';inp.min='0';inp.placeholder='Add amount…';
   inp.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();_addBdItemFromInput(f,inp);}};
-  inp.onblur=()=>{if(parseFloat(inp.value))_addBdItemFromInput(f,inp);};
-  row.appendChild(inp);wrap.appendChild(row);
-  const inputs=wrap.querySelectorAll('input');
-  if(inputs.length)inputs[inputs.length-1].focus();
+  const addBtn=document.createElement('button');
+  addBtn.className='breakdown-add';addBtn.textContent='+';addBtn.type='button';
+  addBtn.onclick=()=>_addBdItemFromInput(f,inp);
+  row.appendChild(inp);row.appendChild(addBtn);wrap.appendChild(row);
+  inp.focus();
 }
 function _addBdItem(f){_bdItems[f].push(0);_renderBdItems(f);_syncBdTotal(f);}
 function _addBdItemFromInput(f,inp){
