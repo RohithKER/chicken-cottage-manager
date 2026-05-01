@@ -1064,7 +1064,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v58-sales-smooth';
+const _COLOR_VER='v59-print-71w-bighead';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -2902,11 +2902,13 @@ async function saveDaySales(){
   }
 }
 
-// 42 chars = standard 80mm paper width. Previous wrapping at 42 was a chunking bug (now fixed).
-// \x01/\x02 are bold-on/bold-off markers translated to ESC E 1/0 in _buildEscPos.
-const _RW=42;
+// 71 chars = compressed font (ESC M 1) on 80mm paper — fills the full page width.
+// Markers in text: \x01/\x02 = bold on/off (ESC E 1/0), \x03/\x04 = double-width+bold on/off (ESC ! 0x28 / ESC ! 0x00)
+const _RW=71;
 function _fmtMoney(n){return'\xa3'+n.toFixed(2);} // \xa3 = U+00A3 = £, encoded as 0x9C in PC437
 function _center(s,w=_RW){const p=Math.max(0,Math.floor((w-s.length)/2));return' '.repeat(p)+s;}
+// For double-width lines: each char prints at 2x width, so effective cols = _RW/2 ≈ 35
+function _centerDW(s){const hw=Math.floor(_RW/2);const p=Math.max(0,Math.floor((hw-s.length)/2));return' '.repeat(p)+s;}
 function _padLine(label,value,width=_RW){
   const v=_fmtMoney(value);
   const spaces=width-label.length-v.length;
@@ -2917,11 +2919,12 @@ function _receiptText(dateLabel,timeLabel,je,cc,ue,dr,cash,card){
   const total=del+cash+card;
   const div='-'.repeat(_RW);
   const dbl='='.repeat(_RW);
-  const B='\x01',b='\x02'; // bold markers — translated to ESC E in _buildEscPos
+  const B='\x01',b='\x02'; // bold on/off markers
+  const DW='\x03',dw='\x04'; // double-width+bold on/off markers
   const lines=[
     '',
-    B+_center('CC CHELMSFORD')+b,  // bold heading
-    B+_center('TOTAL SALES')+b,    // bold heading
+    DW+_centerDW('CC CHELMSFORD')+dw,  // double-wide + bold heading
+    DW+_centerDW('TOTAL SALES')+dw,    // double-wide + bold heading
     dbl,
     dateLabel,   // left-aligned
     timeLabel,   // left-aligned
@@ -2936,7 +2939,7 @@ function _receiptText(dateLabel,timeLabel,je,cc,ue,dr,cash,card){
     _padLine('Cash',cash),
     _padLine('Card',card),
     div,
-    _padLine('TOTAL SALES',total),
+    B+_padLine('TOTAL SALES',total)+b,  // bold total line
     dbl,
     '','',''
   ];
@@ -3020,16 +3023,21 @@ let _btDevice=null; // cached device object — survives _btChar reset within a 
 let _btChar=null;   // cached write characteristic
 
 function _buildEscPos(text){
-  // ESC @ = init/reset printer
-  // ESC E 1/0 = bold on/off (triggered by \x01/\x02 markers in text)
-  // GS V A 5 = feed 5 lines and full cut
-  const init=[0x1B,0x40];
+  // ESC @     = init/reset printer
+  // ESC M 1   = select compressed Font B (~71 chars/line on 80mm paper)
+  // ESC E 1/0 = bold on/off  (triggered by \x01/\x02 markers)
+  // ESC ! 0x28 = double-width + bold (triggered by \x03 marker)
+  // ESC ! 0x00 = normal size reset  (triggered by \x04 marker)
+  // GS V A 5  = feed 5 lines and full cut
+  const init=[0x1B,0x40, 0x1B,0x4D,0x01]; // reset + compressed font B
   const cut=[0x1D,0x56,0x41,0x05];
   const bytes=[];
   for(let i=0;i<text.length;i++){
     const c=text.charCodeAt(i);
-    if(c===0x01){bytes.push(0x1B,0x45,0x01);}  // \x01 → ESC E 1 = bold on
-    else if(c===0x02){bytes.push(0x1B,0x45,0x00);} // \x02 → ESC E 0 = bold off
+    if(c===0x01){bytes.push(0x1B,0x45,0x01);}         // bold on
+    else if(c===0x02){bytes.push(0x1B,0x45,0x00);}    // bold off
+    else if(c===0x03){bytes.push(0x1B,0x21,0x28);}    // double-width + bold on
+    else if(c===0x04){bytes.push(0x1B,0x21,0x00,0x1B,0x4D,0x01);} // normal + restore compressed font
     else if(c===0x00A3)bytes.push(0x9C);  // £ → byte 0x9C in PC437 code page
     else if(c===0x0A)bytes.push(0x0A);    // newline pass-through
     else if(c<0x80)bytes.push(c);         // plain ASCII pass-through
