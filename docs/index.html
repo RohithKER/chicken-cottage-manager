@@ -564,6 +564,13 @@ body{
 }
 .stbl tr.stbl-grand .stbl-total{color:var(--green);font-size:14px}
 .stbl-tap-hint{text-align:center;color:var(--text3);font-size:12px;margin-top:16px;padding-bottom:4px;opacity:0.7}
+.breakdown-toggle{background:none;border:none;color:var(--accent2);font-size:11px;padding:3px 0 2px;cursor:pointer;width:100%;text-align:left;opacity:0.85;letter-spacing:.2px}
+.breakdown-panel{background:var(--surface2);border-radius:8px;padding:8px 8px 6px;margin:4px 0 6px}
+.breakdown-item{display:flex;align-items:center;gap:6px;margin-bottom:5px}
+.breakdown-item input{flex:1;background:var(--surface);border:1px solid var(--border2);border-radius:6px;padding:6px 10px;color:var(--text);font-size:14px;text-align:right;outline:none;-webkit-appearance:none}
+.breakdown-item input:focus{border-color:var(--accent)}
+.breakdown-rm{width:28px;height:28px;border-radius:50%;border:none;background:rgba(220,60,60,.15);color:#e05555;font-size:18px;line-height:28px;cursor:pointer;flex-shrink:0;padding:0;text-align:center}
+.breakdown-collapse{width:100%;margin-top:4px;background:none;border:1px solid var(--border);border-radius:6px;color:var(--text3);font-size:11px;padding:5px;cursor:pointer}
 
 /* Day Entry Sheet */
 #sales-overlay{
@@ -908,7 +915,11 @@ body{
         <div class="ss-row"><label>Just Eat</label><input type="number" id="sd-je" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
         <div class="ss-row"><label>CC App</label><input type="number" id="sd-cc" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
         <div class="ss-row"><label>Uber Eats</label><input type="number" id="sd-ue" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
+        <button class="breakdown-toggle" onclick="toggleBreakdown('ue')">▼ Breakdown <span id="ue-badge"></span></button>
+        <div id="ue-panel" style="display:none" class="breakdown-panel"><div id="ue-items"></div><button class="breakdown-collapse" onclick="toggleBreakdown('ue')">▲ Collapse</button></div>
         <div class="ss-row"><label>Deliveroo</label><input type="number" id="sd-dr" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
+        <button class="breakdown-toggle" onclick="toggleBreakdown('dr')">▼ Breakdown <span id="dr-badge"></span></button>
+        <div id="dr-panel" style="display:none" class="breakdown-panel"><div id="dr-items"></div><button class="breakdown-collapse" onclick="toggleBreakdown('dr')">▲ Collapse</button></div>
         <div class="ss-total-row"><label>Delivery Total</label><div class="ss-total-val" id="sd-del-total" style="color:var(--accent2)">£0.00</div></div>
       </div>
       <!-- Payments section -->
@@ -3014,6 +3025,72 @@ function changeSalesWeek(dir){
   loadSalesWeek();
 }
 
+// ── Order Breakdown (Uber Eats / Deliveroo) ──────────────────────────────────
+let _bdItems={ue:[],dr:[]};
+function toggleBreakdown(f){
+  const panel=document.getElementById(f+'-panel');
+  if(!panel)return;
+  const open=panel.style.display==='none';
+  panel.style.display=open?'block':'none';
+  if(open)_renderBdItems(f);
+}
+function _renderBdItems(f){
+  const wrap=document.getElementById(f+'-items');
+  if(!wrap)return;
+  const items=_bdItems[f];
+  wrap.innerHTML='';
+  items.forEach((v,i)=>{
+    const row=document.createElement('div');
+    row.className='breakdown-item';
+    const inp=document.createElement('input');
+    inp.type='number';inp.inputMode='decimal';inp.step='0.01';inp.min='0';
+    inp.value=v||'';inp.placeholder='0.00';
+    inp.oninput=()=>{_bdItems[f][i]=parseFloat(inp.value)||0;_syncBdTotal(f);};
+    inp.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();_addBdItem(f);}};
+    const rm=document.createElement('button');
+    rm.className='breakdown-rm';rm.textContent='×';rm.type='button';
+    rm.onclick=()=>{_bdItems[f].splice(i,1);_renderBdItems(f);_syncBdTotal(f);};
+    row.appendChild(inp);row.appendChild(rm);
+    wrap.appendChild(row);
+  });
+  const row=document.createElement('div');
+  row.className='breakdown-item';
+  const inp=document.createElement('input');
+  inp.type='number';inp.inputMode='decimal';inp.step='0.01';inp.min='0';inp.placeholder='Add amount…';
+  inp.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();_addBdItemFromInput(f,inp);}};
+  inp.onblur=()=>{if(parseFloat(inp.value))_addBdItemFromInput(f,inp);};
+  row.appendChild(inp);wrap.appendChild(row);
+  const inputs=wrap.querySelectorAll('input');
+  if(inputs.length)inputs[inputs.length-1].focus();
+}
+function _addBdItem(f){_bdItems[f].push(0);_renderBdItems(f);_syncBdTotal(f);}
+function _addBdItemFromInput(f,inp){
+  const v=parseFloat(inp.value)||0;
+  if(v){_bdItems[f].push(v);_syncBdTotal(f);_renderBdItems(f);}
+}
+function _syncBdTotal(f){
+  const items=_bdItems[f];
+  if(!items.length)return;
+  const sum=items.reduce((a,b)=>a+(b||0),0);
+  const fieldId=f==='ue'?'sd-ue':'sd-dr';
+  const el=document.getElementById(fieldId);
+  if(el){el.value=sum.toFixed(2);calcDaySales();}
+  const badge=document.getElementById(f+'-badge');
+  if(badge)badge.textContent=items.length?`· ${items.length} order${items.length!==1?'s':''} £${sum.toFixed(2)}`:'';
+}
+function _resetBreakdown(){
+  _bdItems={ue:[],dr:[]};
+  ['ue','dr'].forEach(f=>{
+    const panel=document.getElementById(f+'-panel');
+    if(panel)panel.style.display='none';
+    const badge=document.getElementById(f+'-badge');
+    if(badge)badge.textContent='';
+    const items=document.getElementById(f+'-items');
+    if(items)items.innerHTML='';
+  });
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 function openDayEntry(dateStr){
   const canEdit=_perms.is_admin||_perms.can_edit_sales;
   const canView=canEdit||_perms.can_view_sales;
@@ -3033,6 +3110,11 @@ function openDayEntry(dateStr){
   document.getElementById('sd-dr').value=r.deliveroo||'';
   document.getElementById('sd-cash').value=r.cash||'';
   document.getElementById('sd-card').value=r.card||'';
+  _resetBreakdown();
+  _bdItems.ue=(Array.isArray(r.uber_eats_items)?r.uber_eats_items:[]).map(Number);
+  _bdItems.dr=(Array.isArray(r.deliveroo_items)?r.deliveroo_items:[]).map(Number);
+  if(_bdItems.ue.length)_syncBdTotal('ue');
+  if(_bdItems.dr.length)_syncBdTotal('dr');
   calcDaySales();
 
   // Show/hide edit controls based on permission
@@ -3090,7 +3172,9 @@ async function saveDaySales(){
     uber_eats:getSdVal('sd-ue'),
     deliveroo:getSdVal('sd-dr'),
     cash:getSdVal('sd-cash'),
-    card:getSdVal('sd-card')
+    card:getSdVal('sd-card'),
+    uber_eats_items:_bdItems.ue,
+    deliveroo_items:_bdItems.dr
   };
   // Save locally first so data is never lost even if cloud fails
   salesWeekData[salesOpenDate]=payload;
