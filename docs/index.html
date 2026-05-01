@@ -1029,7 +1029,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v72-settings-perm';
+const _COLOR_VER='v73-view-sales-perms';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -1155,7 +1155,7 @@ async function saveBlacklistToCloud(){
 let user = null;
 
 // ─── Permissions ──────────────────────────────────────
-let _perms={is_admin:false,can_edit_rota:false,can_edit_delivery:false,can_edit_staffs:false,can_edit_sales:false,can_edit_settings:false};
+let _perms={is_admin:false,can_edit_rota:false,can_edit_delivery:false,can_edit_staffs:false,can_view_sales:false,can_edit_sales:false,can_edit_settings:false};
 
 const _ADMIN_EMAILS=['rohithkrishna.erumbhapurath@gmail.com'];
 
@@ -1174,6 +1174,7 @@ async function loadPermissions(userId,email){
         can_edit_rota:isHardcodedAdmin,
         can_edit_delivery:isHardcodedAdmin,
         can_edit_staffs:isHardcodedAdmin,
+        can_view_sales:isHardcodedAdmin,
         can_edit_sales:isHardcodedAdmin,
         can_edit_settings:isHardcodedAdmin
       };
@@ -1196,6 +1197,7 @@ async function loadPermissions(userId,email){
         can_edit_rota:!!data.can_edit_rota,
         can_edit_delivery:!!data.can_edit_delivery,
         can_edit_staffs:!!data.can_edit_staffs,
+        can_view_sales:!!data.can_view_sales,
         can_edit_sales:!!data.can_edit_sales,
         can_edit_settings:!!data.can_edit_settings
       };
@@ -1211,7 +1213,7 @@ function _applyPermUI(){
   const adminItem=document.getElementById('um-admin');
   if(adminItem)adminItem.style.display=_perms.is_admin?'':'none';
   const salesBtn=document.getElementById('nav-sales');
-  if(salesBtn)salesBtn.style.display=(_perms.is_admin||_perms.can_edit_sales)?'':'none';
+  if(salesBtn)salesBtn.style.display=(_perms.is_admin||_perms.can_view_sales||_perms.can_edit_sales)?'':'none';
   // Settings edit controls
   const rotaGroup=document.getElementById('settings-rota-group');
   if(rotaGroup)rotaGroup.style.display=canSettings?'':'none';
@@ -1250,11 +1252,18 @@ async function openPermsPanel(){
   closeUserMenu();
   const overlay=document.getElementById('perms-overlay');
   overlay.style.display='flex';
+  _loadPermsData();
+}
+async function _loadPermsData(){
   const list=document.getElementById('perms-list');
   list.innerHTML='<div style="color:var(--text3);font-size:13px;text-align:center;padding:20px">Loading users…</div>';
   try{
-    // user_permissions is now the single source of truth — every user gets a row on first login
-    const{data,error}=await db.from('user_permissions').select('*').order('email');
+    const _tout=new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),8000));
+    const res=await Promise.race([
+      db.from('user_permissions').select('*').order('email'),
+      _tout
+    ]);
+    const{data,error}=res;
     if(error)throw error;
     if(!data||!data.length){
       list.innerHTML='<div style="color:var(--text3);font-size:13px;text-align:center;padding:20px">No users yet</div>';
@@ -1263,7 +1272,11 @@ async function openPermsPanel(){
     list.innerHTML='';
     data.forEach(u=>list.appendChild(_buildUserPermRow(u)));
   }catch(e){
-    list.innerHTML='<div style="color:var(--red);font-size:13px;text-align:center;padding:20px">Error loading users</div>';
+    const msg=e.message==='timeout'?'Request timed out':'Error loading users';
+    list.innerHTML=`<div style="text-align:center;padding:20px">
+      <div style="color:var(--red);font-size:13px;margin-bottom:12px">${msg}</div>
+      <button onclick="_loadPermsData()" style="background:var(--accent);color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:13px;cursor:pointer">↺ Retry</button>
+    </div>`;
     console.error('openPermsPanel:',e);
   }
 }
@@ -1288,6 +1301,7 @@ function _buildUserPermRow(u){
     {key:'can_edit_rota',label:'Edit Rota'},
     {key:'can_edit_delivery',label:'Edit Delivery'},
     {key:'can_edit_staffs',label:'Manage Staff'},
+    {key:'can_view_sales',label:'View Sales'},
     {key:'can_edit_sales',label:'Edit Sales'},
     {key:'can_edit_settings',label:'Edit Settings'},
   ];
@@ -1822,7 +1836,7 @@ function setViewMode(mode){
 
 /* ─── Navigation ─────────────────────────────────────── */
 function showView(v){
-  if(v==='sales'&&!_perms.is_admin&&!_perms.can_edit_sales)return;
+  if(v==='sales'&&!_perms.is_admin&&!_perms.can_view_sales&&!_perms.can_edit_sales)return;
   document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(x=>x.classList.remove('active'));
   document.getElementById(`view-${v}`).classList.add('active');
@@ -2523,7 +2537,7 @@ async function doGoogleAuth(){
 async function signOut(){
   await db.auth.signOut();
   user=null;userProfile=null;
-  _perms={is_admin:false,can_edit_rota:false,can_edit_delivery:false,can_edit_staffs:false,can_edit_sales:false,can_edit_settings:false};
+  _perms={is_admin:false,can_edit_rota:false,can_edit_delivery:false,can_edit_staffs:false,can_view_sales:false,can_edit_sales:false,can_edit_settings:false};
   state.schedules={};
   _saveSchedCache({});
   showScreen('auth');closeUserMenu();
