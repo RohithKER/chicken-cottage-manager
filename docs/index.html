@@ -2640,11 +2640,15 @@ function roundRect(ctx,x,y,w,h,r){
 
 /* ─── Settings ───────────────────────────────────────── */
 function exportBackup(){
-  const blob=new Blob([JSON.stringify({state,cols:COLS},null,2)],{type:'application/json'});
+  const sales=_loadSalesCache();
+  const data={state,cols:COLS,sales,exportedAt:new Date().toISOString()};
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
-  a.download=`rota-${new Date().toISOString().slice(0,10)}.json`;
-  a.click();toast('Backup exported');
+  a.download=`cc-backup-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  const salesDays=Object.keys(sales).length;
+  toast(`Backup exported (${salesDays} sales day${salesDays!==1?'s':''})`);
 }
 function importBackup(){if(!requirePerm('can_edit_settings','edit settings'))return;document.getElementById('import-file').click();}
 function handleImport(e){
@@ -2659,7 +2663,16 @@ function handleImport(e){
         localStorage.setItem('cc_cols_inside',JSON.stringify(COLS.inside));
         localStorage.setItem('cc_cols_delivery',JSON.stringify(COLS.delivery));
       }
-      renderRota();renderStaff();toast('Restored ✓');
+      if(p.sales&&typeof p.sales==='object'){
+        // Merge restored sales into existing cache (restored data wins)
+        const existing=_loadSalesCache();
+        _saveSalesCache({...existing,...p.sales});
+        salesWeekData={};
+        _salesLoadedOffset=null; // force reload next time sales tab is viewed
+      }
+      renderRota();renderStaff();
+      const salesDays=p.sales?Object.keys(p.sales).length:0;
+      toast(`Restored ✓ (${salesDays} sales day${salesDays!==1?'s':''})`);
     }catch{toast('Invalid file');}
   };
   r.readAsText(f);e.target.value='';
