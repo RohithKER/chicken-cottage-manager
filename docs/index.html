@@ -1029,7 +1029,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v73-view-sales-perms';
+const _COLOR_VER='v74-pending-queue';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -1511,21 +1511,38 @@ async function seedDefaultStaff(){
 
 async function loadSchedules(){
   const wks=[weekKey(-1),weekKey(0),weekKey(1)];
+  // Seed state.schedules from local cache FIRST so pending-unsynced shifts survive the merge
+  const cached=_loadSchedCache();
+  Object.assign(state.schedules,cached);
   // Shared data — no user_id filter — load all types at once for instant switching
   const {data}=await db.from('schedules').select('*').in('week_key',wks);
   if(data){
-    // MERGE remote into local — never wipe local changes that remote may not have yet
+    // Merge remote into local — but LOCAL WINS for any shift in the pending queue
+    // (those are shifts saved locally but not yet confirmed by cloud)
     data.forEach(row=>{
       const k=`${row.schedule_type}|${row.week_key}|${row.day}|${row.shift_col}`;
-      state.schedules[k]=row.staff_names||[];
+      if(!_pendingShiftSet.has(k)){
+        state.schedules[k]=row.staff_names||[];
+      }
     });
-    _saveSchedCache(state.schedules); // keep localStorage in sync with merged state
+    _saveSchedCache(state.schedules);
   }
 }
 
 /* ─── Pending-save tracking ──────────────────────────── */
 let _pendingSaves=0;
-const _failedSaves=new Map(); // key->'type|wk|day|col' → save args
+const _failedSaves=new Map(); // key->'type|wk|day|col' → save args (in-memory, current session)
+
+// Persistent pending queue — survives force-close. Shifts here are in local cache
+// but not yet confirmed by cloud. On next load, local wins and we auto-retry.
+const _PSHIFT_KEY='cc_pending_shifts_v1';
+const _PSALES_KEY='cc_pending_sales_v1';
+function _loadPendingShifts(){try{return new Set(JSON.parse(localStorage.getItem(_PSHIFT_KEY)||'[]'));}catch{return new Set();}}
+function _savePendingShifts(){try{localStorage.setItem(_PSHIFT_KEY,JSON.stringify([..._pendingShiftSet]));}catch{}}
+function _loadPendingSales(){try{return new Set(JSON.parse(localStorage.getItem(_PSALES_KEY)||'[]'));}catch{return new Set();}}
+function _savePendingSales(){try{localStorage.setItem(_PSALES_KEY,JSON.stringify([..._pendingSaleSet]));}catch{}}
+let _pendingShiftSet=_loadPendingShifts(); // shift keys with unconfirmed cloud saves
+let _pendingSaleSet=_loadPendingSales();   // sale dates with unconfirmed cloud saves
 function _updateSaveIndicator(){
   const btn=document.getElementById('sync-btn');
   if(!btn)return;
@@ -1559,12 +1576,16 @@ async function saveShiftToCloud(type,wk,day,col,names){
     ]);
     if(error)throw error;
     _failedSaves.delete(_key);
+    _pendingShiftSet.delete(_key);
+    _savePendingShifts();
     setSyncDot(day,col,'saved');
     logActivity(`${day} ${col} saved to cloud ✓`, 'success');
     setTimeout(()=>setSyncDot(day,col,''),1500);
   }catch(e){
-    // Queue for retry on next sync
+    // Queue for retry — persist so data survives a force-close
     _failedSaves.set(_key,{type,wk,day,col,names});
+    _pendingShiftSet.add(_key);
+    _savePendingShifts();
     setSyncDot(day,col,'');
     if(e.message==='timeout'){
       logActivity(`${day} ${col} — saved locally (cloud timeout, will retry on ↻)`, 'saving');
@@ -2637,6 +2658,40 @@ async function approveUser(userId,email){
 /* ─── User Access (new permissions system only) ─────── */
 // Anyone who can sign in gets access — permissions control what they can do
 
+/* ─── Pending-on-load retry ──────────────────────────── */
+async function _retryPendingOnLoad(){
+  const shiftCount=_pendingShiftSet.size;
+  const salesCount=_pendingSaleSet.size;
+  if(shiftCount===0&&salesCount===0)return;
+  const total=shiftCount+salesCount;
+  toast(`⚠ ${total} unsaved change${total!==1?'s':''} found — syncing to cloud…`);
+  // Retry pending shifts
+  if(shiftCount>0){
+    const pending=[..._pendingShiftSet];
+    for(const k of pending){
+      const [type,wk,day,col]=k.split('|');
+      const names=state.schedules[k]||[];
+      await saveShiftToCloud(type,wk,day,col,names);
+    }
+  }
+  // Retry pending sales
+  if(salesCount>0){
+    const dates=[..._pendingSaleSet];
+    const allCached=_loadSalesCache();
+    for(const dateStr of dates){
+      const row=allCached[dateStr];
+      if(!row){_pendingSaleSet.delete(dateStr);_savePendingSales();continue;}
+      try{
+        const{error}=await db.from('daily_sales').upsert(row,{onConflict:'sale_date',ignoreDuplicates:false});
+        if(!error){_pendingSaleSet.delete(dateStr);_savePendingSales();}
+      }catch(e){console.warn('Pending sales retry failed:',e);}
+    }
+  }
+  const remaining=_pendingShiftSet.size+_pendingSaleSet.size;
+  if(remaining===0)toast('✅ All unsaved changes synced to cloud');
+  else toast(`⚠ ${remaining} change${remaining!==1?'s':''} still pending — tap ↻ to retry`);
+}
+
 /* ─── Realtime Sync ──────────────────────────────────── */
 let _realtimeSetup=false;
 function setupRealtime(){
@@ -2741,6 +2796,8 @@ async function _startSession(u){
   renderRota();
   showScreen('main');
   setupRealtime();
+  // After load, silently retry any shifts/sales that failed to reach cloud last session
+  _retryPendingOnLoad();
 }
 
 async function init(){
@@ -2825,11 +2882,15 @@ async function loadSalesWeek(){
     _settled=true;
     if(error)throw error;
     if(data){
+      // Start from local cache, then merge cloud in — local wins for pending dates
       salesWeekData={};
-      data.forEach(r=>{salesWeekData[r.sale_date]=r;});
-      // Merge fresh data back into full cache and persist
+      dates.forEach(d=>{const k=fmt(d);if(allCached[k])salesWeekData[k]=allCached[k];});
+      data.forEach(r=>{
+        if(!_pendingSaleSet.has(r.sale_date))salesWeekData[r.sale_date]=r;
+      });
+      // Merge fresh data back into full cache and persist (pending dates keep local value)
       const merged={...allCached};
-      data.forEach(r=>{merged[r.sale_date]=r;});
+      data.forEach(r=>{if(!_pendingSaleSet.has(r.sale_date))merged[r.sale_date]=r;});
       _saveSalesCache(merged);
       _salesLoadedOffset=salesWeekOffset; // mark this offset as fully loaded
       renderSalesTable(dates);
@@ -2989,13 +3050,18 @@ async function saveDaySales(){
     ]);
     if(error)throw error;
     logActivity(`Sales ${salesOpenDate} saved to cloud ✓`, 'success');
+    _pendingSaleSet.delete(salesOpenDate);
+    _savePendingSales();
     if(btn){btn.textContent='✓ Saved!';btn.style.background='var(--green)';}
     setTimeout(()=>closeDayEntry(),700);
   }catch(e){
     logActivity(`Sales ${salesOpenDate} cloud save failed: ${e.message}`, 'error');
-    // Still close — data is safe locally, user can ☁ Save Sales later
+    // Mark as persistently pending so next app load will retry it
+    _pendingSaleSet.add(salesOpenDate);
+    _savePendingSales();
+    // Still close — data is safe locally, will auto-retry on next open
     if(btn){btn.textContent='Saved locally ✓';btn.style.background='#666';}
-    toast(e.message==='timeout'?'⚠ Saved locally — tap ☁ to push to cloud':'⚠ '+e.message+' — saved locally');
+    toast(e.message==='timeout'?'⚠ Saved locally — will sync on next open':'⚠ '+e.message+' — saved locally');
     setTimeout(()=>closeDayEntry(),900);
   }
 }
