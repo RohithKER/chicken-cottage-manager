@@ -545,13 +545,13 @@ body{
 .stbl thead th{
   background:var(--surface2);color:var(--text2);
   font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;
-  padding:7px 6px;text-align:right;border:1px solid var(--border);white-space:nowrap;
+  padding:4px 5px;text-align:right;border:1px solid var(--border);white-space:nowrap;
 }
 .stbl thead th:first-child{text-align:left}
 .stbl tbody tr{cursor:pointer;transition:background .1s}
 .stbl tbody tr:active{background:rgba(255,255,255,.04)}
-.stbl td{padding:7px 6px;border:1px solid var(--border);vertical-align:middle}
-.stbl-day{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap}
+.stbl td{padding:4px 5px;border:1px solid var(--border);vertical-align:middle}
+.stbl-day{font-size:11px;font-weight:600;color:var(--text);white-space:nowrap;line-height:1.2}
 .stbl-val{text-align:right;color:var(--text3);font-size:11px;font-variant-numeric:tabular-nums;white-space:nowrap}
 .stbl-total{text-align:right;font-weight:700;font-size:11px;color:var(--text2);font-variant-numeric:tabular-nums;white-space:nowrap}
 .stbl tr.row-filled .stbl-val{color:var(--text2)}
@@ -1055,7 +1055,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v87-next-week-default';
+const _COLOR_VER='v88-sales-compact';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -2976,7 +2976,7 @@ function renderSalesTable(dates){
       const total=del+(r.cash||0)+(r.card||0);
       gCard+=(r.card||0); gCash+=(r.cash||0); gDel+=del; gTotal+=total;
       html+=`<tr class="row-filled" onclick="openDayEntry('${key}')">
-        <td><div class="stbl-day">${dayLabel}</div><div style="font-size:10px;color:var(--text3)">${dateLabel}</div></td>
+        <td><div class="stbl-day">${dayLabel}</div><div style="font-size:9px;color:var(--text3)">${dateLabel}</div></td>
         <td class="stbl-val">£${fmtS(r.card||0)}</td>
         <td class="stbl-val">£${fmtS(r.cash||0)}</td>
         <td class="stbl-val">£${fmtS(del)}</td>
@@ -2984,7 +2984,7 @@ function renderSalesTable(dates){
       </tr>`;
     } else {
       html+=`<tr class="row-empty" onclick="openDayEntry('${key}')">
-        <td><div class="stbl-day">${dayLabel}</div><div style="font-size:10px;color:var(--text3)">${dateLabel}</div></td>
+        <td><div class="stbl-day">${dayLabel}</div><div style="font-size:9px;color:var(--text3)">${dateLabel}</div></td>
         <td class="stbl-val">—</td><td class="stbl-val">—</td>
         <td class="stbl-val">—</td><td class="stbl-total">—</td>
       </tr>`;
