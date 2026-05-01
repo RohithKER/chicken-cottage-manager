@@ -1055,7 +1055,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v90-sync-btn-refresh-fix';
+const _COLOR_VER='v91-perms-loading-fix';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -1287,29 +1287,34 @@ async function openPermsPanel(){
   _loadPermsData();
 }
 async function _loadPermsData(){
+  // Root-cause fix: the old Promise.race(supabaseQuery, 20sTimeout) silently hangs
+  // when the Supabase auth client is mid-JWT-refresh (triggered by onAuthStateChange
+  // firing immediately on re-registration in init()). The query never settles so the
+  // panel stays stuck on 'Loading users...' until the user gives up. Direct await
+  // lets Supabase queue and resolve the query once the token is ready, and any real
+  // error surfaces immediately in the catch block.
   const list=document.getElementById('perms-list');
+  if(!list)return;
   list.innerHTML='<div style="color:var(--text3);font-size:13px;text-align:center;padding:20px">Loading users…</div>';
   try{
-    const _tout=new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),20000));
-    const res=await Promise.race([
-      db.from('user_permissions').select('*').order('email'),
-      _tout
-    ]);
-    const{data,error}=res;
+    const{data,error}=await db.from('user_permissions').select('*').order('email');
     if(error)throw error;
+    // Re-fetch after await to ensure we write to the live DOM node
+    const el=document.getElementById('perms-list');
+    if(!el)return;
     if(!data||!data.length){
-      list.innerHTML='<div style="color:var(--text3);font-size:13px;text-align:center;padding:20px">No users yet</div>';
+      el.innerHTML='<div style="color:var(--text3);font-size:13px;text-align:center;padding:20px">No users yet</div>';
       return;
     }
-    list.innerHTML='';
-    data.forEach(u=>list.appendChild(_buildUserPermRow(u)));
+    el.innerHTML='';
+    data.forEach(u=>el.appendChild(_buildUserPermRow(u)));
   }catch(e){
-    const msg=e.message==='timeout'?'Request timed out':'Error loading users';
-    list.innerHTML=`<div style="text-align:center;padding:20px">
-      <div style="color:var(--red);font-size:13px;margin-bottom:12px">${msg}</div>
+    const el=document.getElementById('perms-list');
+    if(el)el.innerHTML=`<div style="text-align:center;padding:20px">
+      <div style="color:var(--red);font-size:13px;margin-bottom:12px">Error: ${e.message}</div>
       <button onclick="_loadPermsData()" style="background:var(--accent);color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:13px;cursor:pointer">↺ Retry</button>
     </div>`;
-    console.error('openPermsPanel:',e);
+    console.error('_loadPermsData:',e);
   }
 }
 
