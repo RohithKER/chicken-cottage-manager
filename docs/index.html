@@ -1064,7 +1064,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v57-print-42w-bold';
+const _COLOR_VER='v58-sales-smooth';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -1690,7 +1690,12 @@ function showView(v){
   document.getElementById(`nav-${v}`).classList.add('active');
   document.getElementById('type-tabs').style.display=v==='rota'?'flex':'none';
   if(v==='staff'){renderStaff();populateNewStaffPalette();}
-  if(v==='sales'){loadSalesWeek();}
+  if(v==='sales'){
+    // If data is already loaded for this week, render instantly (realtime keeps it fresh).
+    // Only fetch from DB if the offset changed or data was never loaded.
+    if(_salesLoadedOffset===salesWeekOffset)renderSalesTable();
+    else loadSalesWeek();
+  }
   if(v==='settings'){loadAdminPanel();}
   closeUserMenu();
 }
@@ -2666,6 +2671,7 @@ async function init(){
 /* ─── Sales / Weekly View ────────────────────────── */
 let salesWeekOffset=0;       // 0 = current week, -1 = last week, etc.
 let salesWeekData={};        // key: 'YYYY-MM-DD' → row object from DB
+let _salesLoadedOffset=null; // which offset salesWeekData was last loaded for
 let salesOpenDate=null;      // date string currently open in sheet
 // Persist sales locally so the tab never gets stuck on "Loading..."
 const _SALES_CACHE_KEY='cc_sales_cache_v1';
@@ -2732,6 +2738,7 @@ async function loadSalesWeek(){
       const merged={...allCached};
       data.forEach(r=>{merged[r.sale_date]=r;});
       _saveSalesCache(merged);
+      _salesLoadedOffset=salesWeekOffset; // mark this offset as fully loaded
       renderSalesTable(dates);
     }
   }catch(err){
