@@ -1028,7 +1028,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v78-modal-clickthrough-fix';
+const _COLOR_VER='v79-rename-staff-fix';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -2057,12 +2057,25 @@ function renameStaff(type,oldName){
   ['inside','delivery'].forEach(t=>{
     state.staff[t]=state.staff[t].map(n=>n===oldName?newName:n);
   });
+  // Update all schedule entries that reference the old name
+  let updatedShifts=0;
+  Object.keys(state.schedules).forEach(k=>{
+    if(state.schedules[k]&&state.schedules[k].includes(oldName)){
+      state.schedules[k]=state.schedules[k].map(n=>n===oldName?newName:n);
+      updatedShifts++;
+      // Push each updated shift to cloud so other tabs see the rename instantly
+      const parts=k.split('|');
+      saveShiftToCloud(parts[0],parts[1],parts[2],parts[3],state.schedules[k]);
+    }
+  });
+  _saveSchedCache(state.schedules);
   // Update colour mapping
   if(staffColors[oldName]){staffColors[newName]=staffColors[oldName];delete staffColors[oldName];}
   localStorage.setItem('cc_staff_colors',JSON.stringify(staffColors));
   saveColorsToCloud();
-  renderStaff();renderRota();toast(`Renamed to ${newName}`);
-  // cloud: add new, remove old
+  renderStaff();renderRota();
+  toast(`Renamed to ${newName}`+(updatedShifts?` · ${updatedShifts} shift${updatedShifts!==1?'s':''} updated`:''));
+  // cloud: add new, remove old staff record
   saveStaffToCloud(newName,type).catch(()=>{});
   deleteStaffFromCloud(oldName).catch(()=>{});
 }
@@ -2812,7 +2825,7 @@ async function init(){
     if(event==='SIGNED_IN'&&session){
       await _startSession(session.user);
     }else if(event==='SIGNED_OUT'){
-      _userStatus='pending';
+      _userStatus='';
       showScreen('auth');
     }
   });
