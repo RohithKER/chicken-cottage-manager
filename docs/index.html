@@ -2080,7 +2080,7 @@ function _renderEarlySection(day){
   const sec=document.getElementById('early-section');
   const hdr=document.getElementById('early-section-hdr');
   const list=document.getElementById('early-list');
-  if(!sec||!EARLY_DAYS[day]||modalSel.length===0){
+  if(!sec||!EARLY_DAYS[day]||modalSel.length===0||modalCtx?.col==='OFF'){
     if(sec)sec.style.display='none';
     return;
   }
