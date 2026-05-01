@@ -553,13 +553,16 @@ body{
 #sales-week-label{font-size:14px;font-weight:700;color:var(--text);letter-spacing:-0.2px}
 
 /* Weekly Sales Table */
-.stbl{width:100%;border-collapse:collapse;font-size:13px;border-radius:10px;overflow:hidden}
+.stbl{width:100%;table-layout:fixed;border-collapse:collapse;font-size:12px;border-radius:10px;overflow:hidden}
+.stbl col.col-day{width:18%}
+.stbl col.col-val{width:20.5%}
+.stbl col.col-total{width:21%}
 .stbl thead tr{background:var(--surface2)}
 .stbl thead th{
   color:var(--text3);background:var(--surface2);
-  font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;
-  padding:9px 10px;text-align:right;border-bottom:1px solid var(--border2);
-  border-right:1px solid var(--border);white-space:nowrap;
+  font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;
+  padding:9px 6px;text-align:right;border-bottom:1px solid var(--border2);
+  border-right:1px solid var(--border);overflow:hidden;
 }
 .stbl thead th:first-child{text-align:left}
 .stbl thead th:last-child{border-right:none}
@@ -568,23 +571,24 @@ body{
 .stbl tbody tr:nth-child(even){background:transparent}
 .stbl tbody tr:active{background:rgba(255,255,255,.06)}
 .stbl td{
-  padding:11px 10px;vertical-align:middle;
+  padding:10px 6px;vertical-align:middle;
   border-bottom:1px solid var(--border);
   border-right:1px solid var(--border);
+  overflow:hidden;
 }
 .stbl td:last-child{border-right:none}
-.stbl-day{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;line-height:1.3;text-align:left}
-.stbl-val{text-align:right;color:var(--text3);font-variant-numeric:tabular-nums;white-space:nowrap}
-.stbl-total{text-align:right;font-weight:700;color:var(--text2);font-variant-numeric:tabular-nums;white-space:nowrap}
+.stbl-day{font-size:12px;font-weight:600;color:var(--text);line-height:1.3;text-align:left}
+.stbl-val{text-align:right;color:var(--text3);font-size:12px;font-variant-numeric:tabular-nums}
+.stbl-total{text-align:right;font-weight:700;font-size:12px;color:var(--text2);font-variant-numeric:tabular-nums}
 .stbl tr.row-filled .stbl-val{color:var(--text2)}
 .stbl tr.row-filled .stbl-total{color:var(--green)}
 .stbl tr.row-empty td{color:var(--text3)}
 .stbl tfoot tr.stbl-grand td{
-  background:var(--surface2);font-weight:700;font-size:13px;padding:12px 10px;
+  background:var(--surface2);font-weight:700;font-size:12px;padding:11px 6px;
   border-top:2px solid var(--border2);border-bottom:none;border-right:1px solid var(--border);
 }
 .stbl tfoot tr.stbl-grand td:last-child{border-right:none}
-.stbl tr.stbl-grand .stbl-total{color:var(--green);font-size:15px}
+.stbl tr.stbl-grand .stbl-total{color:var(--green);font-size:14px}
 .stbl-tap-hint{text-align:center;color:var(--text3);font-size:12px;margin-top:16px;padding-bottom:4px;opacity:0.7}
 .ss-row-lbl{display:flex;flex-direction:column;align-items:flex-start;gap:5px;flex:1}
 .ss-row-lbl label{font-size:14px;color:var(--text2)}
@@ -903,7 +907,7 @@ body{
       </div>
 
       <!-- Weekly Table -->
-      <div style="flex:1;min-height:0;overflow-y:auto;padding:0 16px 16px">
+      <div style="flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:0 14px 16px">
         <div id="sales-week-table"></div>
         <div class="stbl-tap-hint" id="sales-tap-hint">Tap a day to enter sales</div>
       </div>
@@ -3163,7 +3167,9 @@ function renderSalesTable(dates){
 
   let gCard=0,gCash=0,gDel=0,gTotal=0;
 
-  let html=`<table class="stbl"><thead><tr>
+  let html=`<table class="stbl">
+  <colgroup><col class="col-day"><col class="col-val"><col class="col-val"><col class="col-val"><col class="col-total"></colgroup>
+  <thead><tr>
     <th>Day</th><th>Card</th><th>Cash</th><th>Deliv</th><th>Total</th>
   </tr></thead><tbody>`;
 
