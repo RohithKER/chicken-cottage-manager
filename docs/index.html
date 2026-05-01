@@ -984,7 +984,21 @@ body{
 <!-- User Menu -->
 <div id="user-menu">
   <div class="um-email" id="um-email">Loading...</div>
+  <div class="um-item" id="um-admin" onclick="openPermsPanel()" style="display:none">⚙️ Manage Permissions</div>
   <div class="um-item danger" onclick="signOut()">🚪 Sign Out</div>
+</div>
+
+<!-- Admin Permissions Panel -->
+<div id="perms-overlay" style="display:none;position:fixed;inset:0;z-index:9700;background:rgba(0,0,0,.75);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);align-items:flex-end;justify-content:center">
+  <div style="width:100%;max-width:480px;background:var(--surface);border-radius:20px 20px 0 0;border-top:1px solid var(--border2);padding:16px 16px calc(env(safe-area-inset-bottom,0px)+20px);max-height:90dvh;display:flex;flex-direction:column;gap:0">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-shrink:0">
+      <div style="font-size:16px;font-weight:700;color:var(--text)">⚙️ Manage Permissions</div>
+      <div onclick="closePermsPanel()" style="cursor:pointer;font-size:20px;color:var(--text3);padding:4px 8px">×</div>
+    </div>
+    <div id="perms-list" style="overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:12px">
+      <div style="color:var(--text3);font-size:13px;text-align:center;padding:20px">Loading users…</div>
+    </div>
+  </div>
 </div>
 
 <!-- Shift Picker Modal -->
@@ -1069,7 +1083,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v65-no-top-dbl';
+const _COLOR_VER='v66-perms-admin';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -1192,6 +1206,116 @@ async function saveBlacklistToCloud(){
 
 /* ─── State ──────────────────────────────────────────── */
 let user = null;
+
+// ─── Permissions ──────────────────────────────────────
+let _perms={is_admin:false,can_edit_rota:false,can_edit_delivery:false,can_edit_staffs:false,can_edit_sales:false};
+
+async function loadPermissions(userId,email){
+  try{
+    let{data,error}=await db.from('user_permissions').select('*').eq('user_id',userId).maybeSingle();
+    if(!data){
+      // First login — create row with all permissions false (admin must grant)
+      const ins=await db.from('user_permissions').insert({user_id:userId,email}).select().maybeSingle();
+      data=ins.data;
+    }
+    if(data){
+      _perms={
+        is_admin:!!data.is_admin,
+        can_edit_rota:!!data.can_edit_rota,
+        can_edit_delivery:!!data.can_edit_delivery,
+        can_edit_staffs:!!data.can_edit_staffs,
+        can_edit_sales:!!data.can_edit_sales
+      };
+    }
+  }catch(e){console.warn('loadPermissions:',e);}
+  // Show admin menu item only to admins
+  const adminItem=document.getElementById('um-admin');
+  if(adminItem)adminItem.style.display=_perms.is_admin?'':'none';
+}
+
+// Show a toast and return false if user lacks a permission
+function requirePerm(perm,label){
+  if(_perms[perm])return true;
+  toast('⛔ No permission to '+label);
+  return false;
+}
+
+/* ─── Admin Permissions Panel ─────────────────────── */
+async function openPermsPanel(){
+  closeUserMenu();
+  const overlay=document.getElementById('perms-overlay');
+  overlay.style.display='flex';
+  const list=document.getElementById('perms-list');
+  list.innerHTML='<div style="color:var(--text3);font-size:13px;text-align:center;padding:20px">Loading users…</div>';
+  try{
+    const{data,error}=await db.from('user_permissions').select('*').order('email');
+    if(error)throw error;
+    if(!data||!data.length){
+      list.innerHTML='<div style="color:var(--text3);font-size:13px;text-align:center;padding:20px">No users found</div>';
+      return;
+    }
+    list.innerHTML='';
+    data.forEach(u=>list.appendChild(_buildUserPermRow(u)));
+  }catch(e){
+    list.innerHTML='<div style="color:var(--red);font-size:13px;text-align:center;padding:20px">Error loading users</div>';
+    console.error('openPermsPanel:',e);
+  }
+}
+
+function closePermsPanel(){
+  document.getElementById('perms-overlay').style.display='none';
+}
+
+function _buildUserPermRow(u){
+  const wrap=document.createElement('div');
+  wrap.style.cssText='background:var(--surface2);border-radius:var(--r);padding:14px;border:1px solid var(--border)';
+  const emailDiv=document.createElement('div');
+  emailDiv.style.cssText='font-size:13px;font-weight:600;color:var(--text);margin-bottom:10px;word-break:break-all';
+  emailDiv.textContent=u.email||u.user_id;
+  wrap.appendChild(emailDiv);
+
+  const permsGrid=document.createElement('div');
+  permsGrid.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:8px';
+
+  const fields=[
+    {key:'is_admin',label:'Admin'},
+    {key:'can_edit_rota',label:'Edit Rota'},
+    {key:'can_edit_delivery',label:'Edit Delivery'},
+    {key:'can_edit_staffs',label:'Manage Staff'},
+    {key:'can_edit_sales',label:'Edit Sales'},
+  ];
+
+  fields.forEach(f=>{
+    const row=document.createElement('label');
+    row.style.cssText='display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text2)';
+    const cb=document.createElement('input');
+    cb.type='checkbox';
+    cb.checked=!!u[f.key];
+    cb.style.cssText='width:17px;height:17px;accent-color:var(--accent);cursor:pointer;flex-shrink:0';
+    cb.onchange=async function(){
+      cb.disabled=true;
+      await setUserPerm(u.user_id,f.key,cb.checked);
+      cb.disabled=false;
+    };
+    row.appendChild(cb);
+    row.appendChild(document.createTextNode(f.label));
+    permsGrid.appendChild(row);
+  });
+
+  wrap.appendChild(permsGrid);
+  return wrap;
+}
+
+async function setUserPerm(userId,field,value){
+  try{
+    const{error}=await db.from('user_permissions').update({[field]:value}).eq('user_id',userId);
+    if(error)throw error;
+    toast(value?'✓ Permission granted':'Permission removed');
+  }catch(e){
+    toast('❌ Failed to update permission');
+    console.error('setUserPerm:',e);
+  }
+}
 let userProfile = null; // {id, email, display_name, role, status}
 let currentRole = null; // 'admin' | 'manager' | 'viewer'
 const _SCHED_CACHE='cc_schedules_local';
@@ -1720,6 +1844,9 @@ function changeWeek(d){
 
 /* ─── Modal ──────────────────────────────────────────── */
 function openModal(day,col){
+  const perm=state.type==='delivery'?'can_edit_delivery':'can_edit_rota';
+  const label=state.type==='delivery'?'edit the delivery rota':'edit the staff rota';
+  if(!requirePerm(perm,label))return;
   modalCtx={day,col};
   modalSel=[...getShift(state.type,state.weekOffset,day,col)];
   const pool=state.staff[state.type]||[];
@@ -1886,6 +2013,7 @@ function renameStaff(type,oldName){
 
 /* ─── Column Editor ──────────────────────────────────── */
 function openColEditor(){
+  if(!requirePerm('can_edit_staffs','manage staff'))return;
   colEditorType=state.type;
   refreshColEditorTabs();
   renderColList();
@@ -2645,7 +2773,7 @@ async function init(){
     document.getElementById('user-email-display').textContent=user.email;
     const approved=await checkUserProfile(user);
     if(approved){
-      await loadFromCloud();
+      await Promise.all([loadFromCloud(), loadPermissions(user.id, user.email)]);
       document.getElementById('week-label').textContent=weekLabel(state.weekOffset);
       renderRota();
       showScreen('main');
@@ -2661,7 +2789,7 @@ async function init(){
       document.getElementById('user-email-display').textContent=user.email;
       const approved=await checkUserProfile(user);
       if(approved){
-        await loadFromCloud();
+        await Promise.all([loadFromCloud(), loadPermissions(user.id, user.email)]);
         document.getElementById('week-label').textContent=weekLabel(state.weekOffset);
         renderRota();
         showScreen('main');
@@ -2818,6 +2946,7 @@ function changeSalesWeek(dir){
 }
 
 function openDayEntry(dateStr){
+  if(!requirePerm('can_edit_sales','edit sales'))return;
   salesOpenDate=dateStr;
   const d=new Date(dateStr+'T12:00:00');
   const dow=d.getDay();
@@ -2834,6 +2963,10 @@ function openDayEntry(dateStr){
   document.getElementById('sd-cash').value=r.cash||'';
   document.getElementById('sd-card').value=r.card||'';
   calcDaySales();
+
+  // Always reset save button to default state (previous save may have left it green/disabled)
+  const btn=document.getElementById('day-save-btn');
+  if(btn){btn.textContent='Save';btn.disabled=false;btn.style.background='';}
 
   const ov=document.getElementById('sales-overlay');
   ov.style.display='flex';
@@ -2953,9 +3086,9 @@ function _receiptText(dateLabel,timeLabel,je,cc,ue,dr,cash,card,notes){
     dbl,
     '','',''
   ];
-  // Append per-day notes if present
+  // Append per-day notes if present (no divider, no label — just the content)
   if(notes&&notes.trim()){
-    lines.push(div,'NOTES:');
+    lines.push('');
     notes.trim().split('\n').forEach(l=>lines.push(l||' '));
     lines.push('','','');
   }
