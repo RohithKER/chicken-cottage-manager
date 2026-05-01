@@ -781,7 +781,7 @@ body{
         <div style="height:8px"></div>
       </div>
 
-      <div class="settings-group">
+      <div class="settings-group" id="settings-rota-group">
         <div class="sg-label">Rota</div>
         <div class="si" onclick="openColEditor()">
           <div class="si-icon" style="background:rgba(99,102,241,.15)">✏️</div>
@@ -801,7 +801,7 @@ body{
           <div><strong>Export Backup</strong><span>Save data as JSON</span></div>
           <div class="si-arr">›</div>
         </div>
-        <div class="si" onclick="importBackup()">
+        <div class="si" id="settings-restore-row" onclick="importBackup()">
           <div class="si-icon" style="background:rgba(52,211,153,.15)">📥</div>
           <div><strong>Restore Backup</strong><span>Load from JSON file</span></div>
           <div class="si-arr">›</div>
@@ -1029,7 +1029,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v71-rm-clearweek';
+const _COLOR_VER='v72-settings-perm';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -1155,7 +1155,7 @@ async function saveBlacklistToCloud(){
 let user = null;
 
 // ─── Permissions ──────────────────────────────────────
-let _perms={is_admin:false,can_edit_rota:false,can_edit_delivery:false,can_edit_staffs:false,can_edit_sales:false};
+let _perms={is_admin:false,can_edit_rota:false,can_edit_delivery:false,can_edit_staffs:false,can_edit_sales:false,can_edit_settings:false};
 
 const _ADMIN_EMAILS=['rohithkrishna.erumbhapurath@gmail.com'];
 
@@ -1174,7 +1174,8 @@ async function loadPermissions(userId,email){
         can_edit_rota:isHardcodedAdmin,
         can_edit_delivery:isHardcodedAdmin,
         can_edit_staffs:isHardcodedAdmin,
-        can_edit_sales:isHardcodedAdmin
+        can_edit_sales:isHardcodedAdmin,
+        can_edit_settings:isHardcodedAdmin
       };
       const ins=await db.from('user_permissions').insert(defaults).select().maybeSingle();
       data=ins.data||defaults;
@@ -1195,7 +1196,8 @@ async function loadPermissions(userId,email){
         can_edit_rota:!!data.can_edit_rota,
         can_edit_delivery:!!data.can_edit_delivery,
         can_edit_staffs:!!data.can_edit_staffs,
-        can_edit_sales:!!data.can_edit_sales
+        can_edit_sales:!!data.can_edit_sales,
+        can_edit_settings:!!data.can_edit_settings
       };
     }
   }catch(e){console.warn('loadPermissions:',e);}
@@ -1203,12 +1205,18 @@ async function loadPermissions(userId,email){
 }
 
 function _applyPermUI(){
+  const canSettings=_perms.is_admin||_perms.can_edit_settings;
   const adminPanel=document.getElementById('admin-panel');
   if(adminPanel)adminPanel.style.display=_perms.is_admin?'':'none';
   const adminItem=document.getElementById('um-admin');
   if(adminItem)adminItem.style.display=_perms.is_admin?'':'none';
   const salesBtn=document.getElementById('nav-sales');
   if(salesBtn)salesBtn.style.display=(_perms.is_admin||_perms.can_edit_sales)?'':'none';
+  // Settings edit controls
+  const rotaGroup=document.getElementById('settings-rota-group');
+  if(rotaGroup)rotaGroup.style.display=canSettings?'':'none';
+  const restoreRow=document.getElementById('settings-restore-row');
+  if(restoreRow)restoreRow.style.display=canSettings?'':'none';
 }
 
 // Watch for pending→approved so the waiting screen auto-redirects
@@ -1281,6 +1289,7 @@ function _buildUserPermRow(u){
     {key:'can_edit_delivery',label:'Edit Delivery'},
     {key:'can_edit_staffs',label:'Manage Staff'},
     {key:'can_edit_sales',label:'Edit Sales'},
+    {key:'can_edit_settings',label:'Edit Settings'},
   ];
 
   fields.forEach(f=>{
@@ -1896,6 +1905,7 @@ function saveShift(){
 }
 
 function toggleUniquePerDay(){
+  if(!requirePerm('can_edit_settings','edit settings'))return;
   uniquePerDay=!uniquePerDay;
   localStorage.setItem('cc_unique_day',uniquePerDay?'1':'0');
   const sw=document.getElementById('unique-switch-settings');
@@ -2017,7 +2027,7 @@ function renameStaff(type,oldName){
 
 /* ─── Column Editor ──────────────────────────────────── */
 function openColEditor(){
-  if(!requirePerm('can_edit_staffs','manage staff'))return;
+  if(!requirePerm('can_edit_settings','edit settings'))return;
   colEditorType=state.type;
   refreshColEditorTabs();
   renderColList();
@@ -2362,7 +2372,7 @@ function exportBackup(){
   a.download=`rota-${new Date().toISOString().slice(0,10)}.json`;
   a.click();toast('Backup exported');
 }
-function importBackup(){document.getElementById('import-file').click();}
+function importBackup(){if(!requirePerm('can_edit_settings','edit settings'))return;document.getElementById('import-file').click();}
 function handleImport(e){
   const f=e.target.files[0];if(!f)return;
   const r=new FileReader();
@@ -2513,7 +2523,7 @@ async function doGoogleAuth(){
 async function signOut(){
   await db.auth.signOut();
   user=null;userProfile=null;
-  _perms={is_admin:false,can_edit_rota:false,can_edit_delivery:false,can_edit_staffs:false,can_edit_sales:false};
+  _perms={is_admin:false,can_edit_rota:false,can_edit_delivery:false,can_edit_staffs:false,can_edit_sales:false,can_edit_settings:false};
   state.schedules={};
   _saveSchedCache({});
   showScreen('auth');closeUserMenu();
