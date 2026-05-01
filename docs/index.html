@@ -552,8 +552,8 @@ body{
 .stbl tbody tr:active{background:rgba(255,255,255,.04)}
 .stbl td{padding:7px 6px;border:1px solid var(--border);vertical-align:middle;overflow:hidden}
 .stbl-day{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.stbl-val{text-align:right;color:var(--text3);font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.stbl-total{text-align:right;font-weight:700;font-size:13px;color:var(--text2);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stbl-val{text-align:right;color:var(--text3);font-size:11px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stbl-total{text-align:right;font-weight:700;font-size:11px;color:var(--text2);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .stbl tr.row-filled .stbl-val{color:var(--text2)}
 .stbl tr.row-filled .stbl-total{color:var(--green)}
 .stbl tr.row-empty td{color:var(--text3)}
@@ -1055,7 +1055,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v83-color-picker-fix';
+const _COLOR_VER='v84-sales-value-fix';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -2955,13 +2955,14 @@ function _salesErr(el,msg){
   </div>`;
 }
 
+function fmtS(v){return v%1===0?v.toLocaleString():v.toFixed(2);}
 function renderSalesTable(dates){
   if(!dates) dates=getSalesWeekDates(salesWeekOffset);
   const el=document.getElementById('sales-week-table');
 
   let gCard=0,gCash=0,gDel=0,gTotal=0;
 
-  let html=`<table class="stbl"><colgroup><col style="width:14%"><col style="width:19%"><col style="width:19%"><col style="width:22%"><col style="width:26%"></colgroup><thead><tr>
+  let html=`<table class="stbl"><colgroup><col style="width:14%"><col style="width:18%"><col style="width:18%"><col style="width:20%"><col style="width:30%"></colgroup><thead><tr>
     <th>Day</th><th>Card</th><th>Cash</th><th>Deliv</th><th>Total</th>
   </tr></thead><tbody>`;
 
@@ -2976,10 +2977,10 @@ function renderSalesTable(dates){
       gCard+=(r.card||0); gCash+=(r.cash||0); gDel+=del; gTotal+=total;
       html+=`<tr class="row-filled" onclick="openDayEntry('${key}')">
         <td><div class="stbl-day">${dayLabel}</div><div style="font-size:10px;color:var(--text3)">${dateLabel}</div></td>
-        <td class="stbl-val">£${(r.card||0).toFixed(2)}</td>
-        <td class="stbl-val">£${(r.cash||0).toFixed(2)}</td>
-        <td class="stbl-val">£${del.toFixed(2)}</td>
-        <td class="stbl-total">£${total.toFixed(2)}</td>
+        <td class="stbl-val">£${fmtS(r.card||0)}</td>
+        <td class="stbl-val">£${fmtS(r.cash||0)}</td>
+        <td class="stbl-val">£${fmtS(del)}</td>
+        <td class="stbl-total">£${fmtS(total)}</td>
       </tr>`;
     } else {
       html+=`<tr class="row-empty" onclick="openDayEntry('${key}')">
@@ -2992,10 +2993,10 @@ function renderSalesTable(dates){
 
   html+=`</tbody><tfoot><tr class="stbl-grand">
     <td class="stbl-day">Total</td>
-    <td class="stbl-total">£${gCard.toFixed(2)}</td>
-    <td class="stbl-total">£${gCash.toFixed(2)}</td>
-    <td class="stbl-total">£${gDel.toFixed(2)}</td>
-    <td class="stbl-total">£${gTotal.toFixed(2)}</td>
+    <td class="stbl-total">£${fmtS(gCard)}</td>
+    <td class="stbl-total">£${fmtS(gCash)}</td>
+    <td class="stbl-total">£${fmtS(gDel)}</td>
+    <td class="stbl-total">£${fmtS(gTotal)}</td>
   </tr></tfoot></table>`;
 
   el.innerHTML=html;
