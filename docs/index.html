@@ -827,7 +827,13 @@ body{
           <div class="admin-section-title">👥 All Users</div>
           <div id="admin-all-users"></div>
         </div>
-        <div style="height:1px;background:var(--border);margin:4px 0 16px"></div>
+        <div style="height:1px;background:var(--border);margin:4px 0 8px"></div>
+        <div class="si" id="settings-perms-btn" onclick="openPermsPanel()" style="display:none">
+          <div class="si-icon" style="background:rgba(91,156,245,.15)">⚙️</div>
+          <div><strong>Manage Permissions</strong><span>Control what each user can edit</span></div>
+          <div class="si-arr">›</div>
+        </div>
+        <div style="height:8px"></div>
       </div>
 
       <div class="settings-group">
@@ -1083,7 +1089,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v66-perms-admin2';
+const _COLOR_VER='v66-perms-admin3';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -1211,10 +1217,26 @@ let user = null;
 let _perms={is_admin:false,can_edit_rota:false,can_edit_delivery:false,can_edit_staffs:false,can_edit_sales:false};
 
 async function loadPermissions(userId,email){
+  // If already admin in the existing user_profiles system, auto-grant everything
+  if(currentRole==='admin'){
+    _perms={is_admin:true,can_edit_rota:true,can_edit_delivery:true,can_edit_staffs:true,can_edit_sales:true};
+    // Sync to user_permissions table so the panel can show them
+    try{
+      await db.from('user_permissions').upsert(
+        {user_id:userId,email,is_admin:true,can_edit_rota:true,can_edit_delivery:true,can_edit_staffs:true,can_edit_sales:true},
+        {onConflict:'user_id'}
+      );
+    }catch(e){console.warn('loadPermissions upsert:',e);}
+    const adminItem=document.getElementById('um-admin');
+    if(adminItem)adminItem.style.display='';
+    const settingsPermsBtn=document.getElementById('settings-perms-btn');
+    if(settingsPermsBtn)settingsPermsBtn.style.display='';
+    return;
+  }
+  // Otherwise read from user_permissions table
   try{
     let{data,error}=await db.from('user_permissions').select('*').eq('user_id',userId).maybeSingle();
     if(!data){
-      // First login — create row with all permissions false (admin must grant)
       const ins=await db.from('user_permissions').insert({user_id:userId,email}).select().maybeSingle();
       data=ins.data;
     }
@@ -1228,9 +1250,10 @@ async function loadPermissions(userId,email){
       };
     }
   }catch(e){console.warn('loadPermissions:',e);}
-  // Show admin menu item only to admins
   const adminItem=document.getElementById('um-admin');
   if(adminItem)adminItem.style.display=_perms.is_admin?'':'none';
+  const settingsPermsBtn=document.getElementById('settings-perms-btn');
+  if(settingsPermsBtn)settingsPermsBtn.style.display=_perms.is_admin?'':'none';
 }
 
 // Show a toast and return false if user lacks a permission
