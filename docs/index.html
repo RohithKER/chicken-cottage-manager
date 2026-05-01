@@ -679,7 +679,6 @@ body{
 </div>
 
 <!-- Pending Approval Screen -->
-<!-- Pending Approval Screen -->
 <div id="pending-screen" style="display:none;flex:1;flex-direction:column;justify-content:center;align-items:center;padding:32px 24px;background:var(--bg);text-align:center">
   <div style="font-size:52px;margin-bottom:20px">⏳</div>
   <div style="font-size:22px;font-weight:700;margin-bottom:8px;letter-spacing:-0.5px">Waiting for Approval</div>
@@ -843,7 +842,7 @@ body{
       <!-- Weekly Table -->
       <div style="flex:1;overflow-y:auto;padding:10px 10px 20px">
         <div id="sales-week-table"></div>
-        <div class="stbl-tap-hint">Tap a day to enter sales</div>
+        <div class="stbl-tap-hint" id="sales-tap-hint">Tap a day to enter sales</div>
       </div>
 
     </div><!-- /view-sales -->
@@ -897,7 +896,7 @@ body{
       <button class="btn-sm primary" id="day-save-btn" style="width:100%;padding:13px;font-size:15px" onclick="saveDaySales()">Save</button>
       <div style="display:flex;gap:8px">
         <button class="btn-sm ghost" style="flex:1;padding:10px;font-size:13px" onclick="closeDayEntry()">Cancel</button>
-        <button class="btn-sm ghost" style="flex:1;padding:10px;font-size:13px;color:var(--red);border-color:rgba(255,107,122,.3)" onclick="clearDayEntry()">Clear</button>
+        <button class="btn-sm ghost" id="day-clear-btn" style="flex:1;padding:10px;font-size:13px;color:var(--red);border-color:rgba(255,107,122,.3)" onclick="clearDayEntry()">Clear</button>
         <button class="btn-sm ghost" style="flex:1;padding:10px;font-size:13px" onclick="printDaySales()">🖨 Print</button>
       </div>
     </div>
@@ -1029,7 +1028,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v74-pending-queue';
+const _COLOR_VER='v75-audit-fixes';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -1208,12 +1207,18 @@ async function loadPermissions(userId,email){
 
 function _applyPermUI(){
   const canSettings=_perms.is_admin||_perms.can_edit_settings;
+  const canEditSales=_perms.is_admin||_perms.can_edit_sales;
   const adminPanel=document.getElementById('admin-panel');
   if(adminPanel)adminPanel.style.display=_perms.is_admin?'':'none';
   const adminItem=document.getElementById('um-admin');
   if(adminItem)adminItem.style.display=_perms.is_admin?'':'none';
   const salesBtn=document.getElementById('nav-sales');
   if(salesBtn)salesBtn.style.display=(_perms.is_admin||_perms.can_view_sales||_perms.can_edit_sales)?'':'none';
+  // Sales edit controls — hidden for view-only users
+  const saveSalesBtn=document.getElementById('save-sales-btn');
+  if(saveSalesBtn)saveSalesBtn.style.display=canEditSales?'':'none';
+  const hint=document.getElementById('sales-tap-hint');
+  if(hint)hint.textContent=canEditSales?'Tap a day to enter sales':'Tap a day to view sales';
   // Settings edit controls
   const rotaGroup=document.getElementById('settings-rota-group');
   if(rotaGroup)rotaGroup.style.display=canSettings?'':'none';
@@ -1337,7 +1342,6 @@ async function setUserPerm(userId,field,value){
     console.error('setUserPerm:',e);
   }
 }
-let userProfile = null; // kept for compatibility
 const _SCHED_CACHE='cc_schedules_local';
 function _saveSchedCache(s){try{localStorage.setItem(_SCHED_CACHE,JSON.stringify(s));}catch{}}
 function _loadSchedCache(){try{return JSON.parse(localStorage.getItem(_SCHED_CACHE)||'{}');}catch{return{};}}
@@ -1706,6 +1710,7 @@ async function saveRotaStaffToCloud(){
 
 /* ─── Save Sales Week to Cloud ───────────────────────── */
 async function saveSalesWeekToCloud(){
+  if(!requirePerm('can_edit_sales','edit sales'))return;
   if(!user){toast('Sign in to save');return;}
   const btn=document.getElementById('save-sales-btn');
   if(btn){btn.classList.add('saving');btn.textContent='☁ Saving…';}
@@ -2038,7 +2043,6 @@ async function purgeStaffFromCloud(name){
       updated_at:new Date().toISOString()
     }));
     await db.from('schedules').upsert(updates,{onConflict:'schedule_type,week_key,day,shift_col'});
-    console.log(`Purged ${name} from ${data.length} schedule rows`);
   }catch(e){console.warn('Purge failed:',e);}
 }
 
@@ -2557,7 +2561,7 @@ async function doGoogleAuth(){
 
 async function signOut(){
   await db.auth.signOut();
-  user=null;userProfile=null;
+  user=null;
   _perms={is_admin:false,can_edit_rota:false,can_edit_delivery:false,can_edit_staffs:false,can_view_sales:false,can_edit_sales:false,can_edit_settings:false};
   state.schedules={};
   _saveSchedCache({});
@@ -2592,13 +2596,6 @@ function showScreen(screen){
     setViewMode(viewMode);
   }
 }
-function showAuthScreen(){showScreen('auth');}
-function showMainApp(){showScreen('main');}
-
-function applyRoleUI(){
-  _applyPermUI(); // delegate to new system
-}
-
 /* ─── Toast ──────────────────────────────────────────── */
 function toast(msg){
   const t=document.getElementById('toast');
@@ -2967,7 +2964,9 @@ function changeSalesWeek(dir){
 }
 
 function openDayEntry(dateStr){
-  if(!requirePerm('can_edit_sales','edit sales'))return;
+  const canEdit=_perms.is_admin||_perms.can_edit_sales;
+  const canView=canEdit||_perms.can_view_sales;
+  if(!canView){toast('⛔ No permission to view sales');return;}
   salesOpenDate=dateStr;
   const d=new Date(dateStr+'T12:00:00');
   const dow=d.getDay();
@@ -2985,9 +2984,18 @@ function openDayEntry(dateStr){
   document.getElementById('sd-card').value=r.card||'';
   calcDaySales();
 
-  // Always reset save button to default state (previous save may have left it green/disabled)
-  const btn=document.getElementById('day-save-btn');
-  if(btn){btn.textContent='Save';btn.disabled=false;btn.style.background='';}
+  // Show/hide edit controls based on permission
+  ['sd-je','sd-cc','sd-ue','sd-dr','sd-cash','sd-card'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el)el.readOnly=!canEdit;
+  });
+  const saveBtn=document.getElementById('day-save-btn');
+  if(saveBtn){
+    saveBtn.style.display=canEdit?'':'none';
+    if(canEdit){saveBtn.textContent='Save';saveBtn.disabled=false;saveBtn.style.background='';}
+  }
+  const clearBtn=document.getElementById('day-clear-btn');
+  if(clearBtn)clearBtn.style.display=canEdit?'':'none';
 
   const ov=document.getElementById('sales-overlay');
   ov.style.display='flex';
