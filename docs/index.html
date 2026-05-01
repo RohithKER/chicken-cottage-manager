@@ -1069,7 +1069,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v64-day-notes';
+const _COLOR_VER='v65-no-top-dbl';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -2931,7 +2931,6 @@ function _receiptText(dateLabel,timeLabel,je,cc,ue,dr,cash,card,notes){
   const dbl='='.repeat(_RW);
   const B='\x01',b='\x02'; // bold on/off markers
   const lines=[
-    dbl,
     '',
     _centerDWLine('CC CHELMSFORD'), // double-width+bold, perfectly centered
     B+_center('TOTAL SALES')+b,     // normal bold subtitle, centered
