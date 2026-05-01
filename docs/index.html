@@ -1064,7 +1064,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v55-print-oneshot';
+const _COLOR_VER='v56-print-chunked-reconnect';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -3008,7 +3008,8 @@ const _BT_PROFILES=[
 ];
 const _BT_ALL_SVCS=_BT_PROFILES.map(p=>p.svc);
 const _BT_NAME_KEY='cc_bt_printer_name';
-let _btChar=null; // cached write characteristic
+let _btDevice=null; // cached device object — survives _btChar reset within a page session
+let _btChar=null;   // cached write characteristic
 
 function _buildEscPos(text){
   // ESC @ = init/reset printer (PC437 default, left-align, normal font)
@@ -3032,10 +3033,35 @@ function _buildEscPos(text){
   return out;
 }
 
+// Acquire the write characteristic from an already-selected device.
+// Reusable so we can reconnect without showing the picker again.
+async function _acquireChar(device){
+  const server=device.gatt.connected?device.gatt:await device.gatt.connect();
+  for(const prof of _BT_PROFILES){
+    try{
+      const svc=await server.getPrimaryService(prof.svc);
+      const chr=await svc.getCharacteristic(prof.chr);
+      return chr;
+    }catch{}
+  }
+  // Discovery fallback — find any writable characteristic
+  try{
+    const svcs=await server.getPrimaryServices();
+    for(const svc of svcs){
+      try{
+        const chars=await svc.getCharacteristics();
+        const wr=chars.find(c=>c.properties.writeWithoutResponse||c.properties.write);
+        if(wr)return wr;
+      }catch{}
+    }
+  }catch{}
+  throw new Error('No print service found on this device.');
+}
+
 async function _connectBtPrinter(){
   const savedName=localStorage.getItem(_BT_NAME_KEY)||'';
   let device=null;
-  // Try to reuse a previously granted device (no picker needed)
+  // Try previously granted device — avoids showing picker
   if(navigator.bluetooth.getDevices&&savedName){
     try{
       const known=await navigator.bluetooth.getDevices();
@@ -3044,7 +3070,7 @@ async function _connectBtPrinter(){
     }catch{}
   }
   if(!device){
-    // Show Bluetooth picker — filter to known printer services
+    // Show Bluetooth picker
     try{
       device=await navigator.bluetooth.requestDevice({
         filters:_BT_PROFILES.map(p=>({services:[p.svc]})),
@@ -3052,7 +3078,6 @@ async function _connectBtPrinter(){
       });
     }catch(e1){
       if(e1.name==='NotFoundError'||e1.name==='AbortError')throw e1;
-      // Some Chrome versions don't support multiple service filters — try one
       try{
         device=await navigator.bluetooth.requestDevice({
           filters:[{services:[_BT_PROFILES[0].svc]}],
@@ -3060,7 +3085,6 @@ async function _connectBtPrinter(){
         });
       }catch(e2){
         if(e2.name==='NotFoundError'||e2.name==='AbortError')throw e2;
-        // Last resort: show all BLE devices (user picks manually)
         device=await navigator.bluetooth.requestDevice({
           acceptAllDevices:true,
           optionalServices:_BT_ALL_SVCS
@@ -3070,43 +3094,30 @@ async function _connectBtPrinter(){
   }
   if(!device)throw new Error('No printer selected');
   localStorage.setItem(_BT_NAME_KEY,device.name||'');
-  // Update pairing info on modal
+  _btDevice=device; // cache so we can reconnect silently next time
   const btInfo=document.getElementById('rcp-bt-info');
   if(btInfo&&device.name)btInfo.innerHTML=`<span style="font-size:11px;color:var(--text3)">Paired: ${device.name} · <span onclick="forgetBtPrinter()" style="color:var(--accent);cursor:pointer;text-decoration:underline">Forget</span></span>`;
-
   toast('Connecting to '+device.name+'…');
-  const server=await device.gatt.connect();
-
-  // Try each known profile
-  for(const prof of _BT_PROFILES){
-    try{
-      const svc=await server.getPrimaryService(prof.svc);
-      const chr=await svc.getCharacteristic(prof.chr);
-      logActivity('Connected to '+(device.name||'printer')+' ✓','success');
-      return chr;
-    }catch{}
-  }
-  // Discovery fallback: find any writable characteristic
-  try{
-    const svcs=await server.getPrimaryServices();
-    for(const svc of svcs){
-      try{
-        const chars=await svc.getCharacteristics();
-        const wr=chars.find(c=>c.properties.writeWithoutResponse||c.properties.write);
-        if(wr){logActivity('Connected (discovered char) ✓','success');return wr;}
-      }catch{}
-    }
-  }catch{}
-  throw new Error('No print service found. Try the other printer from the list.');
+  const chr=await _acquireChar(device);
+  logActivity('Connected to '+(device.name||'printer')+' ✓','success');
+  return chr;
 }
 
 async function printViaBluetooth(text){
-  // Check cached connection
+  // 1. We have a cached device from this session — reconnect without picker
+  if(_btDevice&&!_btChar){
+    try{
+      _btChar=await _acquireChar(_btDevice);
+      logActivity('Reconnected to '+(localStorage.getItem(_BT_NAME_KEY)||'printer')+' ✓','saving');
+    }catch{_btDevice=null;} // device gone, fall through to picker
+  }
+  // 2. We have _btChar but GATT dropped — reconnect
   if(_btChar){
     try{
       if(!_btChar.service.device.gatt.connected)await _btChar.service.device.gatt.connect();
-    }catch{_btChar=null;}
+    }catch{_btChar=null;_btDevice=null;}
   }
+  // 3. No connection at all — full connect (getDevices or picker)
   if(!_btChar){
     try{_btChar=await _connectBtPrinter();}
     catch(e){
@@ -3120,11 +3131,14 @@ async function printViaBluetooth(text){
   const btBtn=document.getElementById('rcp-bt-btn');
   if(btBtn){btBtn.textContent='Printing…';btBtn.disabled=true;}
   try{
-    // Send entire receipt in ONE write — splitting with delays causes the printer
-    // to treat the pause as a line break, garbling label/value alignment.
-    // Chrome BLE handles internal fragmentation automatically.
-    try{await _btChar.writeValueWithoutResponse(data);}
-    catch{await _btChar.writeValue(data);}
+    // 20-byte chunks, no delay — respects BLE MTU (min 20 bytes) without pausing
+    // long enough to trigger the printer's line-flush buffer timeout.
+    const CHUNK=20;
+    for(let i=0;i<data.length;i+=CHUNK){
+      const chunk=data.slice(i,i+CHUNK);
+      try{await _btChar.writeValueWithoutResponse(chunk);}
+      catch{await _btChar.writeValue(chunk);}
+    }
     logActivity('Receipt printed via Bluetooth ✓','success');
     toast('Printed ✓');
     closeReceiptModal();
@@ -3143,7 +3157,7 @@ function btPrintFromModal(){printViaBluetooth(_currentReceiptText);}
 
 function forgetBtPrinter(){
   localStorage.removeItem(_BT_NAME_KEY);
-  _btChar=null;
+  _btChar=null;_btDevice=null;
   const btInfo=document.getElementById('rcp-bt-info');
   if(btInfo)btInfo.innerHTML='<span style="font-size:11px;color:var(--text3)">Will ask you to select a printer</span>';
   toast('Printer forgotten — next print will ask again');
