@@ -1028,7 +1028,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v77-longer-timeouts';
+const _COLOR_VER='v78-modal-clickthrough-fix';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -1354,6 +1354,7 @@ let state = {
 let viewMode = localStorage.getItem('cc_view') || 'table';
 let modalCtx = null;
 let modalSel = [];
+let _modalClosedAt = 0; // timestamp of last closeModal() call
 let authMode = 'signin';
 let colEditorType = 'inside';
 let uniquePerDay = localStorage.getItem('cc_unique_day') === '1';
@@ -1894,6 +1895,7 @@ function changeWeek(d){
 
 /* ─── Modal ──────────────────────────────────────────── */
 function openModal(day,col){
+  if(Date.now()-_modalClosedAt<350)return; // guard: ignore click-through after modal close
   const perm=state.type==='delivery'?'can_edit_delivery':'can_edit_rota';
   const label=state.type==='delivery'?'edit the delivery rota':'edit the staff rota';
   if(!requirePerm(perm,label))return;
@@ -1955,6 +1957,7 @@ function toggleUniquePerDay(){
 function closeModal(){
   const ov=document.getElementById('overlay');
   ov.classList.remove('open');
+  _modalClosedAt=Date.now();
   setTimeout(()=>{ov.style.display='none';modalCtx=null;},220);
 }
 function handleOverlay(e){if(e.target===document.getElementById('overlay'))closeModal();}
