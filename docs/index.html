@@ -552,25 +552,38 @@ body{
 #sales-week-nav button:active{background:var(--surface2)}
 #sales-week-label{font-size:14px;font-weight:700;color:var(--text);letter-spacing:-0.2px}
 
-/* Weekly Sales Table — minimal */
-.stbl{width:100%;border-collapse:collapse;font-size:13px}
+/* Weekly Sales Table */
+.stbl{width:100%;border-collapse:collapse;font-size:13px;border-radius:10px;overflow:hidden}
+.stbl thead tr{background:var(--surface2)}
 .stbl thead th{
-  color:var(--text3);
-  font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;
-  padding:0 0 10px 0;text-align:right;border:none;white-space:nowrap;
+  color:var(--text3);background:var(--surface2);
+  font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;
+  padding:9px 10px;text-align:right;border-bottom:1px solid var(--border2);
+  border-right:1px solid var(--border);white-space:nowrap;
 }
 .stbl thead th:first-child{text-align:left}
-.stbl tbody tr{cursor:pointer;transition:background .12s;border-top:1px solid var(--border)}
-.stbl tbody tr:active{background:rgba(255,255,255,.04)}
-.stbl td{padding:11px 0;border:none;vertical-align:middle}
+.stbl thead th:last-child{border-right:none}
+.stbl tbody tr{cursor:pointer;transition:background .12s}
+.stbl tbody tr:nth-child(odd){background:rgba(255,255,255,.015)}
+.stbl tbody tr:nth-child(even){background:transparent}
+.stbl tbody tr:active{background:rgba(255,255,255,.06)}
+.stbl td{
+  padding:11px 10px;vertical-align:middle;
+  border-bottom:1px solid var(--border);
+  border-right:1px solid var(--border);
+}
+.stbl td:last-child{border-right:none}
 .stbl-day{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;line-height:1.3;text-align:left}
-.stbl-val{text-align:right;color:var(--text3);font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap}
-.stbl-total{text-align:right;font-weight:700;font-size:13px;color:var(--text2);font-variant-numeric:tabular-nums;white-space:nowrap}
+.stbl-val{text-align:right;color:var(--text3);font-variant-numeric:tabular-nums;white-space:nowrap}
+.stbl-total{text-align:right;font-weight:700;color:var(--text2);font-variant-numeric:tabular-nums;white-space:nowrap}
 .stbl tr.row-filled .stbl-val{color:var(--text2)}
 .stbl tr.row-filled .stbl-total{color:var(--green)}
 .stbl tr.row-empty td{color:var(--text3)}
-.stbl tfoot tr.stbl-grand{border-top:2px solid var(--border2)}
-.stbl tr.stbl-grand td{padding:13px 0;font-weight:700;font-size:14px}
+.stbl tfoot tr.stbl-grand td{
+  background:var(--surface2);font-weight:700;font-size:13px;padding:12px 10px;
+  border-top:2px solid var(--border2);border-bottom:none;border-right:1px solid var(--border);
+}
+.stbl tfoot tr.stbl-grand td:last-child{border-right:none}
 .stbl tr.stbl-grand .stbl-total{color:var(--green);font-size:15px}
 .stbl-tap-hint{text-align:center;color:var(--text3);font-size:12px;margin-top:16px;padding-bottom:4px;opacity:0.7}
 .ss-row-lbl{display:flex;flex-direction:column;align-items:flex-start;gap:5px;flex:1}
