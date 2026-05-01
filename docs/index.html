@@ -583,51 +583,6 @@ body{
 .sales-btn-row{display:flex;gap:10px;padding:4px 0 12px}
 .wage-row,.wage-name,.wage-amt,.wage-paid,.wage-del,.sales-add-btn{display:none}
 
-/* ─── Pending / Access Screen ────────────────────── */
-#pending-screen,#rejected-screen{
-  flex:1;display:flex;flex-direction:column;
-  justify-content:center;align-items:center;
-  padding:32px 24px;background:var(--bg);text-align:center;
-}
-.access-icon{font-size:48px;margin-bottom:16px}
-.access-title{font-size:22px;font-weight:700;margin-bottom:8px}
-.access-sub{font-size:14px;color:var(--text2);max-width:280px;line-height:1.5}
-.access-email{font-size:12px;color:var(--text3);margin-top:12px}
-.btn-signout{
-  margin-top:24px;padding:10px 24px;
-  background:var(--surface);border:1px solid var(--border);
-  border-radius:var(--rs);color:var(--text2);
-  font-size:14px;cursor:pointer;
-}
-
-/* ─── Admin Panel ─────────────────────────────────── */
-.admin-section{margin-bottom:20px}
-.admin-section-title{
-  font-size:11px;font-weight:700;text-transform:uppercase;
-  letter-spacing:0.6px;color:var(--text3);
-  padding:0 2px;margin-bottom:8px;
-}
-.user-row{
-  display:flex;align-items:center;gap:12px;
-  padding:11px 14px;
-  background:var(--surface);
-  border-bottom:1px solid var(--border);
-}
-.user-row:first-child{border-radius:var(--r) var(--r) 0 0}
-.user-row:last-child{border-radius:0 0 var(--r) var(--r);border-bottom:none}
-.user-row:only-child{border-radius:var(--r)}
-.user-info{flex:1;min-width:0}
-.user-email-lbl{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.user-meta-lbl{font-size:11px;color:var(--text3);margin-top:2px}
-.user-actions{display:flex;gap:6px;flex-shrink:0;align-items:center}
-.btn-approve{background:rgba(52,211,153,.15);color:#34d399;border:1px solid rgba(52,211,153,.3);padding:5px 10px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer}
-.btn-reject{background:rgba(248,113,113,.12);color:#f87171;border:1px solid rgba(248,113,113,.25);padding:5px 10px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer}
-.role-select{
-  background:var(--bg2);border:1px solid var(--border2);
-  color:var(--text);border-radius:6px;padding:4px 6px;
-  font-size:12px;
-}
-
 /* ─── Print / Thermal Receipt ────────────────────── */
 @media print{
   *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
@@ -724,23 +679,6 @@ body{
 </div>
 
 <!-- Pending Approval Screen -->
-<div id="pending-screen" style="display:none">
-  <div class="access-icon">⏳</div>
-  <div class="access-title">Waiting for Approval</div>
-  <div class="access-sub">Your account has been created. An admin needs to approve your access before you can use the app.</div>
-  <div class="access-email" id="pending-email"></div>
-  <button class="btn-signout" onclick="signOut()">Sign Out</button>
-</div>
-
-<!-- Rejected Screen -->
-<div id="rejected-screen" style="display:none">
-  <div class="access-icon">🚫</div>
-  <div class="access-title">Access Denied</div>
-  <div class="access-sub">Your access request has been rejected. Contact the admin if you think this is a mistake.</div>
-  <div class="access-email" id="rejected-email"></div>
-  <button class="btn-signout" onclick="signOut()">Sign Out</button>
-</div>
-
 <!-- Main App -->
 <div id="main-app" style="display:none;flex-direction:column;height:100%;height:100dvh">
 
@@ -818,22 +756,12 @@ body{
     <div id="view-settings" class="view" style="padding:10px">
 
       <!-- Admin Panel (only shown to admins) -->
-      <div id="admin-panel" style="display:none;margin-bottom:4px">
-        <div class="admin-section">
-          <div class="admin-section-title">⏳ Pending Approvals</div>
-          <div id="admin-pending-list"></div>
-        </div>
-        <div class="admin-section">
-          <div class="admin-section-title">👥 All Users</div>
-          <div id="admin-all-users"></div>
-        </div>
-        <div style="height:1px;background:var(--border);margin:4px 0 8px"></div>
+      <div id="admin-panel" style="margin-bottom:4px">
         <div class="si" id="settings-perms-btn" onclick="openPermsPanel()" style="display:none">
           <div class="si-icon" style="background:rgba(91,156,245,.15)">⚙️</div>
           <div><strong>Manage Permissions</strong><span>Control what each user can edit</span></div>
           <div class="si-arr">›</div>
         </div>
-        <div style="height:8px"></div>
       </div>
 
       <div class="settings-group">
@@ -1089,7 +1017,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v66-perms-admin4';
+const _COLOR_VER='v67-new-auth';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -1216,29 +1144,24 @@ let user = null;
 // ─── Permissions ──────────────────────────────────────
 let _perms={is_admin:false,can_edit_rota:false,can_edit_delivery:false,can_edit_staffs:false,can_edit_sales:false};
 
+const _ADMIN_EMAILS=['rohithkrishna.mm@gmail.com','rohithkrishna.erumbhapurath@gmail.com'];
+
 async function loadPermissions(userId,email){
-  // If already admin in the existing user_profiles system, auto-grant everything
-  if(currentRole==='admin'){
-    _perms={is_admin:true,can_edit_rota:true,can_edit_delivery:true,can_edit_staffs:true,can_edit_sales:true};
-    // Sync to user_permissions table so the panel can show them
-    try{
-      await db.from('user_permissions').upsert(
-        {user_id:userId,email,is_admin:true,can_edit_rota:true,can_edit_delivery:true,can_edit_staffs:true,can_edit_sales:true},
-        {onConflict:'user_id'}
-      );
-    }catch(e){console.warn('loadPermissions upsert:',e);}
-    const adminItem=document.getElementById('um-admin');
-    if(adminItem)adminItem.style.display='';
-    const settingsPermsBtn=document.getElementById('settings-perms-btn');
-    if(settingsPermsBtn)settingsPermsBtn.style.display='';
-    return;
-  }
-  // Otherwise read from user_permissions table
+  const isHardcodedAdmin=_ADMIN_EMAILS.includes(email);
   try{
-    let{data,error}=await db.from('user_permissions').select('*').eq('user_id',userId).maybeSingle();
+    let{data}=await db.from('user_permissions').select('*').eq('user_id',userId).maybeSingle();
     if(!data){
-      const ins=await db.from('user_permissions').insert({user_id:userId,email}).select().maybeSingle();
-      data=ins.data;
+      // First login — seed permissions (admins get everything, others get nothing)
+      const defaults={
+        user_id:userId,email,
+        is_admin:isHardcodedAdmin,
+        can_edit_rota:isHardcodedAdmin,
+        can_edit_delivery:isHardcodedAdmin,
+        can_edit_staffs:isHardcodedAdmin,
+        can_edit_sales:isHardcodedAdmin
+      };
+      const ins=await db.from('user_permissions').insert(defaults).select().maybeSingle();
+      data=ins.data||defaults;
     }
     if(data){
       _perms={
@@ -1250,10 +1173,14 @@ async function loadPermissions(userId,email){
       };
     }
   }catch(e){console.warn('loadPermissions:',e);}
+  // Update UI
   const adminItem=document.getElementById('um-admin');
   if(adminItem)adminItem.style.display=_perms.is_admin?'':'none';
   const settingsPermsBtn=document.getElementById('settings-perms-btn');
   if(settingsPermsBtn)settingsPermsBtn.style.display=_perms.is_admin?'':'none';
+  // Hide Sales nav from users who can't view sales
+  const salesBtn=document.getElementById('nav-sales');
+  if(salesBtn)salesBtn.style.display=(_perms.is_admin||_perms.can_edit_sales)?'':'none';
 }
 
 // Show a toast and return false if user lacks a permission
@@ -1369,8 +1296,7 @@ async function setUserPerm(userId,field,value){
     console.error('setUserPerm:',e);
   }
 }
-let userProfile = null; // {id, email, display_name, role, status}
-let currentRole = null; // 'admin' | 'manager' | 'viewer'
+let userProfile = null; // kept for compatibility
 const _SCHED_CACHE='cc_schedules_local';
 function _saveSchedCache(s){try{localStorage.setItem(_SCHED_CACHE,JSON.stringify(s));}catch{}}
 function _loadSchedCache(){try{return JSON.parse(localStorage.getItem(_SCHED_CACHE)||'{}');}catch{return{};}}
@@ -1865,7 +1791,7 @@ function setViewMode(mode){
 
 /* ─── Navigation ─────────────────────────────────────── */
 function showView(v){
-  if(v==='sales'&&currentRole==='viewer')return;
+  if(v==='sales'&&!_perms.is_admin&&!_perms.can_edit_sales)return;
   document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(x=>x.classList.remove('active'));
   document.getElementById(`view-${v}`).classList.add('active');
@@ -1878,7 +1804,7 @@ function showView(v){
     if(_salesLoadedOffset===salesWeekOffset)renderSalesTable();
     else loadSalesWeek();
   }
-  if(v==='settings'){loadAdminPanel();}
+  if(v==='settings'){/* permissions panel loaded on demand via openPermsPanel() */}
   closeUserMenu();
 }
 
@@ -2561,7 +2487,8 @@ async function doGoogleAuth(){
 
 async function signOut(){
   await db.auth.signOut();
-  user=null;userProfile=null;currentRole=null;
+  user=null;userProfile=null;
+  _perms={is_admin:false,can_edit_rota:false,can_edit_delivery:false,can_edit_staffs:false,can_edit_sales:false};
   state.schedules={};
   _saveSchedCache({});
   showScreen('auth');closeUserMenu();
@@ -2580,37 +2507,23 @@ document.addEventListener('click',e=>{
 
 /* ─── Screens ────────────────────────────────────────── */
 function showScreen(screen){
-  // Hide all top-level screens
   document.getElementById('loading-screen').style.display='none';
   document.getElementById('auth-screen').style.display='none';
-  document.getElementById('pending-screen').style.display='none';
-  document.getElementById('rejected-screen').style.display='none';
   document.getElementById('main-app').style.display='none';
   if(screen==='loading'){
     document.getElementById('loading-screen').style.display='flex';
   }else if(screen==='auth'){
     document.getElementById('auth-screen').style.display='flex';
-  }else if(screen==='pending'){
-    document.getElementById('pending-screen').style.display='flex';
-  }else if(screen==='rejected'){
-    document.getElementById('rejected-screen').style.display='flex';
   }else if(screen==='main'){
     document.getElementById('main-app').style.display='flex';
     setViewMode(viewMode);
-    applyRoleUI();
   }
 }
-// Legacy aliases used by existing code
 function showAuthScreen(){showScreen('auth');}
 function showMainApp(){showScreen('main');}
 
 function applyRoleUI(){
-  const salesBtn=document.getElementById('nav-sales');
-  if(currentRole==='viewer'){
-    if(salesBtn) salesBtn.style.display='none';
-  }else{
-    if(salesBtn) salesBtn.style.display='';
-  }
+  // Kept for compatibility — permissions now control this via loadPermissions()
 }
 
 /* ─── Toast ──────────────────────────────────────────── */
@@ -2639,112 +2552,8 @@ function _confirmNo(){
   _confirmCb=null;
 }
 
-/* ─── User Profile / Access Control ─────────────────── */
-async function checkUserProfile(u){
-  const{data,error}=await db.from('user_profiles').select('*').eq('id',u.id).single();
-  if(error&&error.code==='PGRST116'){
-    // No profile — create pending entry
-    const adminEmails=['rohithkrishna.mm@gmail.com','rohithkrishna.erumbhapurath@gmail.com'];
-    const isAdmin=adminEmails.includes(u.email);
-    const np={
-      id:u.id,email:u.email,
-      display_name:u.user_metadata?.full_name||u.email.split('@')[0],
-      role:isAdmin?'admin':'viewer',
-      status:isAdmin?'approved':'pending'
-    };
-    await db.from('user_profiles').insert(np);
-    userProfile=np;currentRole=null;
-    document.getElementById('pending-email').textContent=u.email;
-    showScreen('pending');
-    return false;
-  }
-  if(error){
-    // If RLS blocks the read entirely (e.g. during bootstrap), fall through to main
-    // This handles the first-ever admin before RLS is set
-    userProfile=null;currentRole='admin';
-    return true;
-  }
-  userProfile=data;currentRole=data.role;
-  if(data.status==='pending'){
-    document.getElementById('pending-email').textContent=u.email;
-    showScreen('pending');return false;
-  }
-  if(data.status==='rejected'){
-    document.getElementById('rejected-email').textContent=u.email;
-    showScreen('rejected');return false;
-  }
-  return true; // approved
-}
-
-async function loadAdminPanel(){
-  const panel=document.getElementById('admin-panel');
-  if(currentRole!=='admin'||!panel)return;
-  panel.style.display='block';
-  const{data:allUsers}=await db.from('user_profiles').select('*').order('created_at');
-  if(!allUsers)return;
-  const pending=allUsers.filter(u=>u.status==='pending');
-  const pendingEl=document.getElementById('admin-pending-list');
-  if(pending.length===0){
-    pendingEl.innerHTML='<div style="background:var(--surface);border-radius:var(--r);padding:12px 14px;color:var(--text3);font-size:13px">No pending requests</div>';
-  }else{
-    pendingEl.innerHTML=pending.map(u=>`
-      <div class="user-row" id="urow-${u.id}">
-        <div class="user-info">
-          <div class="user-email-lbl">${escHtml(u.email)}</div>
-          <div class="user-meta-lbl">Requested ${new Date(u.created_at).toLocaleDateString('en-GB')}</div>
-        </div>
-        <div class="user-actions">
-          <button class="btn-approve" onclick="approveUser('${u.id}','manager')">✓ Approve</button>
-          <button class="btn-reject" onclick="rejectUser('${u.id}')">✗ Reject</button>
-        </div>
-      </div>`).join('');
-  }
-  const allEl=document.getElementById('admin-all-users');
-  allEl.innerHTML=allUsers.map(u=>`
-    <div class="user-row" id="urow-all-${u.id}">
-      <div class="user-info">
-        <div class="user-email-lbl">${escHtml(u.email)}${u.id===user.id?'&nbsp;<span style="color:var(--accent);font-size:10px;font-weight:700">YOU</span>':''}</div>
-        <div class="user-meta-lbl">${u.status==='approved'?u.role:u.status}</div>
-      </div>
-      <div class="user-actions">
-        ${u.id!==user.id?`
-          ${u.status==='approved'?`
-            <select class="role-select" onchange="changeUserRole('${u.id}',this.value)">
-              <option value="viewer"${u.role==='viewer'?' selected':''}>Viewer</option>
-              <option value="manager"${u.role==='manager'?' selected':''}>Manager</option>
-              <option value="admin"${u.role==='admin'?' selected':''}>Admin</option>
-            </select>
-            <button class="btn-reject" onclick="revokeUser('${u.id}','${escHtml(u.email)}')">Remove</button>
-          `:`
-            <button class="btn-approve" onclick="approveUser('${u.id}','manager')">✓ Approve</button>
-            <button class="btn-reject" onclick="revokeUser('${u.id}','${escHtml(u.email)}')">✗ Deny</button>
-          `}
-        `:'<span style="color:var(--text3);font-size:11px">You</span>'}
-      </div>
-    </div>`).join('');
-}
-
-async function approveUser(uid,role){
-  const{error}=await db.from('user_profiles').update({status:'approved',role,updated_at:new Date().toISOString()}).eq('id',uid);
-  if(error){toast('Error: '+error.message);return;}
-  toast('User approved ✓');
-  loadAdminPanel();
-}
-
-async function revokeUser(uid,email){
-  if(!confirm(`Remove ${email} from the user list?`))return;
-  const{error}=await db.from('user_profiles').delete().eq('id',uid);
-  if(error){toast('Error: '+error.message);return;}
-  toast('User removed');
-  loadAdminPanel();
-}
-
-async function changeUserRole(uid,role){
-  const{error}=await db.from('user_profiles').update({role,updated_at:new Date().toISOString()}).eq('id',uid);
-  if(error){toast('Error: '+error.message);loadAdminPanel();return;}
-  toast('Role updated ✓');
-  loadAdminPanel();
-}
+/* ─── User Access (new permissions system only) ─────── */
+// Anyone who can sign in gets access — permissions control what they can do
 
 /* ─── Realtime Sync ──────────────────────────────────── */
 let _realtimeSetup=false;
@@ -2824,14 +2633,11 @@ async function init(){
     user=session.user;
     document.getElementById('um-email').textContent=user.email;
     document.getElementById('user-email-display').textContent=user.email;
-    const approved=await checkUserProfile(user);
-    if(approved){
-      await Promise.all([loadFromCloud(), loadPermissions(user.id, user.email)]);
-      document.getElementById('week-label').textContent=weekLabel(state.weekOffset);
-      renderRota();
-      showScreen('main');
-      setupRealtime();
-    }
+    await Promise.all([loadFromCloud(), loadPermissions(user.id, user.email)]);
+    document.getElementById('week-label').textContent=weekLabel(state.weekOffset);
+    renderRota();
+    showScreen('main');
+    setupRealtime();
   }else{
     showScreen('auth');
   }
@@ -2840,14 +2646,11 @@ async function init(){
       user=session.user;
       document.getElementById('um-email').textContent=user.email;
       document.getElementById('user-email-display').textContent=user.email;
-      const approved=await checkUserProfile(user);
-      if(approved){
-        await Promise.all([loadFromCloud(), loadPermissions(user.id, user.email)]);
-        document.getElementById('week-label').textContent=weekLabel(state.weekOffset);
-        renderRota();
-        showScreen('main');
-        setupRealtime();
-      }
+      await Promise.all([loadFromCloud(), loadPermissions(user.id, user.email)]);
+      document.getElementById('week-label').textContent=weekLabel(state.weekOffset);
+      renderRota();
+      showScreen('main');
+      setupRealtime();
     }else if(event==='SIGNED_OUT'){
       showScreen('auth');
     }
