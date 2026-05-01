@@ -463,6 +463,17 @@ body{
 .pi-name{font-size:15px;color:var(--text);font-weight:500}
 .sh-foot{padding:14px 16px 0;flex-shrink:0;border-top:1px solid var(--border);display:flex;gap:8px}
 .sh-foot .btn-sm{padding:13px}
+/* Early shift section inside modal */
+.early-section{border-top:1px solid var(--border);padding:10px 16px 6px;flex-shrink:0}
+.early-section-hdr{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text3);margin-bottom:8px}
+.early-item{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.early-item:last-child{border-bottom:none}
+.early-item .pill{flex:1}
+.early-btn{border:none;border-radius:20px;font-size:11px;font-weight:700;padding:4px 10px;cursor:pointer;letter-spacing:.3px;transition:background .15s,color .15s}
+.early-btn.off{background:var(--surface2);color:var(--text3)}
+.early-btn.on{background:rgba(255,170,0,.2);color:#ffb347;border:1px solid rgba(255,170,0,.35)}
+/* Time tag on rota pills */
+.early-tag{display:inline-block;font-size:9px;font-weight:700;background:rgba(255,170,0,.15);color:#ffb347;border:1px solid rgba(255,170,0,.3);border-radius:8px;padding:1px 5px;margin-left:3px;vertical-align:middle;letter-spacing:.2px;white-space:nowrap}
 
 /* ─── User Menu ──────────────────────────────────── */
 #user-menu{
@@ -999,6 +1010,10 @@ body{
     </div>
     <div class="sh-sub" id="sh-sub"></div>
     <div class="picker-list" id="picker-list"></div>
+    <div class="early-section" id="early-section" style="display:none">
+      <div class="early-section-hdr" id="early-section-hdr">⏰ Early start</div>
+      <div id="early-list"></div>
+    </div>
     <div class="sh-foot">
       <button class="btn-sm ghost" onclick="closeModal()">Cancel</button>
       <button class="btn-sm primary" onclick="saveShift()">Save</button>
@@ -1043,6 +1058,8 @@ const db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+// Days with early starters and their start time label
+const EARLY_DAYS = {Friday:'4pm', Saturday:'5pm'};
 const DEFAULT_COLS = {
   inside: ['MORNING','NIGHT','OFF'],
   delivery: ['DAY','4:00','5:00']
@@ -1397,11 +1414,13 @@ function _loadSchedCache(){try{return JSON.parse(localStorage.getItem(_SCHED_CAC
 let state = {
   type:'inside', weekOffset:1,
   staff:{inside:[...DEFAULT_STAFF.inside],delivery:[...DEFAULT_STAFF.delivery]},
-  schedules:_loadSchedCache()   // seed from localStorage so changes survive restarts
+  schedules:_loadSchedCache(),   // seed from localStorage so changes survive restarts
+  earlyShift:{}                  // { 'weekKey|day': Set<staffName> } — Fri/Sat early starters
 };
 let viewMode = localStorage.getItem('cc_view') || 'table';
 let modalCtx = null;
 let modalSel = [];
+let modalEarlySet = new Set(); // early starters being edited in current modal
 let _modalClosedAt = 0; // timestamp of last closeModal() call
 let authMode = 'signin';
 let colEditorType = 'inside';
@@ -1492,6 +1511,7 @@ async function syncAll(){
     }
     // 4. Pull fresh merged data from Supabase (includes our push + other users' changes)
     await Promise.race([loadSchedules(),_tout(6000)]);
+    await Promise.race([loadEarlyShift(),_tout(6000)]);
     // 5. Sales data for currently viewed week
     await Promise.race([loadSalesWeek(),_tout(6000)]);
     // Re-render everything
@@ -1532,6 +1552,7 @@ async function refreshFromCloud(){
     }
     // Pull latest schedules (merges with local — local always wins on conflict)
     await Promise.race([loadSchedules(),_tout(6000)]);
+    await Promise.race([loadEarlyShift(),_tout(6000)]);
     // Pull latest sales
     await Promise.race([loadSalesWeek(),_tout(6000)]);
     renderRota();renderStaff();applyStaffColors();
@@ -1563,6 +1584,54 @@ async function seedDefaultStaff(){
   if(abdulRow)abdulRow.type='both';
   await db.from('staff').insert(rows);
 }
+
+// ── Early Shift tracking ─────────────────────────────────────────────────────
+// state.earlyShift: { 'weekKey|day': Set<staffName> }
+// Only Friday (4pm) and Saturday (5pm) use this
+const _EARLY_CACHE_KEY='cc_early_shifts_v1';
+function _loadEarlyCache(){try{const d=JSON.parse(localStorage.getItem(_EARLY_CACHE_KEY)||'{}');return d;}catch{return{};}}
+function _saveEarlyCache(obj){try{localStorage.setItem(_EARLY_CACHE_KEY,JSON.stringify(obj));}catch{}}
+function _earlyKey(wk,day){return`${wk}|${day}`;}
+function getEarlySet(off,day){
+  const k=_earlyKey(weekKey(off),day);
+  return state.earlyShift[k]||new Set();
+}
+function isEarlyStaff(off,day,name){return getEarlySet(off,day).has(name);}
+function _setEarlySet(wk,day,set){
+  const k=_earlyKey(wk,day);
+  if(set.size)state.earlyShift[k]=set; else delete state.earlyShift[k];
+}
+async function loadEarlyShift(){
+  const wks=[weekKey(-1),weekKey(0),weekKey(1)];
+  // Seed from cache
+  const cached=_loadEarlyCache();
+  Object.keys(cached).forEach(k=>{state.earlyShift[k]=new Set(cached[k]||[]);});
+  if(!user)return;
+  const{data}=await db.from('shift_early').select('*').in('week_key',wks);
+  if(data){
+    data.forEach(row=>{
+      const k=_earlyKey(row.week_key,row.day);
+      state.earlyShift[k]=new Set(row.staff_names||[]);
+    });
+    // Persist merged to cache
+    const toCache={};
+    Object.entries(state.earlyShift).forEach(([k,s])=>{toCache[k]=[...s];});
+    _saveEarlyCache(toCache);
+  }
+}
+async function saveEarlyToCloud(wk,day){
+  if(!user)return;
+  const k=_earlyKey(wk,day);
+  const names=[...(state.earlyShift[k]||new Set())];
+  // Persist to cache
+  const cached=_loadEarlyCache();
+  cached[k]=names;
+  _saveEarlyCache(cached);
+  try{
+    await db.from('shift_early').upsert({week_key:wk,day,staff_names:names,updated_at:new Date().toISOString()},{onConflict:'week_key,day'});
+  }catch(e){logActivity('Early shift save failed: '+e.message,'error');}
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 async function loadSchedules(){
   const wks=[weekKey(-1),weekKey(0),weekKey(1)];
@@ -1841,7 +1910,11 @@ function renderCards(){
       <div class="day-header"><div class="day-dot"></div><b class="day-name">${day}</b><span class="day-date">${dayDate(di,state.weekOffset)} ${dayMonth(di,state.weekOffset)}</span></div>`;
     cols.forEach(col=>{
       const staff=getShift(state.type,state.weekOffset,day,col);
-      const pills=staff.length?staff.map(n=>pill(n,state.type)).join(''):`<span class="empty-label">Tap to assign</span>`;
+      const earlySet=EARLY_DAYS[day]?getEarlySet(state.weekOffset,day):null;
+      const pills=staff.length?staff.map(n=>{
+        const tag=earlySet&&earlySet.has(n)?`<span class="early-tag">${EARLY_DAYS[day]}</span>`:'';
+        return pill(n,state.type)+tag;
+      }).join(''):`<span class="empty-label">Tap to assign</span>`;
       html+=`<div class="shift-row${col==='OFF'?' off-row':''}" onclick="openModal('${day}','${col}')">
         <span class="shift-label">${col}</span>
         <div class="pills-wrap">${pills}</div>
@@ -1867,8 +1940,12 @@ function renderTable(){
       </td>`;
     cols.forEach(col=>{
       const staff=getShift(state.type,state.weekOffset,day,col);
+      const earlySet=EARLY_DAYS[day]?getEarlySet(state.weekOffset,day):null;
       const pills=staff.length
-        ?staff.map(n=>`<span class="pill" style="${pillStyle(n,state.type)}">${n}</span>`).join('')
+        ?staff.map(n=>{
+            const tag=earlySet&&earlySet.has(n)?`<span class="early-tag">${EARLY_DAYS[day]}</span>`:'';
+            return`<span class="pill" style="${pillStyle(n,state.type)}">${n}</span>${tag}`;
+          }).join('')
         :`<span class="td-empty">—</span>`;
       html+=`<td class="shift-cell${col==='OFF'?' off-cell':''}" onclick="openModal('${day}','${col}')">
         <div class="td-pills">${pills}</div>
@@ -1962,15 +2039,47 @@ function openModal(day,col){
       <span class="pi-name">${n}</span>
     </div>`;
   }).join('');
+  // Early shift section — only for Fri/Sat
+  modalEarlySet=new Set(getEarlySet(state.weekOffset,day));
+  _renderEarlySection(day);
+
   const ov=document.getElementById('overlay');
   ov.style.display='flex';
   requestAnimationFrame(()=>ov.classList.add('open'));
 }
 
+function _renderEarlySection(day){
+  const sec=document.getElementById('early-section');
+  const hdr=document.getElementById('early-section-hdr');
+  const list=document.getElementById('early-list');
+  if(!sec||!EARLY_DAYS[day]||modalSel.length===0){
+    if(sec)sec.style.display='none';
+    return;
+  }
+  sec.style.display='block';
+  hdr.textContent=`⏰ Early start — ${EARLY_DAYS[day]}`;
+  list.innerHTML=modalSel.map(n=>{
+    const on=modalEarlySet.has(n);
+    return `<div class="early-item">
+      <span class="pill" style="${pillStyle(n,state.type)}">${n}</span>
+      <button class="early-btn ${on?'on':'off'}" onclick="toggleEarlyModal('${n}')">${on?EARLY_DAYS[day]:'7pm'}</button>
+    </div>`;
+  }).join('');
+}
+
+function toggleEarlyModal(name){
+  if(modalEarlySet.has(name))modalEarlySet.delete(name); else modalEarlySet.add(name);
+  if(modalCtx)_renderEarlySection(modalCtx.day);
+}
+
 function togglePick(el,name){
   const i=modalSel.indexOf(name);
   if(i===-1){modalSel.push(name);el.classList.add('sel');el.querySelector('.pi-check').textContent='✓';}
-  else{modalSel.splice(i,1);el.classList.remove('sel');el.querySelector('.pi-check').textContent='';}
+  else{
+    modalSel.splice(i,1);el.classList.remove('sel');el.querySelector('.pi-check').textContent='';
+    modalEarlySet.delete(name); // remove from early if deselected
+  }
+  if(modalCtx)_renderEarlySection(modalCtx.day);
 }
 
 function saveShift(){
@@ -1990,6 +2099,13 @@ function saveShift(){
         }
       });
     });
+  }
+
+  // Save early shift assignment for Fri/Sat
+  if(EARLY_DAYS[day]){
+    const wk=weekKey(state.weekOffset);
+    _setEarlySet(wk,day,modalEarlySet);
+    saveEarlyToCloud(wk,day);
   }
 
   setShift(state.type,state.weekOffset,day,col,modalSel);
