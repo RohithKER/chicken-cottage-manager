@@ -1028,7 +1028,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v76-no-zoom';
+const _COLOR_VER='v77-longer-timeouts';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -1263,7 +1263,7 @@ async function _loadPermsData(){
   const list=document.getElementById('perms-list');
   list.innerHTML='<div style="color:var(--text3);font-size:13px;text-align:center;padding:20px">Loading users…</div>';
   try{
-    const _tout=new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),8000));
+    const _tout=new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),20000));
     const res=await Promise.race([
       db.from('user_permissions').select('*').order('email'),
       _tout
@@ -1569,7 +1569,7 @@ async function saveShiftToCloud(type,wk,day,col,names){
   _pendingSaves++;
   _updateSaveIndicator();
   try{
-    const _t=new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),8000));
+    const _t=new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),15000));
     // Destructure to catch Supabase-level errors (RLS, constraint, etc.)
     const{error}=await Promise.race([
       db.from('schedules').upsert({
@@ -1615,7 +1615,7 @@ function setSyncDot(day,col,status){
 async function saveStaffToCloud(name,type){
   if(!user)return;
   try{
-    const _t=new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),8000));
+    const _t=new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),15000));
     const{error}=await Promise.race([
       db.from('staff').upsert({name,type},{onConflict:'name'}),
       _t
