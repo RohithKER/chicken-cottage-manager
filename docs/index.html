@@ -1064,7 +1064,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v61-heading-centered';
+const _COLOR_VER='v62-heading-framed';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -2926,9 +2926,10 @@ function _receiptText(dateLabel,timeLabel,je,cc,ue,dr,cash,card){
   const dbl='='.repeat(_RW);
   const B='\x01',b='\x02'; // bold on/off markers
   const lines=[
+    dbl,
     '',
-    _centerDWLine('CC CHELMSFORD'), // double-height+double-width+bold, perfectly centered
-    _centerDWLine('TOTAL SALES'),   // double-height+double-width+bold, perfectly centered
+    _centerDWLine('CC CHELMSFORD'), // double-width+bold, perfectly centered
+    B+_center('TOTAL SALES')+b,     // normal bold subtitle, centered
     '',
     dbl,
     dateLabel,
@@ -3041,7 +3042,7 @@ function _buildEscPos(text){
     const c=text.charCodeAt(i);
     if(c===0x01){bytes.push(0x1B,0x45,0x01);}      // bold on
     else if(c===0x02){bytes.push(0x1B,0x45,0x00);}  // bold off
-    else if(c===0x03){bytes.push(0x1B,0x21,0x38);}  // double-height + double-width + bold
+    else if(c===0x03){bytes.push(0x1B,0x21,0x28);}  // double-width + bold (no double-height = cleaner)
     else if(c===0x04){bytes.push(0x1B,0x21,0x00);}  // normal Font A
     else if(c===0x00A3)bytes.push(0x9C);  // £ → byte 0x9C in PC437 code page
     else if(c===0x0A)bytes.push(0x0A);    // newline pass-through
