@@ -548,11 +548,11 @@ body{
   font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;
   padding:6px 6px 6px 2px;text-align:right;border:1px solid var(--border);white-space:nowrap;
 }
-.stbl thead th:first-child{text-align:left}
+.stbl thead th:first-child{text-align:left;padding-left:8px}
 .stbl tbody tr{cursor:pointer;transition:background .1s}
 .stbl tbody tr:active{background:rgba(255,255,255,.04)}
 .stbl td{padding:6px 6px 6px 2px;border:1px solid var(--border);vertical-align:middle}
-.stbl-day{padding:6px 6px 6px 2px;font-size:11px;font-weight:600;color:var(--text);white-space:nowrap;line-height:1.2;text-align:left}
+.stbl-day{padding:6px 6px 6px 8px;font-size:11px;font-weight:600;color:var(--text);white-space:nowrap;line-height:1.2;text-align:left}
 .stbl-val{padding:6px 6px 6px 2px;text-align:right;color:var(--text3);font-size:11px;font-variant-numeric:tabular-nums;white-space:nowrap}
 .stbl-total{padding:6px 6px 6px 2px;text-align:right;font-weight:700;font-size:11px;color:var(--text2);font-variant-numeric:tabular-nums;white-space:nowrap}
 .stbl tr.row-filled .stbl-val{color:var(--text2)}
@@ -867,7 +867,7 @@ body{
       </div>
 
       <!-- Weekly Table -->
-      <div style="flex:1;overflow:hidden;padding:0">
+      <div style="flex:1;overflow:hidden;padding:0 12px">
         <div id="sales-week-table"></div>
         <div class="stbl-tap-hint" id="sales-tap-hint">Tap a day to enter sales</div>
       </div>
