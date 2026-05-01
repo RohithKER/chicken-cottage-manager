@@ -2360,24 +2360,26 @@ async function shareRota(){
   const DAY_W=72;
   const COL_W=Math.floor((W-PAD*2-DAY_W)/cols.length);
   // Estimate how many visual rows of pills a cell needs (horizontal wrap)
-  function estPillRows(names,cellW,padX=12){
+  function estPillRows(names,cellW,padX=12,earlySet=null,day=''){
     const maxW=cellW-padX*2; const PW_GAP=5;
     let cx=0,rows=1;
     names.forEach((n,i)=>{
       const dn=n.length>9?n.slice(0,8)+'…':n;
-      const pw=Math.min(dn.length*8+18,maxW);
+      const extraW=(earlySet&&earlySet.has(n)&&EARLY_DAYS[day])?26:0;
+      const pw=Math.min(dn.length*8+18+extraW,maxW);
       if(i>0&&cx+pw>maxW){cx=0;rows++;}
       cx+=pw+PW_GAP;
     });
     return rows;
   }
-  const rowHeights=DAYS.map(day=>
-    Math.max(52,Math.max(...cols.map(col=>{
+  const rowHeights=DAYS.map(day=>{
+    const _es=EARLY_DAYS[day]?getEarlySet(state.weekOffset,day):null;
+    return Math.max(52,Math.max(...cols.map(col=>{
       const st=getShift(state.type,state.weekOffset,day,col);
       if(!st.length)return 52;
-      return estPillRows(st,COL_W)*27+20;
-    })))
-  );
+      return estPillRows(st,COL_W,12,_es,day)*27+20;
+    })));
+  });
   const TBL_H=TH_H+rowHeights.reduce((a,b)=>a+b,0);
 
   // ── Canvas height (no footer) ────────────────────────
@@ -2510,6 +2512,7 @@ async function shareRota(){
     const PILL_H=21;
     const PILL_GAP=5;
     const PILL_GAP_X=5;
+    const dayEarlySet=EARLY_DAYS[day]?getEarlySet(state.weekOffset,day):null;
     cols.forEach((col,ci)=>{
       const cellX=PAD+DAY_W+ci*COL_W;
       if(ci>0){ctx.fillStyle='rgba(255,255,255,0.04)';ctx.fillRect(cellX,rowY,1,ROW_H);}
@@ -2525,17 +2528,20 @@ async function shareRota(){
       } else {
         const maxPW=COL_W-CELL_PAD_X*2;
         // Count actual pill rows for this cell (to vertically center)
-        const nRows=estPillRows(staff,COL_W,CELL_PAD_X);
+        const nRows=estPillRows(staff,COL_W,CELL_PAD_X,dayEarlySet,day);
         const totalH=nRows*(PILL_H+PILL_GAP)-PILL_GAP;
         // Vertically center the pill group; respect minimum top padding
         const startY=rowY+Math.max(CELL_PAD_Y,Math.floor((ROW_H-totalH)/2));
         let curX=cellX+CELL_PAD_X, curY=startY;
         staff.forEach((name,si)=>{
+          const earlyTime=dayEarlySet&&dayEarlySet.has(name)?EARLY_DAYS[day]:null;
           const c=getStaffCanvasColor(name,state.type);
           ctx.font=`600 13px -apple-system,sans-serif`;
           const displayName=name.length>9?name.slice(0,8)+'…':name;
           const tw=ctx.measureText(displayName).width;
-          const pw=Math.min(tw+16,maxPW);
+          let tagW=0;
+          if(earlyTime){ctx.font=`bold 10px -apple-system,sans-serif`;tagW=ctx.measureText(earlyTime).width+6;ctx.font=`600 13px -apple-system,sans-serif`;}
+          const pw=Math.min(tw+16+tagW,maxPW);
           if(si>0 && curX+pw>cellX+COL_W-CELL_PAD_X){
             curX=cellX+CELL_PAD_X;
             curY+=PILL_H+PILL_GAP;
@@ -2549,6 +2555,11 @@ async function shareRota(){
           ctx.fillStyle=c.text;
           ctx.textAlign='left'; ctx.textBaseline='alphabetic';
           ctx.fillText(displayName,curX+8,curY+15);
+          if(earlyTime){
+            ctx.font=`bold 10px -apple-system,sans-serif`;
+            ctx.fillStyle='#fb923c';
+            ctx.fillText(earlyTime,curX+8+tw+4,curY+15);
+          }
           curX+=pw+PILL_GAP_X;
         });
       }
