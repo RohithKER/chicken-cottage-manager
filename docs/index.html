@@ -2185,8 +2185,13 @@ async function addStaff(){
   saveColorsToCloud();
   applyStaffColors();
   renderStaff();toast(`${name} added`); // update UI immediately, don't wait for cloud
-  logActivity(`${name} added (${type})`, 'success');
-  saveStaffToCloud(name,type).catch(e=>{
+  // Derive the correct combined type from current state (handles case where
+  // person already exists in the other list — must save as 'both', not overwrite)
+  const _nowInside=state.staff.inside.includes(name);
+  const _nowDelivery=state.staff.delivery.includes(name);
+  const _cloudType=_nowInside&&_nowDelivery?'both':_nowInside?'inside':'delivery';
+  logActivity(`${name} added (${_cloudType})`, 'success');
+  saveStaffToCloud(name,_cloudType).catch(e=>{
     console.warn('Staff save failed:',e);
     logActivity(`Failed to save ${name} to cloud: ${e.message}`, 'error');
   });
