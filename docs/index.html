@@ -1064,7 +1064,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v52-print-clean';
+const _COLOR_VER='v53-print-42w';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -2895,9 +2895,9 @@ async function saveDaySales(){
   }
 }
 
-// 32 chars = universal width — fits 58mm AND 80mm thermal printers without wrapping
-// On 80mm paper this leaves side margins which looks clean; on 58mm it fills edge to edge
-const _RW=32;
+// 42 chars = standard width for 80mm thermal printers
+// If lines wrap on your printer, change _RW to 32 (58mm/narrow printers)
+const _RW=42;
 function _fmtMoney(n){return'\xa3'+n.toFixed(2);} // \xa3 = U+00A3 = £, encoded as 0x9C in PC437
 function _center(s,w=_RW){const p=Math.max(0,Math.floor((w-s.length)/2));return' '.repeat(p)+s;}
 function _padLine(label,value,width=_RW){
@@ -2911,12 +2911,11 @@ function _receiptText(dateLabel,timeLabel,je,cc,ue,dr,cash,card){
   const div='-'.repeat(_RW);
   const dbl='='.repeat(_RW);
   const lines=[
-    dbl,
+    '',
     _center('CC CHELMSFORD'),
     _center('TOTAL SALES'),
-    dbl,
-    _center(dateLabel),   // date on its own line — avoids overflow
-    _center(timeLabel),   // time on its own line
+    div,
+    _center(dateLabel+' '+timeLabel),
     div,
     _padLine('Just Eat',je),
     _padLine('CC App',cc),
