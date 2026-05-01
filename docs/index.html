@@ -679,6 +679,15 @@ body{
 </div>
 
 <!-- Pending Approval Screen -->
+<!-- Pending Approval Screen -->
+<div id="pending-screen" style="display:none;flex:1;flex-direction:column;justify-content:center;align-items:center;padding:32px 24px;background:var(--bg);text-align:center">
+  <div style="font-size:52px;margin-bottom:20px">⏳</div>
+  <div style="font-size:22px;font-weight:700;margin-bottom:8px;letter-spacing:-0.5px">Waiting for Approval</div>
+  <div style="font-size:14px;color:var(--text2);max-width:280px;line-height:1.6;margin-bottom:8px">Your account has been created. An admin needs to approve your access.</div>
+  <div id="pending-email-display" style="font-size:12px;color:var(--text3);margin-bottom:28px"></div>
+  <button onclick="signOut()" style="padding:10px 24px;background:var(--surface);border:1px solid var(--border);border-radius:var(--rs);color:var(--text2);font-size:14px;cursor:pointer">Sign Out</button>
+</div>
+
 <!-- Main App -->
 <div id="main-app" style="display:none;flex-direction:column;height:100%;height:100dvh">
 
@@ -756,12 +765,20 @@ body{
     <div id="view-settings" class="view" style="padding:10px">
 
       <!-- Admin Panel (only shown to admins) -->
-      <div id="admin-panel" style="margin-bottom:4px">
-        <div class="si" id="settings-perms-btn" onclick="openPermsPanel()" style="display:none">
+      <div id="admin-panel" style="display:none;margin-bottom:4px">
+        <!-- Pending approvals — shown to admins only -->
+        <div id="pending-section" style="margin-bottom:8px">
+          <div class="sg-label">⏳ Pending Approvals</div>
+          <div id="pending-list">
+            <div style="background:var(--surface);border-radius:var(--r);padding:12px 14px;color:var(--text3);font-size:13px">No pending requests</div>
+          </div>
+        </div>
+        <div class="si" id="settings-perms-btn" onclick="openPermsPanel()">
           <div class="si-icon" style="background:rgba(91,156,245,.15)">⚙️</div>
           <div><strong>Manage Permissions</strong><span>Control what each user can edit</span></div>
           <div class="si-arr">›</div>
         </div>
+        <div style="height:8px"></div>
       </div>
 
       <div class="settings-group">
@@ -1017,7 +1034,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v68-rls-fix';
+const _COLOR_VER='v69-approval';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -1146,14 +1163,17 @@ let _perms={is_admin:false,can_edit_rota:false,can_edit_delivery:false,can_edit_
 
 const _ADMIN_EMAILS=['rohithkrishna.erumbhapurath@gmail.com'];
 
+// Returns 'pending' | 'approved' — call after loadPermissions resolves
+let _userStatus='pending';
+
 async function loadPermissions(userId,email){
   const isHardcodedAdmin=_ADMIN_EMAILS.includes(email);
   try{
     let{data}=await db.from('user_permissions').select('*').eq('user_id',userId).maybeSingle();
     if(!data){
-      // First login — seed permissions (admins get everything, others get nothing)
+      // First login — create row. Hardcoded admins are auto-approved; everyone else is pending.
       const defaults={
-        user_id:userId,email,
+        user_id:userId,email,status:isHardcodedAdmin?'approved':'pending',
         is_admin:isHardcodedAdmin,
         can_edit_rota:isHardcodedAdmin,
         can_edit_delivery:isHardcodedAdmin,
@@ -1162,6 +1182,16 @@ async function loadPermissions(userId,email){
       };
       const ins=await db.from('user_permissions').insert(defaults).select().maybeSingle();
       data=ins.data||defaults;
+    }
+    _userStatus=data?.status||'pending';
+    if(_userStatus==='pending'){
+      // Show waiting screen — don't load app data
+      const el=document.getElementById('pending-email-display');
+      if(el)el.textContent=email;
+      showScreen('pending');
+      // Subscribe to own row so approval redirects them instantly
+      _setupPendingWatcher(userId,email);
+      return;
     }
     if(data){
       _perms={
@@ -1173,14 +1203,34 @@ async function loadPermissions(userId,email){
       };
     }
   }catch(e){console.warn('loadPermissions:',e);}
-  // Update UI
+  _applyPermUI();
+}
+
+function _applyPermUI(){
+  const adminPanel=document.getElementById('admin-panel');
+  if(adminPanel)adminPanel.style.display=_perms.is_admin?'':'none';
   const adminItem=document.getElementById('um-admin');
   if(adminItem)adminItem.style.display=_perms.is_admin?'':'none';
-  const settingsPermsBtn=document.getElementById('settings-perms-btn');
-  if(settingsPermsBtn)settingsPermsBtn.style.display=_perms.is_admin?'':'none';
-  // Hide Sales nav from users who can't view sales
   const salesBtn=document.getElementById('nav-sales');
   if(salesBtn)salesBtn.style.display=(_perms.is_admin||_perms.can_edit_sales)?'':'none';
+}
+
+// Watch for pending→approved so the waiting screen auto-redirects
+function _setupPendingWatcher(userId,email){
+  db.channel('cc-pending-'+userId)
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'user_permissions',filter:`user_id=eq.${userId}`},async payload=>{
+      if(payload.new&&payload.new.status==='approved'){
+        // Reload and enter the app
+        await loadPermissions(userId,email);
+        await loadFromCloud();
+        document.getElementById('week-label').textContent=weekLabel(state.weekOffset);
+        renderRota();
+        showScreen('main');
+        setupRealtime();
+        toast('✅ You have been approved!');
+      }
+    })
+    .subscribe();
 }
 
 // Show a toast and return false if user lacks a permission
@@ -1776,7 +1826,7 @@ function showView(v){
     if(_salesLoadedOffset===salesWeekOffset)renderSalesTable();
     else loadSalesWeek();
   }
-  if(v==='settings'){/* permissions panel loaded on demand via openPermsPanel() */}
+  if(v==='settings'){loadPendingUsers();}
   closeUserMenu();
 }
 
@@ -2481,11 +2531,14 @@ document.addEventListener('click',e=>{
 function showScreen(screen){
   document.getElementById('loading-screen').style.display='none';
   document.getElementById('auth-screen').style.display='none';
+  document.getElementById('pending-screen').style.display='none';
   document.getElementById('main-app').style.display='none';
   if(screen==='loading'){
     document.getElementById('loading-screen').style.display='flex';
   }else if(screen==='auth'){
     document.getElementById('auth-screen').style.display='flex';
+  }else if(screen==='pending'){
+    document.getElementById('pending-screen').style.display='flex';
   }else if(screen==='main'){
     document.getElementById('main-app').style.display='flex';
     setViewMode(viewMode);
@@ -2495,7 +2548,7 @@ function showAuthScreen(){showScreen('auth');}
 function showMainApp(){showScreen('main');}
 
 function applyRoleUI(){
-  // Kept for compatibility — permissions now control this via loadPermissions()
+  _applyPermUI(); // delegate to new system
 }
 
 /* ─── Toast ──────────────────────────────────────────── */
@@ -2522,6 +2575,36 @@ function _confirmNo(){
   document.getElementById('confirm-overlay').classList.remove('open');
   setTimeout(()=>{document.getElementById('confirm-overlay').style.display='none';},200);
   _confirmCb=null;
+}
+
+/* ─── Pending Approvals (Settings tab) ──────────────── */
+async function loadPendingUsers(){
+  if(!_perms.is_admin)return;
+  const{data}=await db.from('user_permissions').select('user_id,email').eq('status','pending').order('email');
+  const listEl=document.getElementById('pending-list');
+  if(!listEl)return;
+  if(!data||!data.length){
+    listEl.innerHTML='<div style="background:var(--surface);border-radius:var(--r);padding:12px 14px;color:var(--text3);font-size:13px">No pending requests</div>';
+    return;
+  }
+  listEl.innerHTML=data.map(u=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:11px 14px;background:var(--surface);border-radius:var(--r);margin-bottom:6px">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(u.email)}</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:2px">Pending approval</div>
+      </div>
+      <button onclick="approveUser('${escHtml(u.user_id)}','${escHtml(u.email)}')"
+        style="background:rgba(52,211,153,.15);color:#34d399;border:1px solid rgba(52,211,153,.3);padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;flex-shrink:0">
+        ✓ Approve
+      </button>
+    </div>`).join('');
+}
+
+async function approveUser(userId,email){
+  const{error}=await db.from('user_permissions').update({status:'approved'}).eq('user_id',userId);
+  if(error){toast('Error: '+error.message);return;}
+  toast(`✓ ${email} approved`);
+  loadPendingUsers();
 }
 
 /* ─── User Access (new permissions system only) ─────── */
@@ -2599,41 +2682,53 @@ function setupRealtime(){
   // Permissions changes — reload instantly when admin changes your permissions
   if(user){
     db.channel('cc-my-perms')
-      .on('postgres_changes',{event:'UPDATE',schema:'public',table:'user_permissions',filter:`user_id=eq.${user.id}`},async()=>{
+      .on('postgres_changes',{event:'UPDATE',schema:'public',table:'user_permissions',filter:`user_id=eq.${user.id}`},async(payload)=>{
+        // Skip if this is the pending→approved transition (handled by _setupPendingWatcher)
+        if(_userStatus==='pending')return;
         await loadPermissions(user.id,user.email);
         toast('🔑 Your permissions have been updated');
+      })
+      .subscribe();
+  }
+
+  // Admin: auto-refresh pending list when a new user signs in
+  if(_perms.is_admin){
+    db.channel('cc-new-signups')
+      .on('postgres_changes',{event:'INSERT',schema:'public',table:'user_permissions'},()=>{
+        loadPendingUsers();
       })
       .subscribe();
   }
 }
 
 /* ─── Init ───────────────────────────────────────────── */
+async function _startSession(u){
+  user=u;
+  document.getElementById('um-email').textContent=u.email;
+  document.getElementById('user-email-display').textContent=u.email;
+  await loadPermissions(u.id,u.email);
+  // loadPermissions shows pending screen itself if status=pending; skip rest
+  if(_userStatus==='pending')return;
+  await loadFromCloud();
+  document.getElementById('week-label').textContent=weekLabel(state.weekOffset);
+  renderRota();
+  showScreen('main');
+  setupRealtime();
+}
+
 async function init(){
   updatePasteBtn();
   const {data:{session}}=await db.auth.getSession();
   if(session){
-    user=session.user;
-    document.getElementById('um-email').textContent=user.email;
-    document.getElementById('user-email-display').textContent=user.email;
-    await Promise.all([loadFromCloud(), loadPermissions(user.id, user.email)]);
-    document.getElementById('week-label').textContent=weekLabel(state.weekOffset);
-    renderRota();
-    showScreen('main');
-    setupRealtime();
+    await _startSession(session.user);
   }else{
     showScreen('auth');
   }
   db.auth.onAuthStateChange(async(event,session)=>{
     if(event==='SIGNED_IN'&&session){
-      user=session.user;
-      document.getElementById('um-email').textContent=user.email;
-      document.getElementById('user-email-display').textContent=user.email;
-      await Promise.all([loadFromCloud(), loadPermissions(user.id, user.email)]);
-      document.getElementById('week-label').textContent=weekLabel(state.weekOffset);
-      renderRota();
-      showScreen('main');
-      setupRealtime();
+      await _startSession(session.user);
     }else if(event==='SIGNED_OUT'){
+      _userStatus='pending';
       showScreen('auth');
     }
   });
