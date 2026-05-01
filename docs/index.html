@@ -552,28 +552,26 @@ body{
 #sales-week-nav button:active{background:var(--surface2)}
 #sales-week-label{font-size:14px;font-weight:700;color:var(--text);letter-spacing:-0.2px}
 
-/* Weekly Sales Table */
-.stbl{width:100%;table-layout:auto;border-collapse:collapse;font-size:13px;border-radius:var(--r);overflow:hidden;box-shadow:var(--shadow-sm)}
+/* Weekly Sales Table — minimal */
+.stbl{width:100%;border-collapse:collapse;font-size:13px}
 .stbl thead th{
-  background:var(--surface2);color:var(--text2);
-  font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;
-  padding:6px 6px 6px 2px;text-align:right;border:1px solid var(--border);white-space:nowrap;
+  color:var(--text3);
+  font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;
+  padding:0 0 10px 0;text-align:right;border:none;white-space:nowrap;
 }
-.stbl thead th:first-child{text-align:left;padding-left:8px}
-.stbl tbody tr{cursor:pointer;transition:background .1s}
+.stbl thead th:first-child{text-align:left}
+.stbl tbody tr{cursor:pointer;transition:background .12s;border-top:1px solid var(--border)}
 .stbl tbody tr:active{background:rgba(255,255,255,.04)}
-.stbl td{padding:6px 6px 6px 2px;border:1px solid var(--border);vertical-align:middle}
-.stbl-day{padding:6px 6px 6px 8px;font-size:11px;font-weight:600;color:var(--text);white-space:nowrap;line-height:1.2;text-align:left}
-.stbl-val{padding:6px 6px 6px 2px;text-align:right;color:var(--text3);font-size:11px;font-variant-numeric:tabular-nums;white-space:nowrap}
-.stbl-total{padding:6px 6px 6px 2px;text-align:right;font-weight:700;font-size:11px;color:var(--text2);font-variant-numeric:tabular-nums;white-space:nowrap}
+.stbl td{padding:11px 0;border:none;vertical-align:middle}
+.stbl-day{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;line-height:1.3;text-align:left}
+.stbl-val{text-align:right;color:var(--text3);font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.stbl-total{text-align:right;font-weight:700;font-size:13px;color:var(--text2);font-variant-numeric:tabular-nums;white-space:nowrap}
 .stbl tr.row-filled .stbl-val{color:var(--text2)}
 .stbl tr.row-filled .stbl-total{color:var(--green)}
 .stbl tr.row-empty td{color:var(--text3)}
-.stbl tr.stbl-grand td{
-  background:var(--surface2);font-weight:700;font-size:13px;
-  border-top:2px solid var(--border2);
-}
-.stbl tr.stbl-grand .stbl-total{color:var(--green);font-size:14px}
+.stbl tfoot tr.stbl-grand{border-top:2px solid var(--border2)}
+.stbl tr.stbl-grand td{padding:13px 0;font-weight:700;font-size:14px}
+.stbl tr.stbl-grand .stbl-total{color:var(--green);font-size:15px}
 .stbl-tap-hint{text-align:center;color:var(--text3);font-size:12px;margin-top:16px;padding-bottom:4px;opacity:0.7}
 .ss-row-lbl{display:flex;flex-direction:column;align-items:flex-start;gap:5px;flex:1}
 .ss-row-lbl label{font-size:14px;color:var(--text2)}
@@ -892,7 +890,7 @@ body{
       </div>
 
       <!-- Weekly Table -->
-      <div style="flex:1;overflow:hidden;padding:0 12px">
+      <div style="flex:1;min-height:0;overflow-y:auto;padding:0 16px 16px">
         <div id="sales-week-table"></div>
         <div class="stbl-tap-hint" id="sales-tap-hint">Tap a day to enter sales</div>
       </div>
