@@ -1064,7 +1064,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v50-print-fix2';
+const _COLOR_VER='v51-print-universal';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -2895,8 +2895,10 @@ async function saveDaySales(){
   }
 }
 
-const _RW=48; // 80mm paper at default font = 48 chars per line (576 dots / 12 per char)
-function _fmtMoney(n){return'\xa3'+n.toFixed(2);} // use literal £ byte (0xA3)
+// 32 chars = universal width — fits 58mm AND 80mm thermal printers without wrapping
+// On 80mm paper this leaves side margins which looks clean; on 58mm it fills edge to edge
+const _RW=32;
+function _fmtMoney(n){return'\xa3'+n.toFixed(2);} // \xa3 = U+00A3 = £, encoded as 0x9C in PC437
 function _center(s,w=_RW){const p=Math.max(0,Math.floor((w-s.length)/2));return' '.repeat(p)+s;}
 function _padLine(label,value,width=_RW){
   const v=_fmtMoney(value);
@@ -2913,21 +2915,22 @@ function _receiptText(dateLabel,timeLabel,je,cc,ue,dr,cash,card){
     _center('CC CHELMSFORD'),
     _center('TOTAL SALES'),
     dbl,
-    _center(dateLabel+'  '+timeLabel),
+    _center(dateLabel),   // date on its own line — avoids overflow
+    _center(timeLabel),   // time on its own line
     div,
     _padLine('Just Eat',je),
     _padLine('CC App',cc),
     _padLine('Uber Eats',ue),
     _padLine('Deliveroo',dr),
     div,
-    _padLine('Total Delivery',del),
+    _padLine('Delivery Total',del),
     div,
     _padLine('Cash',cash),
     _padLine('Card',card),
     div,
     _padLine('TOTAL SALES',total),
     dbl,
-    '',''
+    '','',''
   ];
   return lines.join('\n');
 }
@@ -3007,23 +3010,46 @@ const _BT_ALL_SVCS=_BT_PROFILES.map(p=>p.svc);
 const _BT_NAME_KEY='cc_bt_printer_name';
 let _btChar=null; // cached write characteristic
 
-function _buildEscPos(text){
-  // ESC @ = init printer (resets code page to PC437 default)
-  // In PC437 (the thermal printer default): £ = 0x9C, NOT 0xA3 (0xA3=ú in PC437)
-  const init=[0x1B,0x40];
-  const cut=[0x1D,0x56,0x41,0x05]; // GS V A 5 = feed + cut
-  // Custom encoder — do NOT use TextEncoder (UTF-8 makes £ into two bytes 0xC2+0xA3)
+function _encodeText(text){
+  // Custom encoder — avoids TextEncoder (UTF-8 encodes £ as 2 bytes 0xC2+0xA3, garbling it)
+  // In PC437 (ESC/POS default): £ lives at byte 0x9C
   const bytes=[];
   for(let i=0;i<text.length;i++){
     const c=text.charCodeAt(i);
-    if(c===0x00A3)bytes.push(0x9C);  // £ → PC437 position 0x9C (pound sign)
-    else if(c<0x80)bytes.push(c);    // plain ASCII, pass through
-    else bytes.push(0x3F);           // unsupported → '?'
+    if(c===0x00A3)bytes.push(0x9C);  // £ → 0x9C in PC437
+    else if(c<0x80)bytes.push(c);    // plain ASCII pass-through
+    else bytes.push(0x3F);           // unsupported char → '?'
   }
-  const encoded=new Uint8Array(bytes);
-  const out=new Uint8Array(init.length+encoded.length+cut.length);
-  out.set(init,0);out.set(encoded,init.length);out.set(cut,init.length+encoded.length);
-  return out;
+  return bytes;
+}
+
+function _buildEscPos(text){
+  // ESC @ = init / reset printer (sets PC437, left-align, normal font)
+  const ESC=0x1B, GS=0x1D;
+  const init=[ESC,0x40];
+  // Split receipt into header block (up to second ===) and body
+  // Use ESC a 1 (center) for title lines, ESC a 0 (left) for content
+  const lines=text.split('\n');
+  const allBytes=[];
+  // Push init
+  allBytes.push(...init);
+  // Find where the date/separator block ends (after 2nd === line)
+  let headerDone=false; let dblCount=0;
+  for(const line of lines){
+    const isDbl=line.startsWith('=');
+    if(isDbl)dblCount++;
+    // Lines 0-5 (title + date block): center-align using ESC a 1
+    if(dblCount<=2&&!headerDone){
+      allBytes.push(ESC,0x61,0x01); // ESC a 1 = center
+    } else {
+      allBytes.push(ESC,0x61,0x00); // ESC a 0 = left
+      headerDone=true;
+    }
+    allBytes.push(..._encodeText(line),0x0A); // line + LF
+  }
+  // GS V A 5 = feed 5 lines and cut
+  allBytes.push(GS,0x56,0x41,0x05);
+  return new Uint8Array(allBytes);
 }
 
 async function _connectBtPrinter(){
