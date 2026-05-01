@@ -1055,7 +1055,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v88-sales-compact';
+const _COLOR_VER='v90-sync-btn-refresh-fix';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -1112,7 +1112,7 @@ function pickStaffColor(name,type=null){
   document.getElementById('cp-title').textContent=type?`${name} (${type})`:name;
   const cur=getStaffHex(name,type);
   document.getElementById('cp-swatches').innerHTML=COLOR_PALETTE.map(hex=>`
-    <div class="cp-swatch${hex===cur?' active':''}" style="background:${hex}" onclick="selectStaffColor('${hex}')"></div>
+    <div class="cp-swatch${hex===cur?' active':''}" data-hex="${hex}" style="background:${hex}" onclick="selectStaffColor('${hex}')"></div>
   `).join('');
   document.getElementById('color-sheet-overlay').style.display='flex';
 }
@@ -1124,8 +1124,8 @@ function selectStaffColor(hex){
   localStorage.setItem('cc_staff_colors',JSON.stringify(staffColors));
   saveColorsToCloud();
   applyStaffColors();
-  document.querySelectorAll('.cp-swatch').forEach(el=>
-    el.classList.toggle('active',el.style.background===hex||el.style.backgroundColor===hex));
+  document.querySelectorAll('#cp-swatches .cp-swatch').forEach(el=>
+    el.classList.toggle('active',el.dataset.hex===hex));
   renderStaff();renderRota();
 }
 function closeColorSheet(){
