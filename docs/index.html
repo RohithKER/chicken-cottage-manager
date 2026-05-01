@@ -966,6 +966,11 @@ body{
       <div onclick="closeReceiptModal()" style="cursor:pointer;font-size:20px;color:var(--text3);padding:4px 8px">×</div>
     </div>
     <pre id="receipt-text-preview" style="font-family:'Courier New',Courier,monospace;font-size:12px;color:var(--text2);background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;overflow-y:auto;flex:1;white-space:pre;line-height:1.5;margin:0"></pre>
+    <!-- Per-day notes — printed at bottom of receipt -->
+    <div style="flex-shrink:0">
+      <div style="font-size:12px;font-weight:600;color:var(--text3);margin-bottom:5px">📝 Notes <span style="font-weight:400">(saved per day · prints at bottom)</span></div>
+      <textarea id="rcp-notes" oninput="saveReceiptNote()" placeholder="Add a note for this day…" rows="3" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;padding:9px 10px;resize:none;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',sans-serif;outline:none;line-height:1.45"></textarea>
+    </div>
     <!-- BT Print button — shown on Android Chrome only -->
     <button onclick="btPrintFromModal()" id="rcp-bt-btn" style="display:none;width:100%;padding:14px;border-radius:10px;border:none;background:var(--accent);color:#fff;font-size:15px;font-weight:700;cursor:pointer;letter-spacing:-0.2px">🖨 Print to Bluetooth Printer</button>
     <div style="display:flex;gap:8px;flex-shrink:0">
@@ -1064,7 +1069,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v63-bt-preconnect';
+const _COLOR_VER='v64-day-notes';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -2919,7 +2924,7 @@ function _padLine(label,value,width=_RW){
   const spaces=width-label.length-v.length;
   return label+(spaces>0?' '.repeat(spaces):' ')+v;
 }
-function _receiptText(dateLabel,timeLabel,je,cc,ue,dr,cash,card){
+function _receiptText(dateLabel,timeLabel,je,cc,ue,dr,cash,card,notes){
   const del=je+cc+ue+dr;
   const total=del+cash+card;
   const div='-'.repeat(_RW);
@@ -2949,11 +2954,36 @@ function _receiptText(dateLabel,timeLabel,je,cc,ue,dr,cash,card){
     dbl,
     '','',''
   ];
+  // Append per-day notes if present
+  if(notes&&notes.trim()){
+    lines.push(div,'NOTES:');
+    notes.trim().split('\n').forEach(l=>lines.push(l||' '));
+    lines.push('','','');
+  }
   return lines.join('\n');
 }
 
 let _currentReceiptText='';
 let _currentReceiptTitle='';
+let _receiptParams=null; // stored so notes can rebuild receipt text live
+
+const _NOTES_KEY='cc_day_notes_';
+
+function _getReceiptText(){
+  if(!_receiptParams)return _currentReceiptText;
+  const notes=(document.getElementById('rcp-notes')||{}).value||'';
+  return _receiptText(..._receiptParams,notes);
+}
+
+function saveReceiptNote(){
+  if(!salesOpenDate)return;
+  const val=(document.getElementById('rcp-notes')||{}).value||'';
+  if(val.trim()) localStorage.setItem(_NOTES_KEY+salesOpenDate,val);
+  else localStorage.removeItem(_NOTES_KEY+salesOpenDate);
+  // Rebuild preview live
+  const pre=document.getElementById('receipt-text-preview');
+  if(pre)pre.textContent=_getReceiptText();
+}
 
 function printDaySales(){
   if(!salesOpenDate){toast('No day selected');return;}
@@ -2963,8 +2993,13 @@ function printDaySales(){
   const now=new Date();
   const timeLabel=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',hour12:true}).toUpperCase();
 
-  _currentReceiptText=_receiptText(dateLabel,timeLabel,je,cc,ue,dr,cash,card);
+  _receiptParams=[dateLabel,timeLabel,je,cc,ue,dr,cash,card];
   _currentReceiptTitle='CC Chelmsford — '+dateLabel;
+
+  // Load saved note for this day
+  const notesEl=document.getElementById('rcp-notes');
+  if(notesEl) notesEl.value=localStorage.getItem(_NOTES_KEY+salesOpenDate)||'';
+  _currentReceiptText=_getReceiptText();
 
   // Show preview modal — user picks how to send to their printer
   document.getElementById('receipt-text-preview').textContent=_currentReceiptText;
@@ -3002,7 +3037,7 @@ function closeReceiptModal(){
 
 async function copyReceipt(){
   try{
-    await navigator.clipboard.writeText(_currentReceiptText);
+    await navigator.clipboard.writeText(_getReceiptText());
     toast('Receipt copied — paste into your printer app ✓');
     closeReceiptModal();
   }catch{
@@ -3017,7 +3052,7 @@ async function copyReceipt(){
 async function shareReceipt(){
   if(!navigator.share)return;
   try{
-    await navigator.share({title:_currentReceiptTitle,text:_currentReceiptText});
+    await navigator.share({title:_currentReceiptTitle,text:_getReceiptText()});
     closeReceiptModal();
   }catch(e){
     if(e.name!=='AbortError') toast('Share failed — try Copy instead');
@@ -3188,7 +3223,7 @@ async function printViaBluetooth(text){
   }
 }
 
-function btPrintFromModal(){printViaBluetooth(_currentReceiptText);}
+function btPrintFromModal(){printViaBluetooth(_getReceiptText());}
 
 function forgetBtPrinter(){
   localStorage.removeItem(_BT_NAME_KEY);
