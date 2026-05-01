@@ -1894,7 +1894,8 @@ async function deleteStaffFromCloud(name){
 /* ─── Local state helpers ────────────────────────────── */
 function getShift(type,off,day,col){
   const raw=state.schedules[`${type}|${weekKey(off)}|${day}|${col}`]||[];
-  return staffBlacklist.size?raw.filter(n=>!staffBlacklist.has(n)):raw;
+  const filtered=staffBlacklist.size?raw.filter(n=>!staffBlacklist.has(n)):raw;
+  return [...filtered].sort((a,b)=>a.localeCompare(b));
 }
 function setShift(type,off,day,col,names){
   const k=`${type}|${weekKey(off)}|${day}|${col}`;
