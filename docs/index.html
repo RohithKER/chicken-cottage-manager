@@ -1064,7 +1064,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v54-print-32w-clean';
+const _COLOR_VER='v55-print-oneshot';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -3117,16 +3117,14 @@ async function printViaBluetooth(text){
     }
   }
   const data=_buildEscPos(text);
-  const CHUNK=200;
   const btBtn=document.getElementById('rcp-bt-btn');
   if(btBtn){btBtn.textContent='Printing…';btBtn.disabled=true;}
   try{
-    for(let i=0;i<data.length;i+=CHUNK){
-      const chunk=data.slice(i,i+CHUNK);
-      try{await _btChar.writeValueWithoutResponse(chunk);}
-      catch{await _btChar.writeValue(chunk);}
-      if(i+CHUNK<data.length)await new Promise(r=>setTimeout(r,30));
-    }
+    // Send entire receipt in ONE write — splitting with delays causes the printer
+    // to treat the pause as a line break, garbling label/value alignment.
+    // Chrome BLE handles internal fragmentation automatically.
+    try{await _btChar.writeValueWithoutResponse(data);}
+    catch{await _btChar.writeValue(data);}
     logActivity('Receipt printed via Bluetooth ✓','success');
     toast('Printed ✓');
     closeReceiptModal();
