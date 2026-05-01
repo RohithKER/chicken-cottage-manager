@@ -1199,43 +1199,15 @@ async function openPermsPanel(){
   const list=document.getElementById('perms-list');
   list.innerHTML='<div style="color:var(--text3);font-size:13px;text-align:center;padding:20px">Loading users…</div>';
   try{
-    // Pull ALL users from user_profiles (source of truth for who exists)
-    // and ALL permission rows, then merge
-    const[profilesRes,permsRes]=await Promise.all([
-      db.from('user_profiles').select('id,email,role').order('email'),
-      db.from('user_permissions').select('*')
-    ]);
-    if(profilesRes.error)throw profilesRes.error;
-    const profiles=profilesRes.data||[];
-    const permsMap={};
-    (permsRes.data||[]).forEach(p=>permsMap[p.user_id]=p);
-
-    if(!profiles.length){
-      list.innerHTML='<div style="color:var(--text3);font-size:13px;text-align:center;padding:20px">No users found</div>';
+    // user_permissions is now the single source of truth — every user gets a row on first login
+    const{data,error}=await db.from('user_permissions').select('*').order('email');
+    if(error)throw error;
+    if(!data||!data.length){
+      list.innerHTML='<div style="color:var(--text3);font-size:13px;text-align:center;padding:20px">No users yet</div>';
       return;
     }
-
-    // Ensure every user has a user_permissions row (upsert missing ones)
-    const missing=profiles.filter(p=>!permsMap[p.id]);
-    if(missing.length){
-      const toInsert=missing.map(p=>({
-        user_id:p.id,
-        email:p.email,
-        is_admin:p.role==='admin',
-        can_edit_rota:p.role==='admin',
-        can_edit_delivery:p.role==='admin',
-        can_edit_staffs:p.role==='admin',
-        can_edit_sales:p.role==='admin'||p.role==='manager'
-      }));
-      const{data:inserted}=await db.from('user_permissions').upsert(toInsert,{onConflict:'user_id'}).select();
-      (inserted||[]).forEach(p=>permsMap[p.user_id]=p);
-    }
-
     list.innerHTML='';
-    profiles.forEach(p=>{
-      const perms=permsMap[p.id]||{user_id:p.id,email:p.email};
-      list.appendChild(_buildUserPermRow(perms));
-    });
+    data.forEach(u=>list.appendChild(_buildUserPermRow(u)));
   }catch(e){
     list.innerHTML='<div style="color:var(--red);font-size:13px;text-align:center;padding:20px">Error loading users</div>';
     console.error('openPermsPanel:',e);
