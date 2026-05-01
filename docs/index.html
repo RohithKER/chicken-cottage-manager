@@ -1608,23 +1608,28 @@ function _setEarlySet(wk,day,set){
 }
 async function loadEarlyShift(){
   const wks=[weekKey(-1),weekKey(0),weekKey(1)];
-  // Seed from cache
+  // Seed from cache first so tags show instantly
   const cached=_loadEarlyCache();
   Object.keys(cached).forEach(k=>{state.earlyShift[k]=new Set(cached[k]||[]);});
   if(!user)return;
   try{
-    const{data}=await db.from('shift_early').select('*').in('week_key',wks);
-    if(data){
+    const{data,error}=await db.from('shift_early').select('*').in('week_key',wks);
+    if(error){logActivity('Early load error: '+error.message,'error');return;}
+    if(data&&data.length){
       data.forEach(row=>{
         const k=_earlyKey(row.week_key,row.day);
         state.earlyShift[k]=new Set(row.staff_names||[]);
       });
+      logActivity(`Early shifts loaded ✓ (${data.length} row(s))`,'success');
       // Persist merged to cache
       const toCache={};
       Object.entries(state.earlyShift).forEach(([k,s])=>{toCache[k]=[...s];});
       _saveEarlyCache(toCache);
+    }else{
+      logActivity('Early shifts: none found for this week','');
     }
-  }catch(e){console.warn('loadEarlyShift cloud error:',e.message);}
+    renderRota();
+  }catch(e){logActivity('loadEarlyShift error: '+e.message,'error');}
 }
 async function saveEarlyToCloud(wk,day){
   if(!user)return;
@@ -2958,6 +2963,24 @@ function setupRealtime(){
       })
       .subscribe();
   }
+
+  // Early shift changes — update tags live across all devices
+  db.channel('cc-early')
+    .on('postgres_changes',{event:'*',schema:'public',table:'shift_early'},payload=>{
+      const r=payload.new||payload.old;
+      if(!r||!r.week_key||!r.day)return;
+      const k=_earlyKey(r.week_key,r.day);
+      if(payload.eventType==='DELETE'){
+        delete state.earlyShift[k];
+      }else{
+        state.earlyShift[k]=new Set(r.staff_names||[]);
+      }
+      const toCache={};
+      Object.entries(state.earlyShift).forEach(([ck,s])=>{toCache[ck]=[...s];});
+      _saveEarlyCache(toCache);
+      renderRota();
+    })
+    .subscribe();
 
   // Admin: auto-refresh pending list when a new user signs in
   if(_perms.is_admin){
