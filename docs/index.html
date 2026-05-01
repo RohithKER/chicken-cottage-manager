@@ -11,7 +11,6 @@
 <title>CC Chelmsford Manager</title>
 <link rel="icon" type="image/png" href="./favicon.png">
 <link rel="apple-touch-icon" href="./icon-192.png"><link rel="apple-touch-icon" sizes="512x512" href="./icon-512.png">
-<link rel="manifest" href="./manifest.json">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 /* ─── Reset ──────────────────────────────────────── */
@@ -1056,7 +1055,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v86-deep-audit';
+const _COLOR_VER='v87-next-week-default';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -1375,7 +1374,7 @@ function _saveSchedCache(s){try{localStorage.setItem(_SCHED_CACHE,JSON.stringify
 function _loadSchedCache(){try{return JSON.parse(localStorage.getItem(_SCHED_CACHE)||'{}');}catch{return{};}}
 
 let state = {
-  type:'inside', weekOffset:0,
+  type:'inside', weekOffset:1,
   staff:{inside:[...DEFAULT_STAFF.inside],delivery:[...DEFAULT_STAFF.delivery]},
   schedules:_loadSchedCache()   // seed from localStorage so changes survive restarts
 };
@@ -2449,23 +2448,11 @@ function roundRect(ctx,x,y,w,h,r){
 
 /* ─── Settings ───────────────────────────────────────── */
 function exportBackup(){
-  const salesRaw=localStorage.getItem('cc_sales_cache_v1');
-  const salesData=salesRaw?JSON.parse(salesRaw):null;
-  const pendingShifts=localStorage.getItem('cc_pending_shifts_v1');
-  const pendingSales=localStorage.getItem('cc_pending_sales_v1');
-  const payload={
-    state,
-    cols:COLS,
-    sales:salesData,
-    pendingShifts:pendingShifts?JSON.parse(pendingShifts):null,
-    pendingSales:pendingSales?JSON.parse(pendingSales):null,
-    exportedAt:new Date().toISOString()
-  };
-  const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+  const blob=new Blob([JSON.stringify({state,cols:COLS},null,2)],{type:'application/json'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
   a.download=`rota-${new Date().toISOString().slice(0,10)}.json`;
-  a.click();toast('Backup exported ✓');
+  a.click();toast('Backup exported');
 }
 function importBackup(){if(!requirePerm('can_edit_settings','edit settings'))return;document.getElementById('import-file').click();}
 function handleImport(e){
@@ -2545,8 +2532,7 @@ function copyWeek(){
 
 async function pasteWeek(){
   if(!weekClipboard){toast('Copy a week first');return;}
-  const ok=await showConfirm(`Paste copied shifts to ${weekLabel(state.weekOffset)}?`,'This will overwrite existing shifts.');
-  if(!ok)return;
+  if(!confirm(`Paste copied shifts to ${weekLabel(state.weekOffset)}?\nThis will overwrite existing shifts.`))return;
   const type = state.type;
   const wk = weekKey();
   const cols = COLS[type];
@@ -2564,9 +2550,8 @@ async function pasteWeek(){
   toast(pasted ? `${pasted} shift${pasted!==1?'s':''} pasted ✓` : 'No matching columns to paste');
 }
 
-async function clearWeek(){
-  const ok=await showConfirm(`Clear all shifts for ${weekLabel(state.weekOffset)}?`,'This cannot be undone.');
-  if(!ok)return;
+function clearWeek(){
+  if(!confirm(`Clear all shifts for ${weekLabel(state.weekOffset)}?`))return;
   const wk=weekKey();
   Object.keys(state.schedules).forEach(k=>{if(k.startsWith(`${state.type}|${wk}|`))delete state.schedules[k];});
   db.from('schedules').delete()
@@ -2661,27 +2646,23 @@ function toast(msg){
   clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2200);
 }
 let _confirmCb=null;
-let _confirmResolve=null;
 function showConfirm(title,body,onConfirm){
   document.getElementById('cfm-title').textContent=title;
-  document.getElementById('cfm-body').textContent=body||'';
-  _confirmCb=onConfirm||null;
+  document.getElementById('cfm-body').textContent=body;
+  _confirmCb=onConfirm;
   const ov=document.getElementById('confirm-overlay');
   ov.style.display='flex';
   requestAnimationFrame(()=>ov.classList.add('open'));
-  return new Promise(resolve=>{_confirmResolve=resolve;});
 }
 function _confirmYes(){
   document.getElementById('confirm-overlay').classList.remove('open');
   setTimeout(()=>{document.getElementById('confirm-overlay').style.display='none';},200);
   if(_confirmCb){_confirmCb();_confirmCb=null;}
-  if(_confirmResolve){_confirmResolve(true);_confirmResolve=null;}
 }
 function _confirmNo(){
   document.getElementById('confirm-overlay').classList.remove('open');
   setTimeout(()=>{document.getElementById('confirm-overlay').style.display='none';},200);
   _confirmCb=null;
-  if(_confirmResolve){_confirmResolve(false);_confirmResolve=null;}
 }
 
 /* ─── Pending Approvals (Settings tab) ──────────────── */
