@@ -606,6 +606,49 @@ body{
 .sales-btn-row{display:flex;gap:10px;padding:4px 0 12px}
 .wage-row,.wage-name,.wage-amt,.wage-paid,.wage-del,.sales-add-btn{display:none}
 
+/* ─── Order Breakdown ────────────────────────────── */
+.ss-row-wrap{border-bottom:1px solid rgba(255,255,255,.04)}
+.ss-row-wrap:last-child{border-bottom:none}
+.ss-row-wrap .ss-row{border-bottom:none}
+.breakdown-toggle{
+  display:flex;align-items:center;gap:6px;
+  padding:4px 14px 8px;cursor:pointer;
+  font-size:11px;color:var(--text3);
+  background:none;border:none;width:100%;text-align:left;
+  transition:color .15s;
+}
+.breakdown-toggle:active{color:var(--accent)}
+.order-count{font-size:10px;color:var(--text3);margin-left:2px}
+.breakdown-panel{
+  padding:8px 10px 10px;
+  border-top:1px solid var(--border);
+  background:rgba(0,0,0,.15);
+}
+.breakdown-item{display:flex;align-items:center;gap:6px;margin-bottom:5px}
+.breakdown-item input[type=number]{
+  flex:1;background:var(--surface2);border:1px solid var(--border2);
+  border-radius:8px;color:var(--text);font-size:16px;font-weight:600;
+  padding:7px 10px;text-align:right;outline:none;
+  -moz-appearance:textfield;transition:border-color .15s;min-height:36px;
+}
+.breakdown-item input[type=number]::-webkit-inner-spin-button{display:none}
+.breakdown-item input[type=number]:focus{border-color:var(--accent);background:rgba(91,156,245,.05)}
+.breakdown-item .rm-btn{
+  width:28px;height:28px;border-radius:50%;border:none;
+  background:rgba(232,112,112,.15);color:var(--red);
+  font-size:16px;line-height:1;cursor:pointer;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  transition:background .15s;
+}
+.breakdown-item .rm-btn:active{background:rgba(232,112,112,.3)}
+.breakdown-collapse{
+  display:flex;align-items:center;justify-content:center;gap:6px;
+  margin-top:6px;padding:5px;background:none;border:none;
+  font-size:11px;color:var(--text3);cursor:pointer;width:100%;
+  transition:color .15s;
+}
+.breakdown-collapse:active{color:var(--accent)}
+
 /* ─── Print / Thermal Receipt ────────────────────── */
 @media print{
   *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
@@ -907,8 +950,24 @@ body{
         <div class="ss-section-hdr">Delivery Platforms</div>
         <div class="ss-row"><label>Just Eat</label><input type="number" id="sd-je" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
         <div class="ss-row"><label>CC App</label><input type="number" id="sd-cc" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
-        <div class="ss-row"><label>Uber Eats</label><input type="number" id="sd-ue" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
-        <div class="ss-row"><label>Deliveroo</label><input type="number" id="sd-dr" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
+        <!-- Uber Eats with breakdown -->
+        <div class="ss-row-wrap" id="ue-wrap">
+          <div class="ss-row"><label>Uber Eats</label><input type="number" id="sd-ue" placeholder="0.00" step="0.01" min="0" oninput="onManualTotal('ue')"></div>
+          <button class="breakdown-toggle" onclick="toggleBreakdown('ue')">▼ Breakdown <span class="order-count" id="ue-count"></span></button>
+          <div class="breakdown-panel" id="ue-panel" style="display:none">
+            <div id="ue-items"></div>
+            <button class="breakdown-collapse" onclick="toggleBreakdown('ue')">▲ Collapse</button>
+          </div>
+        </div>
+        <!-- Deliveroo with breakdown -->
+        <div class="ss-row-wrap" id="dr-wrap">
+          <div class="ss-row"><label>Deliveroo</label><input type="number" id="sd-dr" placeholder="0.00" step="0.01" min="0" oninput="onManualTotal('dr')"></div>
+          <button class="breakdown-toggle" onclick="toggleBreakdown('dr')">▼ Breakdown <span class="order-count" id="dr-count"></span></button>
+          <div class="breakdown-panel" id="dr-panel" style="display:none">
+            <div id="dr-items"></div>
+            <button class="breakdown-collapse" onclick="toggleBreakdown('dr')">▲ Collapse</button>
+          </div>
+        </div>
         <div class="ss-total-row"><label>Delivery Total</label><div class="ss-total-val" id="sd-del-total" style="color:var(--accent2)">£0.00</div></div>
       </div>
       <!-- Payments section -->
@@ -1055,7 +1114,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v93-boot-fix';
+const _COLOR_VER='v93-delivery-breakdown';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -3033,12 +3092,39 @@ function openDayEntry(dateStr){
   document.getElementById('sd-dr').value=r.deliveroo||'';
   document.getElementById('sd-cash').value=r.cash||'';
   document.getElementById('sd-card').value=r.card||'';
+  // Load breakdown items and collapse panels
+  _bdItems.ue=(r.uber_eats_items||[]).filter(v=>v!==null&&v!=='').map(Number).filter(v=>!isNaN(v));
+  _bdItems.dr=(r.deliveroo_items||[]).filter(v=>v!==null&&v!=='').map(Number).filter(v=>!isNaN(v));
+  ['ue','dr'].forEach(f=>{
+    const panel=document.getElementById(f+'-panel');
+    if(panel) panel.style.display='none';
+    // If breakdown items exist, mark total as read-only; else editable
+    const totalEl=document.getElementById(f==='ue'?'sd-ue':'sd-dr');
+    if(totalEl) totalEl.readOnly=_bdItems[f].length>0;
+    renderBreakdownItems(f);
+    updateBdToggle(f);
+  });
   calcDaySales();
 
   // Show/hide edit controls based on permission
-  ['sd-je','sd-cc','sd-ue','sd-dr','sd-cash','sd-card'].forEach(id=>{
+  ['sd-je','sd-cc','sd-cash','sd-card'].forEach(id=>{
     const el=document.getElementById(id);
     if(el)el.readOnly=!canEdit;
+  });
+  // For breakdown-controlled fields: read-only if no edit permission OR if breakdown items drive the total
+  ['sd-ue','sd-dr'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(!el)return;
+    if(!canEdit){el.readOnly=true;return;}
+    const f=id==='sd-ue'?'ue':'dr';
+    el.readOnly=_bdItems[f].length>0; // breakdown controls total when items present
+  });
+  // Hide breakdown toggles if not editable
+  ['ue','dr'].forEach(f=>{
+    const wrap=document.getElementById(f+'-wrap');
+    if(!wrap)return;
+    const tog=wrap.querySelector('.breakdown-toggle');
+    if(tog)tog.style.display=canEdit?'':'none';
   });
   const saveBtn=document.getElementById('day-save-btn');
   if(saveBtn){
@@ -3069,6 +3155,8 @@ function clearDayEntry(){
   ['sd-je','sd-cc','sd-ue','sd-dr','sd-cash','sd-card'].forEach(id=>{
     document.getElementById(id).value='';
   });
+  _bdItems.ue=[];_bdItems.dr=[];
+  ['ue','dr'].forEach(f=>{renderBreakdownItems(f);updateBdToggle(f);});
   calcDaySales();
 }
 
@@ -3081,6 +3169,155 @@ function calcDaySales(){
   document.getElementById('sd-day-total').textContent='£'+total.toFixed(2);
 }
 
+// ─── Order Breakdown ──────────────────────────────────────────────────────
+// State: per-field item arrays. Keyed 'ue' and 'dr'.
+const _bdItems={ue:[],dr:[]};
+// Map short key to element ids
+function _bdIds(f){
+  return{
+    total: f==='ue'?'sd-ue':'sd-dr',
+    panel: f+'-panel',
+    items: f+'-items',
+    count: f+'-count',
+    toggle:'.breakdown-toggle', // used via wrap query
+    wrap:  f+'-wrap'
+  };
+}
+
+function toggleBreakdown(f){
+  const ids=_bdIds(f);
+  const panel=document.getElementById(ids.panel);
+  const open=panel.style.display==='none';
+  panel.style.display=open?'block':'none';
+  // Update toggle button arrow
+  updateBdToggle(f);
+  if(open){
+    renderBreakdownItems(f);
+    // Focus the blank trailing input so user can start typing immediately
+    setTimeout(()=>{
+      const inputs=document.querySelectorAll('#'+ids.items+' input');
+      if(inputs.length) inputs[inputs.length-1].focus();
+    },50);
+  }
+}
+
+function updateBdToggle(f){
+  const ids=_bdIds(f);
+  const panel=document.getElementById(ids.panel);
+  const open=panel&&panel.style.display!=='none';
+  const wrap=document.getElementById(ids.wrap);
+  if(!wrap)return;
+  const tog=wrap.querySelector('.breakdown-toggle');
+  if(!tog)return;
+  const items=_bdItems[f].filter(v=>v!==''&&v!==null&&!isNaN(Number(v))&&Number(v)>0);
+  const countEl=wrap.querySelector('.order-count');
+  if(open){
+    tog.innerHTML='▲ Breakdown <span class="order-count"></span>';
+  } else {
+    if(items.length>0){
+      const sum=items.reduce((a,b)=>a+Number(b),0);
+      tog.innerHTML=`▼ Breakdown <span class="order-count">${items.length} order${items.length===1?'':'s'} · £${sum.toFixed(2)}</span>`;
+    } else {
+      tog.innerHTML='▼ Breakdown <span class="order-count"></span>';
+    }
+  }
+}
+
+function renderBreakdownItems(f){
+  const ids=_bdIds(f);
+  const container=document.getElementById(ids.items);
+  if(!container)return;
+  const arr=_bdItems[f];
+  let html='';
+  // Render each existing item
+  arr.forEach((val,i)=>{
+    const disp=(val===''||val===null)?'':Number(val);
+    html+=`<div class="breakdown-item">
+      <input type="number" inputmode="decimal" placeholder="0.00" step="0.01" min="0"
+        value="${disp}"
+        oninput="onBdInput('${f}',${i},this.value)"
+        onkeydown="onBdKeydown(event,'${f}',${i})"
+      ><button class="rm-btn" onclick="removeBdItem('${f}',${i})">×</button>
+    </div>`;
+  });
+  // Always render one blank "add" row at the end (index = arr.length, not stored until typed)
+  const ni=arr.length;
+  html+=`<div class="breakdown-item">
+    <input type="number" inputmode="decimal" placeholder="+ add order" step="0.01" min="0"
+      value=""
+      oninput="onBdInput('${f}',${ni},this.value)"
+      onkeydown="onBdKeydown(event,'${f}',${ni})"
+    ><button class="rm-btn" onclick="removeBdItem('${f}',${ni})" style="visibility:hidden">×</button>
+  </div>`;
+  container.innerHTML=html;
+}
+
+function onBdInput(f,i,val){
+  const wasNew=(i===_bdItems[f].length);
+  if(val===''&&wasNew) return; // nothing typed yet in blank row
+  _bdItems[f][i]=val===''?'':val;
+  if(wasNew&&val!==''){
+    // New item added — re-render to show a fresh blank row, but preserve focus/cursor
+    calcBdTotal(f);
+    updateBdToggle(f);
+    // Re-render so the new blank row appears below
+    renderBreakdownItems(f);
+    // Restore focus to this (now newly rendered) input
+    const inputs=document.querySelectorAll('#'+f+'-items input');
+    if(inputs[i]) inputs[i].focus();
+    return;
+  }
+  calcBdTotal(f);
+  updateBdToggle(f);
+}
+
+function onBdKeydown(e,f,i){
+  if(e.key==='Enter'||e.keyCode===13){
+    e.preventDefault();
+    // If this is last row and has a value, the render loop will have already added a blank —
+    // just re-render and focus the new last input
+    renderBreakdownItems(f);
+    setTimeout(()=>{
+      const inputs=document.querySelectorAll('#'+f+'-items input');
+      if(inputs.length) inputs[inputs.length-1].focus();
+    },30);
+  }
+}
+
+function removeBdItem(f,i){
+  if(i>=_bdItems[f].length) return; // blank trailing row — nothing to remove
+  _bdItems[f].splice(i,1);
+  calcBdTotal(f);
+  renderBreakdownItems(f);
+  updateBdToggle(f);
+}
+
+function calcBdTotal(f){
+  const ids=_bdIds(f);
+  const items=_bdItems[f];
+  const validItems=items.filter(v=>v!==''&&v!==null&&String(v)!=='');
+  const el=document.getElementById(ids.total);
+  if(validItems.length===0){
+    // No items — leave main field editable
+    if(el) el.readOnly=false;
+    calcDaySales();
+    return;
+  }
+  const sum=validItems.reduce((a,b)=>a+parseFloat(b||0),0);
+  if(el){
+    el.value=sum.toFixed(2);
+    el.readOnly=true;
+  }
+  calcDaySales();
+}
+
+function onManualTotal(f){
+  // Called when user manually edits the total field (only possible when no breakdown items)
+  calcDaySales();
+}
+
+// ─── End Order Breakdown ──────────────────────────────────────────────────
+
 async function saveDaySales(){
   if(!salesOpenDate){closeDayEntry();return;}
   const payload={
@@ -3090,7 +3327,9 @@ async function saveDaySales(){
     uber_eats:getSdVal('sd-ue'),
     deliveroo:getSdVal('sd-dr'),
     cash:getSdVal('sd-cash'),
-    card:getSdVal('sd-card')
+    card:getSdVal('sd-card'),
+    uber_eats_items:_bdItems.ue.slice(),
+    deliveroo_items:_bdItems.dr.slice()
   };
   // Save locally first so data is never lost even if cloud fails
   salesWeekData[salesOpenDate]=payload;
@@ -3167,372 +3406,4 @@ function _receiptText(dateLabel,timeLabel,je,cc,ue,dr,cash,card,notes){
     _padLine('Cash',cash),
     _padLine('Card',card),
     div,
-    B+_padLine('TOTAL SALES',total)+b,
-    dbl,
-    '','',''
-  ];
-  // Append per-day notes if present (no divider, no label — just the content)
-  if(notes&&notes.trim()){
-    lines.push('');
-    notes.trim().split('\n').forEach(l=>lines.push(l||' '));
-    lines.push('','','');
-  }
-  return lines.join('\n');
-}
-
-let _currentReceiptText='';
-let _currentReceiptTitle='';
-let _receiptParams=null; // stored so notes can rebuild receipt text live
-
-const _NOTES_KEY='cc_day_notes_';
-
-function _getReceiptText(){
-  if(!_receiptParams)return _currentReceiptText;
-  const notes=(document.getElementById('rcp-notes')||{}).value||'';
-  return _receiptText(..._receiptParams,notes);
-}
-
-function saveReceiptNote(){
-  if(!salesOpenDate)return;
-  const val=(document.getElementById('rcp-notes')||{}).value||'';
-  if(val.trim()) localStorage.setItem(_NOTES_KEY+salesOpenDate,val);
-  else localStorage.removeItem(_NOTES_KEY+salesOpenDate);
-  // Rebuild preview live
-  const pre=document.getElementById('receipt-text-preview');
-  if(pre)pre.textContent=_getReceiptText();
-}
-
-function printDaySales(){
-  if(!salesOpenDate){toast('No day selected');return;}
-  const je=getSdVal('sd-je'),cc=getSdVal('sd-cc'),ue=getSdVal('sd-ue'),dr=getSdVal('sd-dr');
-  const cash=getSdVal('sd-cash'),card=getSdVal('sd-card');
-  const dateLabel=new Date(salesOpenDate+'T12:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'});
-  const now=new Date();
-  const timeLabel=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',hour12:true}).toUpperCase();
-
-  _receiptParams=[dateLabel,timeLabel,je,cc,ue,dr,cash,card];
-  _currentReceiptTitle='CC Chelmsford — '+dateLabel;
-
-  // Load saved note for this day
-  const notesEl=document.getElementById('rcp-notes');
-  if(notesEl) notesEl.value=localStorage.getItem(_NOTES_KEY+salesOpenDate)||'';
-  _currentReceiptText=_getReceiptText();
-
-  // Show preview modal — user picks how to send to their printer
-  document.getElementById('receipt-text-preview').textContent=_currentReceiptText;
-  // BT Print button: only on Android Chrome (has navigator.bluetooth)
-  const btBtn=document.getElementById('rcp-bt-btn');
-  if(btBtn) btBtn.style.display=navigator.bluetooth?'':'none';
-  // Show saved printer name under BT button
-  const btInfo=document.getElementById('rcp-bt-info');
-  if(btInfo){
-    const saved=localStorage.getItem('cc_bt_printer_name');
-    btInfo.innerHTML=saved&&navigator.bluetooth
-      ?`<span style="font-size:11px;color:var(--text3)">Paired: ${saved} · <span onclick="forgetBtPrinter()" style="color:var(--accent);cursor:pointer;text-decoration:underline">Forget</span></span>`
-      :(navigator.bluetooth?'<span style="font-size:11px;color:var(--text3)">Will ask you to select a printer</span>':'');
-  }
-  // Share button: hide if not supported
-  const shareBtn=document.getElementById('rcp-share-btn');
-  if(shareBtn) shareBtn.style.display=navigator.share?'':'none';
-  document.getElementById('receipt-overlay').style.display='flex';
-  // Pre-connect silently while user reads the preview — so "Print" taps instantly with no picker
-  if(navigator.bluetooth&&navigator.bluetooth.getDevices&&!_btChar){
-    const _pn=localStorage.getItem(_BT_NAME_KEY);
-    if(_pn)(async()=>{
-      try{
-        const _kn=await navigator.bluetooth.getDevices();
-        const _dv=_kn.find(d=>d.name===_pn);
-        if(_dv){_btDevice=_dv;_btChar=await _acquireChar(_dv);}
-      }catch{}
-    })();
-  }
-}
-
-function closeReceiptModal(){
-  document.getElementById('receipt-overlay').style.display='none';
-}
-
-async function copyReceipt(){
-  try{
-    await navigator.clipboard.writeText(_getReceiptText());
-    toast('Receipt copied — paste into your printer app ✓');
-    closeReceiptModal();
-  }catch{
-    // Clipboard API blocked — select the text manually
-    const pre=document.getElementById('receipt-text-preview');
-    const range=document.createRange();range.selectNodeContents(pre);
-    const sel=window.getSelection();sel.removeAllRanges();sel.addRange(range);
-    toast('Text selected — copy it and paste into your printer app');
-  }
-}
-
-async function shareReceipt(){
-  if(!navigator.share)return;
-  try{
-    await navigator.share({title:_currentReceiptTitle,text:_getReceiptText()});
-    closeReceiptModal();
-  }catch(e){
-    if(e.name!=='AbortError') toast('Share failed — try Copy instead');
-  }
-}
-
-/* ─── Bluetooth Printing (Android Chrome) ────────────── */
-// BLE service/characteristic pairs for common thermal printers
-const _BT_PROFILES=[
-  // Epson TM-m30 BLE (TM-m30-b001)
-  {svc:'000018f0-0000-1000-8000-00805f9b34fb',chr:'00002af1-0000-1000-8000-00805f9b34fb'},
-  // SUNMI / generic Chinese thermal printers (CloudPrint_0035)
-  {svc:'0000ff00-0000-1000-8000-00805f9b34fb',chr:'0000ff02-0000-1000-8000-00805f9b34fb'},
-  // Sewoo / another common BLE profile
-  {svc:'49535343-fe7d-4ae5-8fa9-9fafd205e455',chr:'49535343-8841-43f4-a8d4-ecbe34729bb3'},
-];
-const _BT_ALL_SVCS=_BT_PROFILES.map(p=>p.svc);
-const _BT_NAME_KEY='cc_bt_printer_name';
-let _btDevice=null; // cached device object — survives _btChar reset within a page session
-let _btChar=null;   // cached write characteristic
-
-function _buildEscPos(text){
-  // ESC @      = init/reset printer (Font A, 48 chars/line on 80mm paper)
-  // ESC E 1/0  = bold on/off  (triggered by \x01/\x02 markers)
-  // ESC ! 0x38 = double-height + double-width + bold (triggered by \x03 marker)
-  //              0x38 = bits 3+4+5 = bold+double-height+double-width. Font A, 24 chars/line.
-  // ESC ! 0x00 = normal Font A (triggered by \x04 marker)
-  // GS V A 5   = feed 5 lines and full cut
-  const init=[0x1B,0x40]; // reset only — Font A, standard width
-  const cut=[0x1D,0x56,0x41,0x05];
-  const bytes=[];
-  for(let i=0;i<text.length;i++){
-    const c=text.charCodeAt(i);
-    if(c===0x01){bytes.push(0x1B,0x45,0x01);}      // bold on
-    else if(c===0x02){bytes.push(0x1B,0x45,0x00);}  // bold off
-    else if(c===0x03){bytes.push(0x1B,0x21,0x28);}  // double-width + bold (no double-height = cleaner)
-    else if(c===0x04){bytes.push(0x1B,0x21,0x00);}  // normal Font A
-    else if(c===0x00A3)bytes.push(0x9C);  // £ → byte 0x9C in PC437 code page
-    else if(c===0x0A)bytes.push(0x0A);    // newline pass-through
-    else if(c<0x80)bytes.push(c);         // plain ASCII pass-through
-    else bytes.push(0x3F);                // unsupported → '?'
-  }
-  const encoded=new Uint8Array(bytes);
-  const out=new Uint8Array(init.length+encoded.length+cut.length);
-  out.set(init,0);
-  out.set(encoded,init.length);
-  out.set(cut,init.length+encoded.length);
-  return out;
-}
-
-// Acquire the write characteristic from an already-selected device.
-// Reusable so we can reconnect without showing the picker again.
-async function _acquireChar(device){
-  const server=device.gatt.connected?device.gatt:await device.gatt.connect();
-  for(const prof of _BT_PROFILES){
-    try{
-      const svc=await server.getPrimaryService(prof.svc);
-      const chr=await svc.getCharacteristic(prof.chr);
-      return chr;
-    }catch{}
-  }
-  // Discovery fallback — find any writable characteristic
-  try{
-    const svcs=await server.getPrimaryServices();
-    for(const svc of svcs){
-      try{
-        const chars=await svc.getCharacteristics();
-        const wr=chars.find(c=>c.properties.writeWithoutResponse||c.properties.write);
-        if(wr)return wr;
-      }catch{}
-    }
-  }catch{}
-  throw new Error('No print service found on this device.');
-}
-
-async function _connectBtPrinter(){
-  const savedName=localStorage.getItem(_BT_NAME_KEY)||'';
-  let device=null;
-  // Try previously granted device — avoids showing picker
-  if(navigator.bluetooth.getDevices&&savedName){
-    try{
-      const known=await navigator.bluetooth.getDevices();
-      device=known.find(d=>d.name===savedName)||null;
-      if(device)logActivity('Reconnecting to '+savedName+'…','saving');
-    }catch{}
-  }
-  if(!device){
-    // Show Bluetooth picker
-    try{
-      device=await navigator.bluetooth.requestDevice({
-        filters:_BT_PROFILES.map(p=>({services:[p.svc]})),
-        optionalServices:_BT_ALL_SVCS
-      });
-    }catch(e1){
-      if(e1.name==='NotFoundError'||e1.name==='AbortError')throw e1;
-      try{
-        device=await navigator.bluetooth.requestDevice({
-          filters:[{services:[_BT_PROFILES[0].svc]}],
-          optionalServices:_BT_ALL_SVCS
-        });
-      }catch(e2){
-        if(e2.name==='NotFoundError'||e2.name==='AbortError')throw e2;
-        device=await navigator.bluetooth.requestDevice({
-          acceptAllDevices:true,
-          optionalServices:_BT_ALL_SVCS
-        });
-      }
-    }
-  }
-  if(!device)throw new Error('No printer selected');
-  localStorage.setItem(_BT_NAME_KEY,device.name||'');
-  _btDevice=device; // cache so we can reconnect silently next time
-  const btInfo=document.getElementById('rcp-bt-info');
-  if(btInfo&&device.name)btInfo.innerHTML=`<span style="font-size:11px;color:var(--text3)">Paired: ${device.name} · <span onclick="forgetBtPrinter()" style="color:var(--accent);cursor:pointer;text-decoration:underline">Forget</span></span>`;
-  toast('Connecting to '+device.name+'…');
-  const chr=await _acquireChar(device);
-  logActivity('Connected to '+(device.name||'printer')+' ✓','success');
-  return chr;
-}
-
-async function printViaBluetooth(text){
-  // 1. We have a cached device from this session — reconnect without picker
-  if(_btDevice&&!_btChar){
-    try{
-      _btChar=await _acquireChar(_btDevice);
-      logActivity('Reconnected to '+(localStorage.getItem(_BT_NAME_KEY)||'printer')+' ✓','saving');
-    }catch{_btDevice=null;} // device gone, fall through to picker
-  }
-  // 2. We have _btChar but GATT dropped — reconnect
-  if(_btChar){
-    try{
-      if(!_btChar.service.device.gatt.connected)await _btChar.service.device.gatt.connect();
-    }catch{_btChar=null;_btDevice=null;}
-  }
-  // 3. No connection at all — full connect (getDevices or picker)
-  if(!_btChar){
-    try{_btChar=await _connectBtPrinter();}
-    catch(e){
-      if(e.name==='NotFoundError'||e.name==='AbortError')return false;
-      logActivity('BT connect failed: '+e.message,'error');
-      toast('❌ '+e.message);
-      return false;
-    }
-  }
-  const data=_buildEscPos(text);
-  const btBtn=document.getElementById('rcp-bt-btn');
-  if(btBtn){btBtn.textContent='Printing…';btBtn.disabled=true;}
-  try{
-    // 20-byte chunks, no delay — respects BLE MTU (min 20 bytes) without pausing
-    // long enough to trigger the printer's line-flush buffer timeout.
-    const CHUNK=20;
-    for(let i=0;i<data.length;i+=CHUNK){
-      const chunk=data.slice(i,i+CHUNK);
-      try{await _btChar.writeValueWithoutResponse(chunk);}
-      catch{await _btChar.writeValue(chunk);}
-    }
-    logActivity('Receipt printed via Bluetooth ✓','success');
-    toast('Printed ✓');
-    closeReceiptModal();
-    return true;
-  }catch(e){
-    _btChar=null;
-    logActivity('BT print error: '+e.message,'error');
-    toast('Print error: '+e.message);
-    return false;
-  }finally{
-    if(btBtn){btBtn.textContent='🖨 Print to Bluetooth Printer';btBtn.disabled=false;}
-  }
-}
-
-function btPrintFromModal(){printViaBluetooth(_getReceiptText());}
-
-function forgetBtPrinter(){
-  localStorage.removeItem(_BT_NAME_KEY);
-  _btChar=null;_btDevice=null;
-  const btInfo=document.getElementById('rcp-bt-info');
-  if(btInfo)btInfo.innerHTML='<span style="font-size:11px;color:var(--text3)">Will ask you to select a printer</span>';
-  toast('Printer forgotten — next print will ask again');
-}
-
-function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-
-// Set logo images from embedded data URI
-(function(){
-  const al=document.getElementById('app-logo');if(al)al.src=CC_LOGO;
-  const sl=document.getElementById('settings-logo');if(sl)sl.src=CC_LOGO;
-})();
-// Apply persisted staff colours
-applyStaffColors();
-
-init();
-</script>
-<!-- Thermal Receipt (hidden, shown only during print) -->
-<div id="print-receipt">
-  <div class="rcp-center">
-    <img id="rcp-logo" class="rcp-logo" src="" alt="CC">
-    <div class="rcp-title">TOTAL SALES</div>
-    <div class="rcp-date" id="rcp-date"></div>
-  </div>
-  <hr class="rcp-divider">
-  <div class="rcp-row"><span>Just Eat</span><span id="rcp-je"></span></div>
-  <div class="rcp-row"><span>CC App</span><span id="rcp-cc"></span></div>
-  <div class="rcp-row"><span>Uber Eats</span><span id="rcp-ue"></span></div>
-  <div class="rcp-row"><span>Deliveroo</span><span id="rcp-dr"></span></div>
-  <hr class="rcp-divider">
-  <div class="rcp-row-bold"><span>Total Delivery</span><span id="rcp-del"></span></div>
-  <hr class="rcp-divider">
-  <div class="rcp-row"><span>Cash</span><span id="rcp-cash"></span></div>
-  <div class="rcp-row"><span>Card</span><span id="rcp-card"></span></div>
-  <hr class="rcp-divider">
-  <div class="rcp-total"><span>Total Sales</span><span id="rcp-total"></span></div>
-  <hr class="rcp-divider">
-  <div id="rcp-wages-section" style="display:none">
-    <div class="rcp-staff-hdr">Staff Wages</div>
-    <div id="rcp-wages"></div>
-    <hr class="rcp-divider">
-  </div>
-  <div style="text-align:center;font-size:10px;color:#666;margin-top:3mm">CC Chelmsford Manager</div>
-</div>
-
-<!-- Confirm Dialog -->
-<div id="confirm-overlay" style="display:none;position:fixed;inset:0;z-index:9500;align-items:center;justify-content:center;background:rgba(0,0,0,.6);padding:24px">
-  <div style="width:100%;max-width:320px;background:#252525;border-radius:16px;padding:24px;box-shadow:0 8px 32px rgba(0,0,0,.6)">
-    <div id="cfm-title" style="font-size:17px;font-weight:700;color:var(--text);margin-bottom:8px"></div>
-    <div id="cfm-body" style="font-size:13px;color:var(--text2);line-height:1.5;margin-bottom:20px"></div>
-    <div style="display:flex;gap:10px">
-      <button onclick="_confirmNo()" style="flex:1;padding:12px;background:var(--surface2);border:1px solid var(--border);color:var(--text2);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">Cancel</button>
-      <button onclick="_confirmYes()" style="flex:1;padding:12px;background:var(--red);border:none;color:#fff;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">Remove</button>
-    </div>
-  </div>
-</div>
-
-<!-- Activity Log Panel -->
-<div id="log-overlay" onclick="if(event.target===this)closeLog()">
-  <div id="log-panel">
-    <div style="display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
-      <div style="font-size:15px;font-weight:700;color:var(--text)">Activity Log</div>
-      <div onclick="closeLog()" style="cursor:pointer;font-size:20px;color:var(--text3);padding:4px 8px">×</div>
-    </div>
-    <div id="log-list"></div>
-  </div>
-</div>
-
-<!-- Sync Confirm Dialog -->
-<div id="sync-confirm-overlay">
-  <div style="width:100%;max-width:320px;background:#252525;border-radius:16px;padding:24px;box-shadow:0 8px 32px rgba(0,0,0,.6)">
-    <div style="font-size:17px;font-weight:700;color:var(--text);margin-bottom:8px">Sync All Data?</div>
-    <div style="font-size:13px;color:var(--text2);line-height:1.5;margin-bottom:20px">This will push your local changes to the cloud, then pull the latest rota, staff and sales from all users.</div>
-    <div style="display:flex;gap:10px">
-      <button onclick="closeSyncConfirm()" style="flex:1;padding:12px;background:var(--surface2);border:1px solid var(--border);color:var(--text2);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">Cancel</button>
-      <button onclick="closeSyncConfirm();syncAll()" style="flex:1;padding:12px;background:var(--accent);border:none;color:#fff;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">Sync</button>
-    </div>
-  </div>
-</div>
-
-<!-- Colour Picker Sheet -->
-<div id="color-sheet-overlay" style="display:none;position:fixed;inset:0;z-index:9000;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.55)" onclick="if(event.target===this)closeColorSheet()">
-  <div style="width:100%;max-width:480px;background:#1a1a2e;border-radius:18px 18px 0 0;padding:20px 20px 32px;box-shadow:0 -4px 24px rgba(0,0,0,.6)">
-    <div style="width:36px;height:4px;background:#333;border-radius:2px;margin:0 auto 18px"></div>
-    <div style="font-size:13px;color:var(--text2);text-align:center;margin-bottom:16px">Choose colour for <strong id="cp-title" style="color:var(--text)"></strong></div>
-    <div id="cp-swatches" style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:20px"></div>
-    <button onclick="closeColorSheet()" style="width:100%;padding:13px;background:var(--accent);border:none;color:#fff;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer">Done</button>
-  </div>
-</div>
-</body>
-</html>
+    B+_padLine('TOTAL SAL
