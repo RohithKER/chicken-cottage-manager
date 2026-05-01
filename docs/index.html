@@ -806,11 +806,6 @@ body{
           <div><strong>Restore Backup</strong><span>Load from JSON file</span></div>
           <div class="si-arr">›</div>
         </div>
-        <div class="si" onclick="clearWeek()">
-          <div class="si-icon" style="background:rgba(251,146,60,.15)">🗑</div>
-          <div><strong>Clear This Week</strong><span>Reset all shifts</span></div>
-          <div class="si-arr">›</div>
-        </div>
       </div>
       <div class="settings-group">
         <div class="sg-label">Account</div>
@@ -1034,7 +1029,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v70-staff-perms';
+const _COLOR_VER='v71-rm-clearweek';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
