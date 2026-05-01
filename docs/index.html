@@ -1064,7 +1064,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v51-print-universal';
+const _COLOR_VER='v52-print-clean';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -3010,46 +3010,26 @@ const _BT_ALL_SVCS=_BT_PROFILES.map(p=>p.svc);
 const _BT_NAME_KEY='cc_bt_printer_name';
 let _btChar=null; // cached write characteristic
 
-function _encodeText(text){
-  // Custom encoder — avoids TextEncoder (UTF-8 encodes £ as 2 bytes 0xC2+0xA3, garbling it)
-  // In PC437 (ESC/POS default): £ lives at byte 0x9C
+function _buildEscPos(text){
+  // ESC @ = init/reset printer (PC437 default, left-align, normal font)
+  // GS V A 5 = feed 5 lines and full cut
+  // Pure text-only — NO ESC alignment commands, zero risk of garbling any printer
+  const init=[0x1B,0x40];
+  const cut=[0x1D,0x56,0x41,0x05];
   const bytes=[];
   for(let i=0;i<text.length;i++){
     const c=text.charCodeAt(i);
-    if(c===0x00A3)bytes.push(0x9C);  // £ → 0x9C in PC437
-    else if(c<0x80)bytes.push(c);    // plain ASCII pass-through
-    else bytes.push(0x3F);           // unsupported char → '?'
+    if(c===0x00A3)bytes.push(0x9C);  // £ → byte 0x9C in PC437 code page
+    else if(c===0x0A)bytes.push(0x0A); // newline pass-through
+    else if(c<0x80)bytes.push(c);      // plain ASCII pass-through
+    else bytes.push(0x3F);             // unsupported → '?'
   }
-  return bytes;
-}
-
-function _buildEscPos(text){
-  // ESC @ = init / reset printer (sets PC437, left-align, normal font)
-  const ESC=0x1B, GS=0x1D;
-  const init=[ESC,0x40];
-  // Split receipt into header block (up to second ===) and body
-  // Use ESC a 1 (center) for title lines, ESC a 0 (left) for content
-  const lines=text.split('\n');
-  const allBytes=[];
-  // Push init
-  allBytes.push(...init);
-  // Find where the date/separator block ends (after 2nd === line)
-  let headerDone=false; let dblCount=0;
-  for(const line of lines){
-    const isDbl=line.startsWith('=');
-    if(isDbl)dblCount++;
-    // Lines 0-5 (title + date block): center-align using ESC a 1
-    if(dblCount<=2&&!headerDone){
-      allBytes.push(ESC,0x61,0x01); // ESC a 1 = center
-    } else {
-      allBytes.push(ESC,0x61,0x00); // ESC a 0 = left
-      headerDone=true;
-    }
-    allBytes.push(..._encodeText(line),0x0A); // line + LF
-  }
-  // GS V A 5 = feed 5 lines and cut
-  allBytes.push(GS,0x56,0x41,0x05);
-  return new Uint8Array(allBytes);
+  const encoded=new Uint8Array(bytes);
+  const out=new Uint8Array(init.length+encoded.length+cut.length);
+  out.set(init,0);
+  out.set(encoded,init.length);
+  out.set(cut,init.length+encoded.length);
+  return out;
 }
 
 async function _connectBtPrinter(){
