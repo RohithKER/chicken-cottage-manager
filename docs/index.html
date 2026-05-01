@@ -1055,7 +1055,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v92-sales-row-padding';
+const _COLOR_VER='v93-boot-fix';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -3392,4 +3392,147 @@ async function _connectBtPrinter(){
 
 async function printViaBluetooth(text){
   // 1. We have a cached device from this session — reconnect without picker
-  if(
+  if(_btDevice&&!_btChar){
+    try{
+      _btChar=await _acquireChar(_btDevice);
+      logActivity('Reconnected to '+(localStorage.getItem(_BT_NAME_KEY)||'printer')+' ✓','saving');
+    }catch{_btDevice=null;} // device gone, fall through to picker
+  }
+  // 2. We have _btChar but GATT dropped — reconnect
+  if(_btChar){
+    try{
+      if(!_btChar.service.device.gatt.connected)await _btChar.service.device.gatt.connect();
+    }catch{_btChar=null;_btDevice=null;}
+  }
+  // 3. No connection at all — full connect (getDevices or picker)
+  if(!_btChar){
+    try{_btChar=await _connectBtPrinter();}
+    catch(e){
+      if(e.name==='NotFoundError'||e.name==='AbortError')return false;
+      logActivity('BT connect failed: '+e.message,'error');
+      toast('❌ '+e.message);
+      return false;
+    }
+  }
+  const data=_buildEscPos(text);
+  const btBtn=document.getElementById('rcp-bt-btn');
+  if(btBtn){btBtn.textContent='Printing…';btBtn.disabled=true;}
+  try{
+    // 20-byte chunks, no delay — respects BLE MTU (min 20 bytes) without pausing
+    // long enough to trigger the printer's line-flush buffer timeout.
+    const CHUNK=20;
+    for(let i=0;i<data.length;i+=CHUNK){
+      const chunk=data.slice(i,i+CHUNK);
+      try{await _btChar.writeValueWithoutResponse(chunk);}
+      catch{await _btChar.writeValue(chunk);}
+    }
+    logActivity('Receipt printed via Bluetooth ✓','success');
+    toast('Printed ✓');
+    closeReceiptModal();
+    return true;
+  }catch(e){
+    _btChar=null;
+    logActivity('BT print error: '+e.message,'error');
+    toast('Print error: '+e.message);
+    return false;
+  }finally{
+    if(btBtn){btBtn.textContent='🖨 Print to Bluetooth Printer';btBtn.disabled=false;}
+  }
+}
+
+function btPrintFromModal(){printViaBluetooth(_getReceiptText());}
+
+function forgetBtPrinter(){
+  localStorage.removeItem(_BT_NAME_KEY);
+  _btChar=null;_btDevice=null;
+  const btInfo=document.getElementById('rcp-bt-info');
+  if(btInfo)btInfo.innerHTML='<span style="font-size:11px;color:var(--text3)">Will ask you to select a printer</span>';
+  toast('Printer forgotten — next print will ask again');
+}
+
+function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+// Set logo images from embedded data URI
+(function(){
+  const al=document.getElementById('app-logo');if(al)al.src=CC_LOGO;
+  const sl=document.getElementById('settings-logo');if(sl)sl.src=CC_LOGO;
+})();
+// Apply persisted staff colours
+applyStaffColors();
+
+init();
+</script>
+<!-- Thermal Receipt (hidden, shown only during print) -->
+<div id="print-receipt">
+  <div class="rcp-center">
+    <img id="rcp-logo" class="rcp-logo" src="" alt="CC">
+    <div class="rcp-title">TOTAL SALES</div>
+    <div class="rcp-date" id="rcp-date"></div>
+  </div>
+  <hr class="rcp-divider">
+  <div class="rcp-row"><span>Just Eat</span><span id="rcp-je"></span></div>
+  <div class="rcp-row"><span>CC App</span><span id="rcp-cc"></span></div>
+  <div class="rcp-row"><span>Uber Eats</span><span id="rcp-ue"></span></div>
+  <div class="rcp-row"><span>Deliveroo</span><span id="rcp-dr"></span></div>
+  <hr class="rcp-divider">
+  <div class="rcp-row-bold"><span>Total Delivery</span><span id="rcp-del"></span></div>
+  <hr class="rcp-divider">
+  <div class="rcp-row"><span>Cash</span><span id="rcp-cash"></span></div>
+  <div class="rcp-row"><span>Card</span><span id="rcp-card"></span></div>
+  <hr class="rcp-divider">
+  <div class="rcp-total"><span>Total Sales</span><span id="rcp-total"></span></div>
+  <hr class="rcp-divider">
+  <div id="rcp-wages-section" style="display:none">
+    <div class="rcp-staff-hdr">Staff Wages</div>
+    <div id="rcp-wages"></div>
+    <hr class="rcp-divider">
+  </div>
+  <div style="text-align:center;font-size:10px;color:#666;margin-top:3mm">CC Chelmsford Manager</div>
+</div>
+
+<!-- Confirm Dialog -->
+<div id="confirm-overlay" style="display:none;position:fixed;inset:0;z-index:9500;align-items:center;justify-content:center;background:rgba(0,0,0,.6);padding:24px">
+  <div style="width:100%;max-width:320px;background:#252525;border-radius:16px;padding:24px;box-shadow:0 8px 32px rgba(0,0,0,.6)">
+    <div id="cfm-title" style="font-size:17px;font-weight:700;color:var(--text);margin-bottom:8px"></div>
+    <div id="cfm-body" style="font-size:13px;color:var(--text2);line-height:1.5;margin-bottom:20px"></div>
+    <div style="display:flex;gap:10px">
+      <button onclick="_confirmNo()" style="flex:1;padding:12px;background:var(--surface2);border:1px solid var(--border);color:var(--text2);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">Cancel</button>
+      <button onclick="_confirmYes()" style="flex:1;padding:12px;background:var(--red);border:none;color:#fff;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">Remove</button>
+    </div>
+  </div>
+</div>
+
+<!-- Activity Log Panel -->
+<div id="log-overlay" onclick="if(event.target===this)closeLog()">
+  <div id="log-panel">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+      <div style="font-size:15px;font-weight:700;color:var(--text)">Activity Log</div>
+      <div onclick="closeLog()" style="cursor:pointer;font-size:20px;color:var(--text3);padding:4px 8px">×</div>
+    </div>
+    <div id="log-list"></div>
+  </div>
+</div>
+
+<!-- Sync Confirm Dialog -->
+<div id="sync-confirm-overlay">
+  <div style="width:100%;max-width:320px;background:#252525;border-radius:16px;padding:24px;box-shadow:0 8px 32px rgba(0,0,0,.6)">
+    <div style="font-size:17px;font-weight:700;color:var(--text);margin-bottom:8px">Sync All Data?</div>
+    <div style="font-size:13px;color:var(--text2);line-height:1.5;margin-bottom:20px">This will push your local changes to the cloud, then pull the latest rota, staff and sales from all users.</div>
+    <div style="display:flex;gap:10px">
+      <button onclick="closeSyncConfirm()" style="flex:1;padding:12px;background:var(--surface2);border:1px solid var(--border);color:var(--text2);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">Cancel</button>
+      <button onclick="closeSyncConfirm();syncAll()" style="flex:1;padding:12px;background:var(--accent);border:none;color:#fff;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">Sync</button>
+    </div>
+  </div>
+</div>
+
+<!-- Colour Picker Sheet -->
+<div id="color-sheet-overlay" style="display:none;position:fixed;inset:0;z-index:9000;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.55)" onclick="if(event.target===this)closeColorSheet()">
+  <div style="width:100%;max-width:480px;background:#1a1a2e;border-radius:18px 18px 0 0;padding:20px 20px 32px;box-shadow:0 -4px 24px rgba(0,0,0,.6)">
+    <div style="width:36px;height:4px;background:#333;border-radius:2px;margin:0 auto 18px"></div>
+    <div style="font-size:13px;color:var(--text2);text-align:center;margin-bottom:16px">Choose colour for <strong id="cp-title" style="color:var(--text)"></strong></div>
+    <div id="cp-swatches" style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:20px"></div>
+    <button onclick="closeColorSheet()" style="width:100%;padding:13px;background:var(--accent);border:none;color:#fff;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer">Done</button>
+  </div>
+</div>
+</body>
+</html>
