@@ -145,7 +145,8 @@ body{
 }
 .icon-btn:active{background:var(--border2)}
 #sync-btn{font-size:18px;transition:color .2s}
-#sync-btn.syncing{animation:spin-sync .7s linear infinite}
+.refresh-icon{display:inline-block}
+.refresh-icon.syncing{animation:spin-sync .7s linear infinite}
 @keyframes spin-sync{to{transform:rotate(360deg)}}
 
 /* ─── Type Tabs ──────────────────────────────────── */
@@ -725,7 +726,7 @@ body{
       <div id="week-label">This week</div>
       <button onclick="changeWeek(1)">›</button>
     </div>
-    <div class="icon-btn" id="sync-btn" onclick="refreshFromCloud()" title="Refresh data from cloud">↻</div>
+    <div class="icon-btn" id="sync-btn" onclick="refreshFromCloud()" title="Refresh data from cloud"><span class="refresh-icon">↻</span></div>
     <div class="icon-btn" onclick="toggleUserMenu()">👤</div>
   </div>
 
@@ -860,10 +861,9 @@ body{
         <div id="sales-week-label">Loading…</div>
         <button onclick="changeSalesWeek(1)">›</button>
       </div>
-      <!-- Sales save/sync row -->
-      <div style="display:flex;gap:8px;padding:8px 10px 10px">
-        <button class="save-cloud-btn" id="save-sales-btn" onclick="saveSalesWeekToCloud()" style="flex:1">☁ Save Sales</button>
-        <button class="save-cloud-btn" id="sync-sales-btn" onclick="syncSalesOnly()" style="flex:1">↻ Sync Sales</button>
+      <!-- Sales save row -->
+      <div style="padding:8px 10px 10px">
+        <button class="save-cloud-btn" id="save-sales-btn" onclick="saveSalesWeekToCloud()" style="width:100%">☁ Save Sales</button>
       </div>
 
       <!-- Weekly Table -->
@@ -1495,7 +1495,9 @@ async function syncAll(){
 /* ─── Refresh from cloud (pull-only, no confirmation) ── */
 async function refreshFromCloud(){
   const btn=document.getElementById('sync-btn');
-  if(btn){btn.classList.add('syncing');btn.style.color='';btn.title='Refreshing…';}
+  const icon=btn?btn.querySelector('.refresh-icon'):null;
+  if(btn){btn.style.color='';btn.title='Refreshing…';}
+  if(icon){icon.classList.add('syncing');}
   logActivity('Refreshing from cloud…','saving');
   const _tout=ms=>new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),ms));
   let ok=false;
@@ -1519,10 +1521,10 @@ async function refreshFromCloud(){
     logActivity('Refresh failed: '+msg,'error');
     toast(e.message==='timeout'?'⚠ Refresh timed out':'Refresh failed');
   }finally{
+    if(icon){icon.classList.remove('syncing');}
     if(btn){
-      btn.classList.remove('syncing');
-      if(ok){btn.textContent='✓';btn.style.color='#4CC4A0';}
-      setTimeout(()=>{if(btn){btn.textContent='↻';_updateSaveIndicator();}},1800);
+      if(ok){if(icon)icon.textContent='✓';btn.style.color='#4CC4A0';}
+      setTimeout(()=>{if(btn&&icon){icon.textContent='↻';_updateSaveIndicator();}},1800);
       btn.title='Refresh data from cloud';
     }
     if(ok)toast('Data refreshed ✓');
