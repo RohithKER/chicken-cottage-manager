@@ -3066,7 +3066,7 @@ function _renderBdItems(f){
     const row=document.createElement('div');
     row.className='breakdown-item';
     const inp=document.createElement('input');
-    inp.type='number';inp.inputMode='decimal';inp.step='0.01';inp.min='0';
+    inp.type='text';inp.inputMode='decimal';
     inp.value=v||'';inp.placeholder='0.00';
     inp.oninput=()=>{_bdItems[f][i]=parseFloat(inp.value)||0;_syncBdTotal(f);};
     inp.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();_addBdItem(f);}};
@@ -3079,7 +3079,7 @@ function _renderBdItems(f){
   const row=document.createElement('div');
   row.className='breakdown-item';
   const inp=document.createElement('input');
-  inp.type='number';inp.inputMode='decimal';inp.step='0.01';inp.min='0';inp.placeholder='Add amount…';
+  inp.type='text';inp.inputMode='decimal';inp.placeholder='Add amount…';
   inp.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();_addBdItemFromInput(f,inp);}};
   const addBtn=document.createElement('button');
   addBtn.className='breakdown-add';addBtn.textContent='+';addBtn.type='button';
