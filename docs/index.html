@@ -1064,7 +1064,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v62-heading-framed';
+const _COLOR_VER='v63-bt-preconnect';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -2983,6 +2983,17 @@ function printDaySales(){
   const shareBtn=document.getElementById('rcp-share-btn');
   if(shareBtn) shareBtn.style.display=navigator.share?'':'none';
   document.getElementById('receipt-overlay').style.display='flex';
+  // Pre-connect silently while user reads the preview — so "Print" taps instantly with no picker
+  if(navigator.bluetooth&&navigator.bluetooth.getDevices&&!_btChar){
+    const _pn=localStorage.getItem(_BT_NAME_KEY);
+    if(_pn)(async()=>{
+      try{
+        const _kn=await navigator.bluetooth.getDevices();
+        const _dv=_kn.find(d=>d.name===_pn);
+        if(_dv){_btDevice=_dv;_btChar=await _acquireChar(_dv);}
+      }catch{}
+    })();
+  }
 }
 
 function closeReceiptModal(){
