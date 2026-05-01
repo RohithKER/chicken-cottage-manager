@@ -473,7 +473,7 @@ body{
 .early-btn.off{background:var(--surface2);color:var(--text3)}
 .early-btn.on{background:rgba(255,170,0,.2);color:#ffb347;border:1px solid rgba(255,170,0,.35)}
 /* Time tag on rota pills */
-.early-tag{display:inline-block;font-size:9px;font-weight:700;background:rgba(255,170,0,.15);color:#ffb347;border:1px solid rgba(255,170,0,.3);border-radius:8px;padding:1px 5px;margin-left:3px;vertical-align:middle;letter-spacing:.2px;white-space:nowrap}
+.early-tag{display:inline-block;font-size:9px;font-weight:700;background:rgba(255,140,0,.25);color:#ffc060;border-radius:6px;padding:1px 4px;margin-left:4px;vertical-align:middle;letter-spacing:.2px;white-space:nowrap;line-height:1.4}
 
 /* ─── User Menu ──────────────────────────────────── */
 #user-menu{
@@ -1913,7 +1913,7 @@ function renderCards(){
       const earlySet=EARLY_DAYS[day]?getEarlySet(state.weekOffset,day):null;
       const pills=staff.length?staff.map(n=>{
         const tag=earlySet&&earlySet.has(n)?`<span class="early-tag">${EARLY_DAYS[day]}</span>`:'';
-        return pill(n,state.type)+tag;
+        return `<span class="pill" style="${pillStyle(n,state.type)}">${n}${tag}</span>`;
       }).join(''):`<span class="empty-label">Tap to assign</span>`;
       html+=`<div class="shift-row${col==='OFF'?' off-row':''}" onclick="openModal('${day}','${col}')">
         <span class="shift-label">${col}</span>
@@ -1944,7 +1944,7 @@ function renderTable(){
       const pills=staff.length
         ?staff.map(n=>{
             const tag=earlySet&&earlySet.has(n)?`<span class="early-tag">${EARLY_DAYS[day]}</span>`:'';
-            return`<span class="pill" style="${pillStyle(n,state.type)}">${n}</span>${tag}`;
+            return`<span class="pill" style="${pillStyle(n,state.type)}">${n}${tag}</span>`;
           }).join('')
         :`<span class="td-empty">—</span>`;
       html+=`<td class="shift-cell${col==='OFF'?' off-cell':''}" onclick="openModal('${day}','${col}')">
