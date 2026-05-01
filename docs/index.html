@@ -3352,8 +3352,15 @@ function handleSalesOverlay(e){
 function getSdVal(id){return parseFloat(document.getElementById(id).value)||0;}
 
 function clearDayEntry(){
+  if(!confirm('Clear all sales for this day?'))return;
   ['sd-je','sd-cc','sd-ue','sd-dr','sd-cash','sd-card'].forEach(id=>{
     document.getElementById(id).value='';
+  });
+  _bdItems={ue:[],dr:[]};
+  ['ue','dr'].forEach(f=>{
+    const panel=document.getElementById(f+'-panel');
+    if(panel)panel.style.display='none';
+    _updateToggleBtn(f);
   });
   calcDaySales();
 }
