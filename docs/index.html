@@ -72,7 +72,7 @@ body{
   width:100%;padding:11px 14px;
   background:var(--bg2);border:1px solid var(--border2);
   border-radius:var(--rs);color:var(--text);
-  font-size:15px;outline:none;
+  font-size:16px;outline:none;
   transition:border-color .15s;
   -webkit-appearance:none;
 }
@@ -358,7 +358,7 @@ body{
 .col-row{display:flex;align-items:center;gap:8px;margin-bottom:8px}
 .col-input{
   flex:1;background:var(--bg2);border:1px solid var(--border2);
-  border-radius:var(--rs);color:var(--text);font-size:14px;
+  border-radius:var(--rs);color:var(--text);font-size:16px;
   padding:9px 12px;outline:none;-webkit-appearance:none;
 }
 .col-input:focus{border-color:var(--accent)}
@@ -571,7 +571,7 @@ body{
 .ss-row{display:flex;align-items:center;padding:9px 13px;gap:10px;border-bottom:1px solid rgba(255,255,255,.04)}
 .ss-row:last-child{border-bottom:none}
 .ss-row label{font-size:13px;color:var(--text2);flex:1}
-.ss-row input[type=number]{width:88px;background:var(--surface);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-size:15px;font-weight:600;padding:6px 9px;text-align:right;outline:none;-moz-appearance:textfield}
+.ss-row input[type=number]{width:88px;background:var(--surface);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-size:16px;font-weight:600;padding:6px 9px;text-align:right;outline:none;-moz-appearance:textfield}
 .ss-row input[type=number]::-webkit-inner-spin-button{display:none}
 .ss-row input[type=number]:focus{border-color:var(--accent)}
 .ss-total-row{display:flex;align-items:center;padding:10px 13px;gap:10px;background:rgba(107,140,186,.08)}
@@ -914,7 +914,7 @@ body{
     <!-- Per-day notes — printed at bottom of receipt -->
     <div style="flex-shrink:0">
       <div style="font-size:12px;font-weight:600;color:var(--text3);margin-bottom:5px">📝 Notes <span style="font-weight:400">(saved per day · prints at bottom)</span></div>
-      <textarea id="rcp-notes" oninput="saveReceiptNote()" placeholder="Add a note for this day…" rows="3" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;padding:9px 10px;resize:none;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',sans-serif;outline:none;line-height:1.45"></textarea>
+      <textarea id="rcp-notes" oninput="saveReceiptNote()" placeholder="Add a note for this day…" rows="3" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:16px;padding:9px 10px;resize:none;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',sans-serif;outline:none;line-height:1.45"></textarea>
     </div>
     <!-- BT Print button — shown on Android Chrome only -->
     <button onclick="btPrintFromModal()" id="rcp-bt-btn" style="display:none;width:100%;padding:14px;border-radius:10px;border:none;background:var(--accent);color:#fff;font-size:15px;font-weight:700;cursor:pointer;letter-spacing:-0.2px">🖨 Print to Bluetooth Printer</button>
@@ -1028,7 +1028,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v75-audit-fixes';
+const _COLOR_VER='v76-no-zoom';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
