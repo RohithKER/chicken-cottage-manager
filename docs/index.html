@@ -2639,16 +2639,46 @@ function roundRect(ctx,x,y,w,h,r){
 }
 
 /* ─── Settings ───────────────────────────────────────── */
-function exportBackup(){
-  const sales=_loadSalesCache();
-  const data={state,cols:COLS,sales,exportedAt:new Date().toISOString()};
-  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);
-  a.download=`cc-backup-${new Date().toISOString().slice(0,10)}.json`;
-  a.click();
-  const salesDays=Object.keys(sales).length;
-  toast(`Backup exported (${salesDays} sales day${salesDays!==1?'s':''})`);
+async function exportBackup(){
+  if(!user){toast('Sign in to export backup');return;}
+  toast('Preparing full backup…');
+  try{
+    // Fetch everything from Supabase in parallel
+    const[salesRes,schedRes,staffRes,earlyRes]=await Promise.all([
+      db.from('daily_sales').select('*').order('sale_date'),
+      db.from('schedules').select('*'),
+      db.from('staff').select('*'),
+      db.from('shift_early').select('*'),
+    ]);
+    // Build sales object keyed by date; merge local pending data too
+    const localSales=_loadSalesCache();
+    const salesFromDB={};
+    (salesRes.data||[]).forEach(r=>{salesFromDB[r.sale_date]=r;});
+    const sales={...localSales,...salesFromDB};
+    // Update local cache with freshly fetched data
+    _saveSalesCache(sales);
+    const data={
+      version:2,
+      state,cols:COLS,
+      sales,
+      schedules:schedRes.data||[],
+      staff:staffRes.data||[],
+      earlyShifts:earlyRes.data||[],
+      exportedAt:new Date().toISOString(),
+    };
+    const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download=`cc-backup-${new Date().toISOString().slice(0,10)}.json`;
+    a.click();
+    const salesDays=Object.keys(sales).length;
+    const rotaWeeks=[...new Set((schedRes.data||[]).map(r=>r.week_key))].length;
+    const staffCount=(staffRes.data||[]).length;
+    toast(`Full backup exported (${salesDays} sales days, ${rotaWeeks} rota weeks, ${staffCount} staff)`);
+  }catch(e){
+    logActivity('Export failed: '+e.message,'error');
+    toast('Export failed — check connection');
+  }
 }
 function importBackup(){if(!requirePerm('can_edit_settings','edit settings'))return;document.getElementById('import-file').click();}
 function handleImport(e){
@@ -2663,17 +2693,46 @@ function handleImport(e){
         localStorage.setItem('cc_cols_inside',JSON.stringify(COLS.inside));
         localStorage.setItem('cc_cols_delivery',JSON.stringify(COLS.delivery));
       }
+      // Restore sales to local cache
       if(p.sales&&typeof p.sales==='object'){
-        // Merge restored sales into existing cache (restored data wins)
         const existing=_loadSalesCache();
         _saveSalesCache({...existing,...p.sales});
         salesWeekData={};
-        _salesLoadedOffset=null; // force reload next time sales tab is viewed
+        _salesLoadedOffset=null;
+      }
+      // Push everything back to Supabase if online
+      if(user){
+        const pushOps=[];
+        // Staff
+        if(p.staff&&p.staff.length){
+          pushOps.push(db.from('staff').upsert(p.staff,{onConflict:'name'}));
+        }
+        // Schedules
+        if(p.schedules&&p.schedules.length){
+          // Chunk into 200-row batches to avoid payload limits
+          for(let i=0;i<p.schedules.length;i+=200){
+            pushOps.push(db.from('schedules').upsert(p.schedules.slice(i,i+200),{onConflict:'schedule_type,week_key,day,shift_col'}));
+          }
+        }
+        // Early shifts
+        if(p.earlyShifts&&p.earlyShifts.length){
+          pushOps.push(db.from('shift_early').upsert(p.earlyShifts,{onConflict:'week_key,day'}));
+        }
+        // Sales
+        if(p.sales&&typeof p.sales==='object'){
+          const salesRows=Object.values(p.sales).filter(r=>r&&r.sale_date);
+          for(let i=0;i<salesRows.length;i+=100){
+            pushOps.push(db.from('daily_sales').upsert(salesRows.slice(i,i+100),{onConflict:'sale_date',ignoreDuplicates:false}));
+          }
+        }
+        await Promise.all(pushOps);
       }
       renderRota();renderStaff();
       const salesDays=p.sales?Object.keys(p.sales).length:0;
-      toast(`Restored ✓ (${salesDays} sales day${salesDays!==1?'s':''})`);
-    }catch{toast('Invalid file');}
+      const rotaWeeks=p.schedules?[...new Set(p.schedules.map(r=>r.week_key))].length:0;
+      const staffCount=p.staff?p.staff.length:0;
+      toast(`Restored ✓ (${salesDays} sales days, ${rotaWeeks} rota weeks, ${staffCount} staff)`);
+    }catch(err){logActivity('Import failed: '+err.message,'error');toast('Restore failed: '+err.message);}
   };
   r.readAsText(f);e.target.value='';
 }
