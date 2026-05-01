@@ -1083,7 +1083,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v66-perms-admin';
+const _COLOR_VER='v66-perms-admin2';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -1234,8 +1234,9 @@ async function loadPermissions(userId,email){
 }
 
 // Show a toast and return false if user lacks a permission
+// Admins bypass all checks — is_admin grants full access to everything
 function requirePerm(perm,label){
-  if(_perms[perm])return true;
+  if(_perms.is_admin||_perms[perm])return true;
   toast('⛔ No permission to '+label);
   return false;
 }
