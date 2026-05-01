@@ -1089,7 +1089,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v66-perms-admin3';
+const _COLOR_VER='v66-perms-admin4';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -1272,14 +1272,43 @@ async function openPermsPanel(){
   const list=document.getElementById('perms-list');
   list.innerHTML='<div style="color:var(--text3);font-size:13px;text-align:center;padding:20px">Loading users…</div>';
   try{
-    const{data,error}=await db.from('user_permissions').select('*').order('email');
-    if(error)throw error;
-    if(!data||!data.length){
+    // Pull ALL users from user_profiles (source of truth for who exists)
+    // and ALL permission rows, then merge
+    const[profilesRes,permsRes]=await Promise.all([
+      db.from('user_profiles').select('id,email,role').order('email'),
+      db.from('user_permissions').select('*')
+    ]);
+    if(profilesRes.error)throw profilesRes.error;
+    const profiles=profilesRes.data||[];
+    const permsMap={};
+    (permsRes.data||[]).forEach(p=>permsMap[p.user_id]=p);
+
+    if(!profiles.length){
       list.innerHTML='<div style="color:var(--text3);font-size:13px;text-align:center;padding:20px">No users found</div>';
       return;
     }
+
+    // Ensure every user has a user_permissions row (upsert missing ones)
+    const missing=profiles.filter(p=>!permsMap[p.id]);
+    if(missing.length){
+      const toInsert=missing.map(p=>({
+        user_id:p.id,
+        email:p.email,
+        is_admin:p.role==='admin',
+        can_edit_rota:p.role==='admin',
+        can_edit_delivery:p.role==='admin',
+        can_edit_staffs:p.role==='admin',
+        can_edit_sales:p.role==='admin'||p.role==='manager'
+      }));
+      const{data:inserted}=await db.from('user_permissions').upsert(toInsert,{onConflict:'user_id'}).select();
+      (inserted||[]).forEach(p=>permsMap[p.user_id]=p);
+    }
+
     list.innerHTML='';
-    data.forEach(u=>list.appendChild(_buildUserPermRow(u)));
+    profiles.forEach(p=>{
+      const perms=permsMap[p.id]||{user_id:p.id,email:p.email};
+      list.appendChild(_buildUserPermRow(perms));
+    });
   }catch(e){
     list.innerHTML='<div style="color:var(--red);font-size:13px;text-align:center;padding:20px">Error loading users</div>';
     console.error('openPermsPanel:',e);
