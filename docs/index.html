@@ -2365,7 +2365,7 @@ async function shareRota(){
     let cx=0,rows=1;
     names.forEach((n,i)=>{
       const dn=n.length>9?n.slice(0,8)+'…':n;
-      const extraW=(earlySet&&earlySet.has(n)&&EARLY_DAYS[day])?26:0;
+      const extraW=(earlySet&&earlySet.has(n)&&EARLY_DAYS[day])?30:0;
       const pw=Math.min(dn.length*8+18+extraW,maxW);
       if(i>0&&cx+pw>maxW){cx=0;rows++;}
       cx+=pw+PW_GAP;
@@ -2539,8 +2539,10 @@ async function shareRota(){
           ctx.font=`600 13px -apple-system,sans-serif`;
           const displayName=name.length>9?name.slice(0,8)+'…':name;
           const tw=ctx.measureText(displayName).width;
-          let tagW=0;
-          if(earlyTime){ctx.font=`bold 10px -apple-system,sans-serif`;tagW=ctx.measureText(earlyTime).width+6;ctx.font=`600 13px -apple-system,sans-serif`;}
+          // Measure early badge size to widen pill
+          const TAG_H=13, TAG_PAD=4;
+          let tagW=0, etw=0;
+          if(earlyTime){ctx.font=`bold 9px -apple-system,sans-serif`;etw=ctx.measureText(earlyTime).width;tagW=etw+TAG_PAD*2+5;ctx.font=`600 13px -apple-system,sans-serif`;}
           const pw=Math.min(tw+16+tagW,maxPW);
           if(si>0 && curX+pw>cellX+COL_W-CELL_PAD_X){
             curX=cellX+CELL_PAD_X;
@@ -2556,9 +2558,16 @@ async function shareRota(){
           ctx.textAlign='left'; ctx.textBaseline='alphabetic';
           ctx.fillText(displayName,curX+8,curY+15);
           if(earlyTime){
-            ctx.font=`bold 10px -apple-system,sans-serif`;
-            ctx.fillStyle='#fb923c';
-            ctx.fillText(earlyTime,curX+8+tw+4,curY+15);
+            // Draw badge matching HTML .early-tag style
+            const badgeX=curX+8+tw+5;
+            const badgeY=curY+(PILL_H-TAG_H)/2;
+            ctx.fillStyle='rgba(255,140,0,0.28)';
+            roundRect(ctx,badgeX,badgeY,etw+TAG_PAD*2,TAG_H,4);
+            ctx.fill();
+            ctx.fillStyle='#ffc060';
+            ctx.font=`bold 9px -apple-system,sans-serif`;
+            ctx.textBaseline='middle';
+            ctx.fillText(earlyTime,badgeX+TAG_PAD,badgeY+TAG_H/2);
           }
           curX+=pw+PILL_GAP_X;
         });
