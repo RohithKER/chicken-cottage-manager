@@ -545,12 +545,12 @@ body{
 .stbl thead th{
   background:var(--surface2);color:var(--text2);
   font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;
-  padding:9px 8px;text-align:right;border:1px solid var(--border);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  padding:7px 6px;text-align:right;border:1px solid var(--border);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
 }
 .stbl thead th:first-child{text-align:left}
 .stbl tbody tr{cursor:pointer;transition:background .1s}
 .stbl tbody tr:active{background:rgba(255,255,255,.04)}
-.stbl td{padding:13px 9px;border:1px solid var(--border);vertical-align:middle;overflow:hidden}
+.stbl td{padding:7px 6px;border:1px solid var(--border);vertical-align:middle;overflow:hidden}
 .stbl-day{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .stbl-val{text-align:right;color:var(--text3);font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .stbl-total{text-align:right;font-weight:700;font-size:13px;color:var(--text2);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -561,7 +561,7 @@ body{
   background:var(--surface2);font-weight:700;font-size:13px;
   border-top:2px solid var(--border2);
 }
-.stbl tr.stbl-grand .stbl-total{color:var(--green);font-size:16px}
+.stbl tr.stbl-grand .stbl-total{color:var(--green);font-size:14px}
 .stbl-tap-hint{text-align:center;color:var(--text3);font-size:12px;margin-top:16px;padding-bottom:4px;opacity:0.7}
 
 /* Day Entry Sheet */
@@ -1055,7 +1055,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v81-sales-table-fit';
+const _COLOR_VER='v82-sales-table-compact';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -2961,8 +2961,8 @@ function renderSalesTable(dates){
 
   let gCard=0,gCash=0,gDel=0,gTotal=0;
 
-  let html=`<table class="stbl"><thead><tr>
-    <th>Day</th><th>Card</th><th>Cash</th><th>Delivery</th><th>Total</th>
+  let html=`<table class="stbl"><colgroup><col style="width:14%"><col style="width:19%"><col style="width:19%"><col style="width:22%"><col style="width:26%"></colgroup><thead><tr>
+    <th>Day</th><th>Card</th><th>Cash</th><th>Deliv</th><th>Total</th>
   </tr></thead><tbody>`;
 
   dates.forEach((d,i)=>{
