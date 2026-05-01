@@ -744,7 +744,7 @@ body{
       <div class="staff-list" id="sl-inside"></div>
       <div class="section-label">Delivery Staff</div>
       <div class="staff-list" id="sl-delivery"></div>
-      <div class="add-form">
+      <div class="add-form" id="staff-add-panel">
         <label>Add Staff Member</label>
         <input class="input" id="ns-name" placeholder="Full name" style="margin-bottom:8px">
         <select class="input" id="ns-type">
@@ -1034,7 +1034,7 @@ const DEFAULT_STAFF_HEX={
   'Shami':'#B07AE0','Asim':'#E07070'
 };
 // Version bump resets cached colours to notion palette
-const _COLOR_VER='v69-approval';
+const _COLOR_VER='v70-staff-perms';
 if(localStorage.getItem('cc_color_ver')!==_COLOR_VER){
   localStorage.removeItem('cc_staff_colors');
   localStorage.setItem('cc_color_ver',_COLOR_VER);
@@ -1086,6 +1086,7 @@ function applyStaffColors(){
 }
 let _cpTarget=null,_cpType=null;
 function pickStaffColor(name,type=null){
+  if(!requirePerm('can_edit_staffs','manage staff'))return;
   _cpTarget=name;_cpType=type;
   document.getElementById('cp-title').textContent=type?`${name} (${type})`:name;
   const cur=getStaffHex(name,type);
@@ -1786,16 +1787,20 @@ function renderTable(){
 }
 
 function renderStaff(){
+  const canEdit=_perms.is_admin||_perms.can_edit_staffs;
+  // Show/hide the Add Member panel based on permission
+  const addPanel=document.getElementById('staff-add-panel');
+  if(addPanel)addPanel.style.display=canEdit?'':'none';
   ['inside','delivery'].forEach(t=>{
     const el=document.getElementById(`sl-${t}`);
     if(!state.staff[t]||!state.staff[t].length){
       el.innerHTML='<div style="color:var(--text3);font-size:13px;padding:8px 0">No staff yet</div>';return;
     }
     el.innerHTML=state.staff[t].map(n=>`<div class="staff-item">
-      <div class="staff-color-dot" onclick="pickStaffColor('${n}','${t}')" style="width:28px;height:28px;border-radius:50%;background:${getStaffHex(n,t)};flex-shrink:0;cursor:pointer;border:2px solid rgba(255,255,255,.2)"></div>
-      <span class="pill" style="${pillStyle(n,t)};cursor:pointer;user-select:none" onclick="renameStaff('${t}','${n}')" title="Tap to rename">${n}</span>
+      <div class="staff-color-dot" ${canEdit?`onclick="pickStaffColor('${n}','${t}')" style="width:28px;height:28px;border-radius:50%;background:${getStaffHex(n,t)};flex-shrink:0;cursor:pointer;border:2px solid rgba(255,255,255,.2)"`:`style="width:28px;height:28px;border-radius:50%;background:${getStaffHex(n,t)};flex-shrink:0;border:2px solid rgba(255,255,255,.2)"`}></div>
+      <span class="pill" style="${pillStyle(n,t)}${canEdit?';cursor:pointer;user-select:none':''}" ${canEdit?`onclick="renameStaff('${t}','${n}')" title="Tap to rename"`:''}>${n}</span>
       <div style="flex:1"></div>
-      <button class="btn-del" onclick="removeStaff('${t}','${n}')">×</button>
+      ${canEdit?`<button class="btn-del" onclick="removeStaff('${t}','${n}')">×</button>`:''}
     </div>`).join('');
   });
 }
@@ -1911,6 +1916,7 @@ function handleOverlay(e){if(e.target===document.getElementById('overlay'))close
 
 /* ─── Staff CRUD ─────────────────────────────────────── */
 async function addStaff(){
+  if(!requirePerm('can_edit_staffs','manage staff'))return;
   const name=document.getElementById('ns-name').value.trim();
   const type=document.getElementById('ns-type').value;
   if(!name){toast('Enter a name');return;}
@@ -1945,6 +1951,7 @@ async function addStaff(){
 }
 
 function removeStaff(type,name){
+  if(!requirePerm('can_edit_staffs','manage staff'))return;
   showConfirm(
     `Remove ${name}?`,
     `This will delete ${name} from the staff list and all rota shifts permanently.`,
@@ -1996,6 +2003,7 @@ async function purgeStaffFromCloud(name){
 }
 
 function renameStaff(type,oldName){
+  if(!requirePerm('can_edit_staffs','manage staff'))return;
   const newName=(prompt(`Rename "${oldName}":`,oldName)||'').trim();
   if(!newName||newName===oldName)return;
   // Update staff list in both types (person might be in both)
