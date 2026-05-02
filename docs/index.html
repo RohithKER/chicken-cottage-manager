@@ -886,7 +886,7 @@ body{
         <div class="sg-label">App</div>
         <div class="si">
           <div class="si-icon" style="background:rgba(255,255,255,.08);overflow:hidden;padding:0"><img src="" id="settings-logo" alt="CC" style="width:34px;height:34px;object-fit:cover;border-radius:7px"></div>
-          <div><strong>CC Chelmsford Manager</strong><span>Version 129 • Cloud sync</span></div>
+          <div><strong>CC Chelmsford Manager</strong><span>Version 130 • Cloud sync</span></div>
         </div>
       </div>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)">
@@ -3834,68 +3834,46 @@ applyStaffColors();
 
 init();
 
-/* ─── PWA Foreground Reconnect v129 ───────────────────────
-   Root cause: iOS homescreen PWA does NOT reliably fire
-   visibilitychange, pageshow, or focus events when returning
-   from background. JS is simply frozen and resumed with no event.
+/* ─── PWA Foreground Reconnect v130 ───────────────────────
+   Root cause: after iOS/Android suspends a homescreen PWA,
+   HTTP fetch() calls hang indefinitely — the TCP stack is
+   broken. You can't probe or heal it from within.
 
-   Fix: heartbeat interval. While the app is running, a timer
-   ticks every 1 second and records the timestamp. When iOS
-   freezes JS, the timer stops. When JS resumes, the next tick
-   sees a gap (e.g. 10s instead of 1s) — that gap IS the signal
-   that the app just came back from suspension. We then probe
-   the connection and reload if broken. No events needed.
+   Fix — mirrors what a normal webapp does in Safari:
+   Safari automatically reloads the page on resumption.
+   We do the same: detect the JS freeze via a heartbeat gap,
+   then call window.location.reload(). The service worker
+   (sw.js) serves the cached page instantly with no network
+   needed. The fresh Supabase client makes brand-new TCP
+   connections that work perfectly.
+
+   Service worker registration is below the closing </script>
+   so it runs after the app is fully initialised.
 ──────────────────────────────────────────────────────────── */
+
+// Heartbeat: ticks every 1 s while JS is running.
+// When iOS freezes the app, ticks stop. On resume the next
+// tick sees a gap larger than normal jitter → reload.
 let _hbLast = Date.now();
-let _hbBusy  = false;
-
-async function _pwaForeground(){
-  if(_hbBusy || !user) return;
-  _hbBusy = true;
-  try{
-    // Probe REST — 3 s timeout
-    const probe = await Promise.race([
-      db.from('staff').select('count').limit(1),
-      new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),3000))
-    ]);
-    if(probe.error) throw probe.error;
-    // Connection alive — quietly refresh data
-    const {data:staffData} = await db.from('staff').select('*');
-    if(staffData && staffData.length > 0){
-      state.staff.inside   = staffData.filter(s=>s.type==='inside'  ||s.type==='both').map(s=>s.name);
-      state.staff.delivery = staffData.filter(s=>s.type==='delivery'||s.type==='both').map(s=>s.name);
-    }
-    await loadSchedules();
-    await loadEarlyShift();
-    _salesLoadedOffset = null;
-    await loadSalesWeek();
-    renderRota(); renderStaff(); applyStaffColors();
-  }catch(_){
-    // Connection broken — reload exactly like force-closing from recents
-    window.location.reload();
-  }finally{
-    _hbBusy = false;
-  }
-}
-
-// Heartbeat: runs every 1 s. When iOS freezes JS and then thaws it,
-// the next tick sees a large gap — that's our "returned from background" signal.
 setInterval(()=>{
-  const now  = Date.now();
-  const gap  = now - _hbLast;
-  _hbLast    = now;
-  // Gap > 2 s means JS was suspended (1 s interval can't drift that much normally)
-  if(gap > 2000) _pwaForeground();
+  const now = Date.now();
+  const gap = now - _hbLast;
+  _hbLast   = now;
+  // gap > 1500 ms means JS was suspended (normal jitter < 100 ms)
+  // Only reload when user is signed in (no point reloading auth screen)
+  if(gap > 1500 && user) window.location.reload();
 }, 1000);
 
-// Keep these as backup for Android / browsers that do fire events
-document.addEventListener('visibilitychange', ()=>{
-  if(document.visibilityState === 'visible') _pwaForeground();
-});
+// iOS bfcache restore — always reload for a clean state
 window.addEventListener('pageshow', e=>{
-  if(e.persisted) _pwaForeground();
+  if(e.persisted && user) window.location.reload();
 });
-window.addEventListener('focus', ()=>{ _pwaForeground(); });
+</script>
+<!-- Service Worker: caches index.html so reload() is instant from cache -->
+<script>
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('./sw.js').catch(()=>{});
+}
 </script>
 <!-- Thermal Receipt (hidden, shown only during print) -->
 <div id="print-receipt">
