@@ -964,8 +964,7 @@ body{
       </div>
       <!-- Notes section -->
       <div class="ss-section">
-        <div class="ss-section-hdr">Notes</div>
-        <textarea id="sd-notes" oninput="saveReceiptNote()" placeholder="Add a note for this day…" rows="2" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:15px;padding:9px 10px;resize:none;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',sans-serif;outline:none;line-height:1.45;box-sizing:border-box"></textarea>
+        <div class="ss-row"><label>Notes</label><input type="text" id="sd-notes" inputmode="decimal" autocorrect="off" autocapitalize="sentences" placeholder="Add a note for this day…" oninput="saveReceiptNote()"></div>
       </div>
     </div>
     <div class="ss-foot" style="flex-direction:column;gap:8px">
@@ -3426,6 +3425,7 @@ function changeSalesWeek(dir){
 
 // ── Order Breakdown (Uber Eats / Deliveroo) ──────────────────────────────────
 let _bdItems={ue:[],dr:[]};
+let _bdFocusNew=false; // flag: focus newly added item row instead of "Add amount"
 function _updateToggleBtn(f){
   const btn=document.getElementById(f+'-toggle');
   const panel=document.getElementById(f+'-panel');
@@ -3456,6 +3456,7 @@ function _renderBdItems(f){
   if(!wrap)return;
   const items=_bdItems[f];
   wrap.innerHTML='';
+  let lastItemInp=null;
   items.forEach((v,i)=>{
     const row=document.createElement('div');
     row.className='breakdown-item';
@@ -3469,19 +3470,22 @@ function _renderBdItems(f){
     rm.onclick=()=>{_bdItems[f].splice(i,1);_renderBdItems(f);_syncBdTotal(f);};
     row.appendChild(inp);row.appendChild(rm);
     wrap.appendChild(row);
+    lastItemInp=inp;
   });
   const row=document.createElement('div');
   row.className='breakdown-item';
-  const inp=document.createElement('input');
-  inp.type='text';inp.inputMode='decimal';inp.placeholder='Add amount…';
-  inp.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();_addBdItemFromInput(f,inp);}};
+  const addInp=document.createElement('input');
+  addInp.type='text';addInp.inputMode='decimal';addInp.placeholder='Add amount…';
+  addInp.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();_addBdItemFromInput(f,addInp);}};
   const addBtn=document.createElement('button');
   addBtn.className='breakdown-add';addBtn.textContent='+';addBtn.type='button';
-  addBtn.onclick=()=>_addBdItemFromInput(f,inp);
-  row.appendChild(inp);row.appendChild(addBtn);wrap.appendChild(row);
-  inp.focus();
+  addBtn.onclick=()=>_addBdItemFromInput(f,addInp);
+  row.appendChild(addInp);row.appendChild(addBtn);wrap.appendChild(row);
+  // Focus the newly added item row if one was just added; otherwise focus "Add amount"
+  if(_bdFocusNew&&lastItemInp){lastItemInp.focus();lastItemInp.select();_bdFocusNew=false;}
+  else{addInp.focus();}
 }
-function _addBdItem(f){_bdItems[f].push(0);_renderBdItems(f);_syncBdTotal(f);}
+function _addBdItem(f){_bdFocusNew=true;_bdItems[f].push(0);_renderBdItems(f);_syncBdTotal(f);}
 function _addBdItemFromInput(f,inp){
   const v=parseFloat(inp.value)||0;
   if(v){_bdItems[f].push(v);_syncBdTotal(f);_renderBdItems(f);}
