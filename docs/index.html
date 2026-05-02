@@ -897,7 +897,7 @@ body{
         <div class="sg-label">App</div>
         <div class="si">
           <div class="si-icon" style="background:rgba(255,255,255,.08);overflow:hidden;padding:0"><img src="" id="settings-logo" alt="CC" style="width:34px;height:34px;object-fit:cover;border-radius:7px"></div>
-          <div><strong>CC Chelmsford Manager</strong><span>Version 172 • Cloud sync</span></div>
+          <div><strong>CC Chelmsford Manager</strong><span>Version 173 • Cloud sync</span></div>
         </div>
       </div>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)">
@@ -916,7 +916,6 @@ body{
         <div id="pin-dots" style="display:flex;gap:14px;margin-bottom:8px"></div>
         <div id="pin-error" style="color:var(--red);font-size:13px;font-weight:600;min-height:20px;margin-bottom:20px;text-align:center;transition:opacity .2s"></div>
         <div id="pin-pad" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:100%;max-width:270px"></div>
-        <button onclick="cancelPinOverlay()" style="margin-top:28px;background:none;border:none;color:var(--text3);font-size:14px;cursor:pointer;padding:10px 20px;border-radius:8px">Cancel</button>
       </div>
 
       <!-- Week Nav -->
@@ -2340,9 +2339,14 @@ function _renderPinDots(){
 function _buildPinPad(){
   const pad=document.getElementById('pin-pad');
   if(!pad)return;
-  const keys=['1','2','3','4','5','6','7','8','9','','0','⌫'];
+  const keys=['1','2','3','4','5','6','7','8','9','cancel','0','⌫'];
   pad.innerHTML=keys.map(k=>{
-    if(k==='')return '<div></div>';
+    if(k==='cancel')return `<button onclick="cancelPinOverlay()"
+      style="padding:18px 0;font-size:14px;font-weight:600;
+      background:transparent;border:none;border-radius:12px;
+      color:var(--text3);cursor:pointer;-webkit-tap-highlight-color:transparent;user-select:none"
+      ontouchstart="this.style.color='var(--text)'"
+      ontouchend="this.style.color='var(--text3)'">Cancel</button>`;
     return `<button onclick="pinPadPress('${k}')"
       style="padding:18px 0;font-size:${k==='⌫'?'20px':'22px'};font-weight:600;
       background:var(--surface);border:1px solid var(--border2);border-radius:12px;
