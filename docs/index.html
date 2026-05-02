@@ -888,7 +888,7 @@ body{
         <div class="sg-label">App</div>
         <div class="si">
           <div class="si-icon" style="background:rgba(255,255,255,.08);overflow:hidden;padding:0"><img src="" id="settings-logo" alt="CC" style="width:34px;height:34px;object-fit:cover;border-radius:7px"></div>
-          <div><strong>CC Chelmsford Manager</strong><span>Version 141 • Cloud sync</span></div>
+          <div><strong>CC Chelmsford Manager</strong><span>Version 142 • Cloud sync</span></div>
         </div>
       </div>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)">
@@ -3462,7 +3462,7 @@ function _renderBdItems(f){
     const row=document.createElement('div');
     row.className='breakdown-item';
     const inp=document.createElement('input');
-    inp.type='text';inp.inputMode='decimal';
+    inp.type='number';inp.step='0.01';inp.min='0';
     inp.value=v||'';inp.placeholder='0.00';
     inp.oninput=()=>{_bdItems[f][i]=parseFloat(inp.value)||0;_syncBdTotal(f);};
     inp.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();_addBdItem(f);}};
@@ -3476,7 +3476,7 @@ function _renderBdItems(f){
   const row=document.createElement('div');
   row.className='breakdown-item';
   const addInp=document.createElement('input');
-  addInp.type='text';addInp.inputMode='decimal';addInp.placeholder='Add amount…';
+  addInp.type='number';addInp.step='0.01';addInp.min='0';addInp.placeholder='Add amount…';
   addInp.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();_addBdItemFromInput(f,addInp);}};
   const addBtn=document.createElement('button');
   addBtn.className='breakdown-add';addBtn.textContent='+';addBtn.type='button';
