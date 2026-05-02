@@ -897,7 +897,7 @@ body{
         <div class="sg-label">App</div>
         <div class="si">
           <div class="si-icon" style="background:rgba(255,255,255,.08);overflow:hidden;padding:0"><img src="" id="settings-logo" alt="CC" style="width:34px;height:34px;object-fit:cover;border-radius:7px"></div>
-          <div><strong>CC Chelmsford Manager</strong><span>Version 163 • Cloud sync</span></div>
+          <div><strong>CC Chelmsford Manager</strong><span>Version 164 • Cloud sync</span></div>
         </div>
       </div>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)">
@@ -1010,6 +1010,14 @@ body{
         <div class="ss-row"><label>Cash</label><input type="number" id="sd-cash" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
         <div class="ss-row"><label>Card</label><input type="number" id="sd-card" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
         <div class="ss-total-row"><label>Day Total</label><div class="ss-total-val" id="sd-day-total" style="color:var(--green)">£0.00</div></div>
+      </div>
+      <!-- Driver Payments section -->
+      <div class="ss-section" id="driver-payments-section">
+        <div class="ss-section-hdr" style="display:flex;align-items:center;justify-content:space-between">
+          <span>Driver Payments</span>
+          <button id="add-driver-btn" onclick="addDriverPayment()" style="background:var(--accent);color:#fff;border:none;border-radius:7px;padding:4px 12px;font-size:13px;font-weight:600;cursor:pointer;line-height:1.6">+ Add</button>
+        </div>
+        <div id="driver-payments-list" style="display:flex;flex-direction:column;gap:8px;margin-top:4px"></div>
       </div>
       <!-- Notes section -->
       <div class="ss-section">
@@ -3536,16 +3544,21 @@ function setupRealtime(){
       const merged={..._loadSalesCache(),[row.sale_date]:row};
       _saveSalesCache(merged);
       renderSalesTable();
-      // If the day entry sheet is open for this date, refresh notes live
+      // If the day entry sheet is open for this date, refresh notes + driver payments live
       if(salesOpenDate===row.sale_date){
         const noteEl=document.getElementById('sd-notes');
         // Only overwrite if the user isn't actively typing in the notes field
         if(noteEl&&document.activeElement!==noteEl&&row.notes!=null){
           noteEl.value=row.notes;
-          // Rebuild receipt preview if visible
-          const pre=document.getElementById('receipt-text-preview');
-          if(pre)pre.textContent=_getReceiptText();
         }
+        // Refresh driver payments (always safe to overwrite — no active input here)
+        if(Array.isArray(row.driver_payments)){
+          _driverPayments=row.driver_payments.map(p=>({driver:p.driver||'',amount:parseFloat(p.amount)||0,paid:!!p.paid}));
+          _renderDriverPayments(_perms.can_edit_sales);
+        }
+        // Rebuild receipt preview if visible
+        const pre=document.getElementById('receipt-text-preview');
+        if(pre)pre.textContent=_getReceiptText();
       }
       logActivity(`Sales ${row.sale_date} updated live ✓`,'success');
     })
@@ -3807,6 +3820,7 @@ function changeSalesWeek(dir){
 let _bdItems={ue:[],dr:[]};
 let _bdFocusNew=false; // flag: focus newly added item row instead of "Add amount"
 let _pendingBd={ue:'',dr:''}; // tracks live value in "Add amount" input before confirmed
+let _driverPayments=[]; // [{driver:'Name',amount:0,paid:false},...]
 function _updateToggleBtn(f){
   const btn=document.getElementById(f+'-toggle');
   const panel=document.getElementById(f+'-panel');
@@ -3895,6 +3909,60 @@ function _resetBreakdown(){
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ── Driver Payments ──────────────────────────────────────────────────────────
+function _renderDriverPayments(canEdit=true){
+  const list=document.getElementById('driver-payments-list');
+  const addBtn=document.getElementById('add-driver-btn');
+  if(!list)return;
+  if(addBtn)addBtn.style.display=canEdit?'':'none';
+  const drivers=(state.staff&&state.staff.delivery)||[];
+  list.innerHTML='';
+  if(!_driverPayments.length){
+    list.innerHTML='<div style="font-size:13px;color:var(--text3);padding:4px 0">No driver payments added.</div>';
+    return;
+  }
+  _driverPayments.forEach((p,i)=>{
+    const row=document.createElement('div');
+    row.style.cssText='display:flex;align-items:center;gap:8px';
+    // Driver select
+    const driverOpts=drivers.map(d=>`<option value="${d}"${d===p.driver?' selected':''}>${d}</option>`).join('');
+    const hasDriver=drivers.includes(p.driver);
+    const extraOpt=(!hasDriver&&p.driver)?`<option value="${p.driver}" selected>${p.driver}</option>`:'';
+    const sel=canEdit
+      ?`<select onchange="_driverPayments[${i}].driver=this.value;_renderDriverPayments(true);_rebuildReceiptPreview()" style="flex:2;padding:7px 8px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:14px"><option value="">— Driver —</option>${driverOpts}${extraOpt}</select>`
+      :`<div style="flex:2;padding:7px 8px;font-size:14px;color:var(--text)">${p.driver||'—'}</div>`;
+    // Amount input
+    const amt=canEdit
+      ?`<input type="number" min="0" step="0.01" placeholder="0.00" value="${p.amount||''}" oninput="_driverPayments[${i}].amount=parseFloat(this.value)||0;_rebuildReceiptPreview()" style="flex:1;padding:7px 8px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:14px;min-width:0">`
+      :`<div style="flex:1;padding:7px 8px;font-size:14px;color:var(--text)">£${(p.amount||0).toFixed(2)}</div>`;
+    // Paid toggle
+    const paidColor=p.paid?'var(--green)':'var(--red)';
+    const paidTxt=p.paid?'Paid':'Unpaid';
+    const toggle=canEdit
+      ?`<button onclick="_driverPayments[${i}].paid=!_driverPayments[${i}].paid;_renderDriverPayments(true);_rebuildReceiptPreview()" style="flex:0 0 auto;padding:6px 10px;border-radius:8px;border:none;background:${paidColor};color:#fff;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">${paidTxt}</button>`
+      :`<div style="padding:6px 10px;border-radius:8px;background:${paidColor};color:#fff;font-size:12px;font-weight:700;white-space:nowrap">${paidTxt}</div>`;
+    // Remove button
+    const remove=canEdit
+      ?`<button onclick="_driverPayments.splice(${i},1);_renderDriverPayments(true);_rebuildReceiptPreview()" style="flex:0 0 auto;padding:6px 8px;border-radius:8px;border:1px solid rgba(255,107,122,.4);background:transparent;color:var(--red);font-size:14px;cursor:pointer;line-height:1">✕</button>`
+      :'';
+    row.innerHTML=sel+amt+toggle+remove;
+    list.appendChild(row);
+  });
+}
+
+function addDriverPayment(){
+  _driverPayments.push({driver:'',amount:0,paid:false});
+  _renderDriverPayments(true);
+  // Focus the last driver select
+  const list=document.getElementById('driver-payments-list');
+  if(list){const selects=list.querySelectorAll('select');if(selects.length)selects[selects.length-1].focus();}
+}
+
+function _rebuildReceiptPreview(){
+  const pre=document.getElementById('receipt-text-preview');
+  if(pre&&_receiptParams)pre.textContent=_getReceiptText();
+}
+
 function openDayEntry(dateStr){
   const canEdit=_perms.can_edit_sales;
   const canView=canEdit||_perms.can_view_sales;
@@ -3917,6 +3985,9 @@ function openDayEntry(dateStr){
   // Load notes — prefer DB row value, fall back to localStorage
   const _noteEl=document.getElementById('sd-notes');
   if(_noteEl)_noteEl.value=r.notes||localStorage.getItem(_NOTES_KEY+dateStr)||'';
+  // Load driver payments
+  _driverPayments=Array.isArray(r.driver_payments)?r.driver_payments.map(p=>({driver:p.driver||'',amount:parseFloat(p.amount)||0,paid:!!p.paid})):[];
+  _renderDriverPayments(canEdit);
   _resetBreakdown();
   _bdItems.ue=(Array.isArray(r.uber_eats_items)?r.uber_eats_items:[]).map(Number);
   _bdItems.dr=(Array.isArray(r.deliveroo_items)?r.deliveroo_items:[]).map(Number);
@@ -3960,6 +4031,8 @@ function clearDayEntry(){
       document.getElementById(id).value='';
     });
     if(salesOpenDate)localStorage.removeItem(_NOTES_KEY+salesOpenDate);
+    _driverPayments=[];
+    _renderDriverPayments(true);
     _bdItems={ue:[],dr:[]};
     ['ue','dr'].forEach(f=>{
       const panel=document.getElementById(f+'-panel');
@@ -4000,7 +4073,8 @@ async function saveDaySales(){
     card:getSdVal('sd-card'),
     uber_eats_items:_bdItems.ue,
     deliveroo_items:_bdItems.dr,
-    notes:(document.getElementById('sd-notes')||{}).value||''
+    notes:(document.getElementById('sd-notes')||{}).value||'',
+    driver_payments:_driverPayments
   };
   // Save locally first so data is never lost even if cloud fails
   salesWeekData[salesOpenDate]=payload;
@@ -4052,7 +4126,7 @@ function _padLine(label,value,width=_RW){
   const spaces=width-label.length-v.length;
   return label+(spaces>0?' '.repeat(spaces):' ')+v;
 }
-function _receiptText(dateLabel,timeLabel,je,cc,ue,dr,cash,card,notes){
+function _receiptText(dateLabel,timeLabel,je,cc,ue,dr,cash,card,driverPayments,notes){
   const del=je+cc+ue+dr;
   const total=del+cash+card;
   const div='-'.repeat(_RW);
@@ -4081,6 +4155,24 @@ function _receiptText(dateLabel,timeLabel,je,cc,ue,dr,cash,card,notes){
     dbl,
     '','',''
   ];
+  // Append driver payments above notes
+  const dp=Array.isArray(driverPayments)?driverPayments.filter(p=>p.driver||p.amount):[];
+  if(dp.length){
+    lines.push(div);
+    lines.push(B+_center('DRIVER PAYMENTS')+b);
+    lines.push(div);
+    dp.forEach(p=>{
+      const name=(p.driver||'Unknown').substring(0,20);
+      const status=p.paid?'[PAID]':'[UNPAID]';
+      const amt=_fmtMoney(parseFloat(p.amount)||0);
+      // "Name       £X.XX  [STATUS]"
+      const right=amt+'  '+status;
+      const spaces=Math.max(1,_RW-name.length-right.length);
+      lines.push(name+' '.repeat(spaces)+right);
+    });
+    lines.push(div);
+    lines.push('','');
+  }
   // Append per-day notes if present (no divider, no label — just the content)
   if(notes&&notes.trim()){
     lines.push('');
@@ -4099,7 +4191,7 @@ const _NOTES_KEY='cc_day_notes_';
 function _getReceiptText(){
   if(!_receiptParams)return _currentReceiptText;
   const notes=(document.getElementById('sd-notes')||{}).value||'';
-  return _receiptText(..._receiptParams,notes);
+  return _receiptText(..._receiptParams,_driverPayments,notes);
 }
 
 function saveReceiptNote(){
