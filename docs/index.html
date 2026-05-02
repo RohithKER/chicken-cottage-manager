@@ -897,7 +897,7 @@ body{
         <div class="sg-label">App</div>
         <div class="si">
           <div class="si-icon" style="background:rgba(255,255,255,.08);overflow:hidden;padding:0"><img src="" id="settings-logo" alt="CC" style="width:34px;height:34px;object-fit:cover;border-radius:7px"></div>
-          <div><strong>CC Chelmsford Manager</strong><span>Version 159 • Cloud sync</span></div>
+          <div><strong>CC Chelmsford Manager</strong><span>Version 160 • Cloud sync</span></div>
         </div>
       </div>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)">
@@ -1347,11 +1347,21 @@ async function loadPermissions(userId,email){
       data=ins.data||defaults;
     }
     _userStatus=data?.status||'pending';
+    if(_userStatus==='removed'){
+      // Admin removed this user — clear cache, sign them out
+      try{localStorage.removeItem(_PERM_CACHE_KEY+userId);}catch{}
+      if(!isHardcodedAdmin){
+        toast('⛔ Your access has been removed. Contact an admin to rejoin.');
+        await db.auth.signOut();
+        showScreen('auth');
+        return;
+      }
+    }
     if(_userStatus==='approved'){
       _applyPermData(data);
       _cachePerms(userId,data); // cache so next load is instant
     }
-    if(_userStatus==='pending'){
+    if(_userStatus==='pending'||_userStatus==='removed'){
       const el=document.getElementById('pending-email-display');
       if(el)el.textContent=email;
       showScreen('pending');
@@ -1375,14 +1385,22 @@ async function loadPermissions(userId,email){
 async function _refreshPermsBackground(userId,email,isHardcodedAdmin){
   try{
     let{data}=await db.from('user_permissions').select('*').eq('user_id',userId).maybeSingle();
-    if(data){
-      _userStatus=data.status||'pending';
-      _applyPermData(data);
-      _cachePerms(userId,data);
-      _applyPermUI();
-      // If user became pending remotely, show pending screen
-      if(_userStatus==='pending'){showScreen('pending');_setupPendingWatcher(userId,email);}
+    if(!data||data.status==='removed'){
+      // Row deleted or admin removed this user — clear their cache and sign them out
+      try{localStorage.removeItem(_PERM_CACHE_KEY+userId);}catch{}
+      if(!isHardcodedAdmin){
+        toast('⛔ Your access has been removed. Contact an admin to rejoin.');
+        await db.auth.signOut();
+        showScreen('auth');
+      }
+      return;
     }
+    _userStatus=data.status||'pending';
+    _applyPermData(data);
+    _cachePerms(userId,data);
+    _applyPermUI();
+    // If user became pending remotely, show pending screen
+    if(_userStatus==='pending'){showScreen('pending');_setupPendingWatcher(userId,email);}
   }catch(_){}
 }
 
@@ -1456,12 +1474,14 @@ async function _loadPermsData(){
     // Re-fetch after await to ensure we write to the live DOM node
     const el=document.getElementById('perms-list');
     if(!el)return;
-    if(!data||!data.length){
+    // Filter out 'removed' users — they're kept in DB only to trigger sign-out on their device
+    const active=(data||[]).filter(u=>u.status!=='removed');
+    if(!active.length){
       el.innerHTML='<div style="color:var(--text3);font-size:13px;text-align:center;padding:20px">No users yet</div>';
       return;
     }
     el.innerHTML='';
-    data.forEach(u=>el.appendChild(_buildUserPermRow(u)));
+    active.forEach(u=>el.appendChild(_buildUserPermRow(u)));
   }catch(e){
     const el=document.getElementById('perms-list');
     if(el)el.innerHTML=`<div style="text-align:center;padding:20px">
@@ -1524,11 +1544,23 @@ function _buildUserPermRow(u){
     rmBtn.onclick=()=>{
       showGenericConfirm(
         'Remove User',
-        `Remove ${u.email||u.user_id}? They will be signed out and must wait for approval to rejoin.`,
+        `Remove ${u.email||u.user_id}? They will be signed out immediately and must wait for admin approval to rejoin.`,
         'Remove',
         async()=>{
           try{
-            const{error}=await db.from('user_permissions').delete().eq('user_id',u.user_id);
+            // Set status:'removed' and strip all permissions — keeps the row so the
+            // background permission refresh on their device detects it and signs them out,
+            // clearing their cached 'approved' status.
+            const{error}=await db.from('user_permissions').update({
+              status:'removed',
+              is_admin:false,
+              can_edit_rota:false,
+              can_edit_delivery:false,
+              can_edit_staffs:false,
+              can_view_sales:false,
+              can_edit_sales:false,
+              can_edit_settings:false
+            }).eq('user_id',u.user_id);
             if(error)throw error;
             toast('User removed ✓');
             _loadPermsData();
