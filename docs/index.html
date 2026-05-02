@@ -897,7 +897,7 @@ body{
         <div class="sg-label">App</div>
         <div class="si">
           <div class="si-icon" style="background:rgba(255,255,255,.08);overflow:hidden;padding:0"><img src="" id="settings-logo" alt="CC" style="width:34px;height:34px;object-fit:cover;border-radius:7px"></div>
-          <div><strong>CC Chelmsford Manager</strong><span>Version 170 • Cloud sync</span></div>
+          <div><strong>CC Chelmsford Manager</strong><span>Version 171 • Cloud sync</span></div>
         </div>
       </div>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)">
@@ -2233,8 +2233,8 @@ function setViewMode(mode){
 function showView(v){
   if(v==='sales'){
     if(!_perms.is_admin&&!_perms.can_view_sales&&!_perms.can_edit_sales)return;
-    // Auto-unlock if within 6-hour grace period after last save; otherwise lock
-    _salesUnlocked=_salesPin?_inUnlockGrace():true;
+    // PIN entry is session-only — always re-lock when switching to this tab
+    _salesUnlocked=false;
     _updateSalesLockBtn();
   }
   _doShowView(v);
@@ -3777,19 +3777,26 @@ function renderSalesTable(dates){
     const r=salesWeekData[key];
     const dayLabel=DAY_NAMES[i];
     const dateLabel=d.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
-    // When locked, only prompt PIN if the row has actual saved data (non-zero totals)
+    // Per-row: row is visible if globally unlocked (PIN this session) OR within its own 6h grace period
+    const rowUnlocked=!locked||_inUnlockGrace(key);
+    const showRow=(v)=>{
+      if(!locked||v===0||rowUnlocked)return'£'+fmtS(v);
+      return`<span style="letter-spacing:2px;color:var(--text3);font-size:13px">••••</span>`;
+    };
     const hasData=r&&((r.just_eat||0)+(r.cc_app||0)+(r.uber_eats||0)+(r.deliveroo||0)+(r.cash||0)+(r.card||0))>0;
-    const clickHandler=locked&&hasData?`requireSalesUnlock(()=>openDayEntry('${key}'))`:`openDayEntry('${key}')`;
+    // Only prompt PIN if row has data AND is not already in its grace period AND not globally unlocked
+    const needsPin=locked&&hasData&&!rowUnlocked;
+    const clickHandler=needsPin?`requireSalesUnlock(()=>openDayEntry('${key}'))`:`openDayEntry('${key}')`;
     if(r){
       const del=(r.just_eat||0)+(r.cc_app||0)+(r.uber_eats||0)+(r.deliveroo||0);
       const total=del+(r.cash||0)+(r.card||0);
       gCard+=(r.card||0); gCash+=(r.cash||0); gDel+=del; gTotal+=total;
       html+=`<tr class="row-filled" onclick="${clickHandler}">
         <td><div class="stbl-day">${dayLabel}</div><div style="font-size:9px;color:var(--text3)">${dateLabel}</div></td>
-        <td class="stbl-val">${show(r.card||0)}</td>
-        <td class="stbl-val">${show(r.cash||0)}</td>
-        <td class="stbl-val">${show(del)}</td>
-        <td class="stbl-total">${show(total)}</td>
+        <td class="stbl-val">${showRow(r.card||0)}</td>
+        <td class="stbl-val">${showRow(r.cash||0)}</td>
+        <td class="stbl-val">${showRow(del)}</td>
+        <td class="stbl-total">${showRow(total)}</td>
       </tr>`;
     } else {
       html+=`<tr class="row-empty" onclick="openDayEntry('${key}')">
@@ -4122,8 +4129,7 @@ async function saveDaySales(){
     logActivity(`Sales ${salesOpenDate} saved to cloud ✓`, 'success');
     _pendingSaleSet.delete(salesOpenDate);
     _savePendingSales();
-    _setUnlockGrace(); // keep sales visible for 6h after saving
-    _salesUnlocked=true;
+    _setUnlockGrace(salesOpenDate); // keep this day's numbers visible for 6h
     if(btn){btn.textContent='✓ Saved!';btn.style.background='var(--green)';}
     setTimeout(()=>closeDayEntry(),700);
   }catch(e){
@@ -4216,10 +4222,10 @@ let _currentReceiptTitle='';
 let _receiptParams=null; // stored so notes can rebuild receipt text live
 
 const _NOTES_KEY='cc_day_notes_';
-const _UNLOCK_UNTIL_KEY='cc_unlock_until'; // timestamp: numbers stay visible for 6h after save
 const _UNLOCK_HOURS=6;
-function _setUnlockGrace(){localStorage.setItem(_UNLOCK_UNTIL_KEY,Date.now()+_UNLOCK_HOURS*3600*1000);}
-function _inUnlockGrace(){return Date.now()<parseInt(localStorage.getItem(_UNLOCK_UNTIL_KEY)||0);}
+// Per-date grace period — only the saved day stays visible for 6h
+function _setUnlockGrace(dateStr){localStorage.setItem('cc_unlock_'+dateStr,Date.now()+_UNLOCK_HOURS*3600*1000);}
+function _inUnlockGrace(dateStr){return Date.now()<parseInt(localStorage.getItem('cc_unlock_'+dateStr)||0);}
 
 function _getReceiptText(){
   if(!_receiptParams)return _currentReceiptText;
