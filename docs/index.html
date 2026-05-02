@@ -891,7 +891,7 @@ body{
         <div class="sg-label">App</div>
         <div class="si">
           <div class="si-icon" style="background:rgba(255,255,255,.08);overflow:hidden;padding:0"><img src="" id="settings-logo" alt="CC" style="width:34px;height:34px;object-fit:cover;border-radius:7px"></div>
-          <div><strong>CC Chelmsford Manager</strong><span>Version 152 • Cloud sync</span></div>
+          <div><strong>CC Chelmsford Manager</strong><span>Version 153 • Cloud sync</span></div>
         </div>
       </div>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)">
@@ -1141,7 +1141,7 @@ function getStaffHex(name,type=null){
 }
 function getStaffCanvasColor(name,type=null){
   const hex=getStaffHex(name,type);const{r,g,b}=hexToRgb(hex);
-  return{bg:`rgba(${r},${g},${b},0.18)`,text:hex,border:`rgba(${r},${g},${b},0.5)`};
+  return{bg:`rgba(${r},${g},${b},0.55)`,text:'#ffffff'};
 }
 function pillStyle(name,type=null){
   const hex=getStaffHex(name,type);const{r,g,b}=hexToRgb(hex);
@@ -2749,9 +2749,6 @@ async function shareRota(){
           ctx.fillStyle=c.bg;
           roundRect(ctx,curX,curY,pw,PILL_H,7);
           ctx.fill();
-          ctx.strokeStyle=c.border; ctx.lineWidth=1.5;
-          roundRect(ctx,curX,curY,pw,PILL_H,7);
-          ctx.stroke();
           ctx.fillStyle=c.text;
           ctx.textAlign='left'; ctx.textBaseline='alphabetic';
           ctx.fillText(displayName,curX+8,curY+15);
