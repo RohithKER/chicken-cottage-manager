@@ -10,7 +10,8 @@
 <meta name="theme-color" content="#191919">
 <title>CC Chelmsford Manager</title>
 <link rel="icon" type="image/png" href="./favicon.png">
-<link rel="apple-touch-icon" href="./icon-192.png"><link rel="apple-touch-icon" sizes="512x512" href="./icon-512.png">
+<link rel="manifest" href="./manifest.json">
+<link rel="apple-touch-icon" sizes="180x180" href="./icon-192.png">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 /* ─── Reset ──────────────────────────────────────── */
@@ -888,7 +889,7 @@ body{
         <div class="sg-label">App</div>
         <div class="si">
           <div class="si-icon" style="background:rgba(255,255,255,.08);overflow:hidden;padding:0"><img src="" id="settings-logo" alt="CC" style="width:34px;height:34px;object-fit:cover;border-radius:7px"></div>
-          <div><strong>CC Chelmsford Manager</strong><span>Version 145 • Cloud sync</span></div>
+          <div><strong>CC Chelmsford Manager</strong><span>Version 146 • Cloud sync</span></div>
         </div>
       </div>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)">
@@ -3017,7 +3018,10 @@ async function doGoogleAuth(){
 }
 
 async function signOut(){
+  const _uid=user?.id;
   await db.auth.signOut();
+  // Clear cached permissions so the next user on this device starts fresh
+  if(_uid)try{localStorage.removeItem(_PERM_CACHE_KEY+_uid);}catch{}
   user=null;
   _perms={is_admin:false,can_edit_rota:false,can_edit_delivery:false,can_edit_staffs:false,can_view_sales:false,can_edit_sales:false,can_edit_settings:false};
   state.schedules={};
@@ -3256,32 +3260,39 @@ function setupRealtime(){
 }
 
 /* ─── Init ───────────────────────────────────────────── */
+let _sessionStarting=false; // guard against concurrent _startSession calls (e.g. token refresh)
 async function _startSession(u){
-  user=u;
-  document.getElementById('um-email').textContent=u.email;
-  document.getElementById('user-email-display').textContent=u.email;
-
-  // loadPermissions now uses localStorage cache for returning users, so this
-  // resolves instantly for approved users and only blocks for first-time logins.
-  await loadPermissions(u.id,u.email);
-
-  // If user is pending, loadPermissions() showed the pending screen — stop here.
-  if(_userStatus==='pending')return;
-
-  // Load cloud data with a hard 6-second timeout.
-  // Returning users already have local state so the app is usable immediately.
+  if(_sessionStarting)return;
+  _sessionStarting=true;
   try{
-    await Promise.race([
-      loadFromCloud(),
-      new Promise(r=>setTimeout(r,6000))
-    ]);
-  }catch(e){console.warn('loadFromCloud error:',e);}
+    user=u;
+    document.getElementById('um-email').textContent=u.email;
+    document.getElementById('user-email-display').textContent=u.email;
 
-  document.getElementById('week-label').textContent=weekLabel(state.weekOffset);
-  renderRota();
-  showScreen('main');
-  setupRealtime();
-  _retryPendingOnLoad();
+    // loadPermissions now uses localStorage cache for returning users, so this
+    // resolves instantly for approved users and only blocks for first-time logins.
+    await loadPermissions(u.id,u.email);
+
+    // If user is pending, loadPermissions() showed the pending screen — stop here.
+    if(_userStatus==='pending')return;
+
+    // Load cloud data with a hard 6-second timeout.
+    // Returning users already have local state so the app is usable immediately.
+    try{
+      await Promise.race([
+        loadFromCloud(),
+        new Promise(r=>setTimeout(r,6000))
+      ]);
+    }catch(e){console.warn('loadFromCloud error:',e);}
+
+    document.getElementById('week-label').textContent=weekLabel(state.weekOffset);
+    renderRota();
+    showScreen('main');
+    setupRealtime();
+    _retryPendingOnLoad();
+  }finally{
+    _sessionStarting=false;
+  }
 }
 
 async function init(){
@@ -3524,11 +3535,11 @@ function _addBdItemFromInput(f,inp){
 }
 function _syncBdTotal(f){
   const items=_bdItems[f];
-  if(!items.length)return;
   const sum=items.reduce((a,b)=>a+(b||0),0);
   const fieldId=f==='ue'?'sd-ue':'sd-dr';
   const el=document.getElementById(fieldId);
-  if(el){el.value=sum.toFixed(2);calcDaySales();}
+  // Always update — even when items is empty so stale values are cleared
+  if(el){el.value=sum>0?sum.toFixed(2):'';calcDaySales();}
   _updateToggleBtn(f);
 }
 function _resetBreakdown(){
@@ -3776,9 +3787,7 @@ function printDaySales(){
   _receiptParams=[dateLabel,timeLabel,je,cc,ue,dr,cash,card];
   _currentReceiptTitle='CC Chelmsford — '+dateLabel;
 
-  // Load saved note for this day
-  const notesEl=document.getElementById('sd-notes');
-  if(notesEl) notesEl.value=localStorage.getItem(_NOTES_KEY+salesOpenDate)||'';
+  // Note is already live in the textarea (saveReceiptNote keeps localStorage in sync on every keystroke)
   _currentReceiptText=_getReceiptText();
 
   // Show preview modal — user picks how to send to their printer
@@ -4056,7 +4065,12 @@ async function _pwaResume(){
     if(!session){ user=null; showScreen('auth'); return; }
     user = session.user;
 
-    // 3. Re-setup realtime on the fresh client
+    // 3. Re-register auth state listener on the new client (old one was on old db instance)
+    db.auth.onAuthStateChange((event,sess)=>{
+      if(event==='SIGNED_OUT'){user=null;showScreen('auth');}
+    });
+
+    // 4. Re-setup realtime on the fresh client
     _realtimeSetup = false;
     setupRealtime();
 

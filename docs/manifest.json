@@ -1,14 +1,19 @@
 {
   "name": "CC Chelmsford Manager",
   "short_name": "CC Manager",
-  "description": "Rota, staff and sales management for Chicken Cottage Chelmsford",
-  "start_url": "./index.html",
+  "description": "CC Chelmsford rota, staff and sales management",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#191919",
   "theme_color": "#191919",
-  "orientation": "portrait-primary",
-  "scope": "./",
   "icons": [
+    {
+      "src": "./favicon.png",
+      "sizes": "any",
+      "type": "image/png"
+    },
     {
       "src": "./icon-192.png",
       "sizes": "192x192",
@@ -21,5 +26,7 @@
       "type": "image/png",
       "purpose": "any maskable"
     }
-  ]
+  ],
+  "categories": ["business", "productivity"],
+  "prefer_related_applications": false
 }

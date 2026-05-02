@@ -1,10 +1,10 @@
-/* CC Manager Service Worker — v145
-   Caches BOTH the HTML page AND the Supabase CDN script so that
+/* CC Manager Service Worker — v146
+   Caches the HTML page, manifest, icons and the Supabase CDN script so that
    window.location.reload() serves everything instantly from cache
    with zero network dependency. The fresh Supabase client then
    makes brand-new TCP connections which work fine.             */
 
-const CACHE = 'cc-v145';
+const CACHE = 'cc-v146';
 const CDN_SUPABASE = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
 
 self.addEventListener('install', event => {
@@ -13,6 +13,10 @@ self.addEventListener('install', event => {
       Promise.all([
         cache.add('./').catch(() => {}),
         cache.add('./index.html').catch(() => {}),
+        cache.add('./manifest.json').catch(() => {}),
+        cache.add('./favicon.png').catch(() => {}),
+        cache.add('./icon-192.png').catch(() => {}),
+        cache.add('./icon-512.png').catch(() => {}),
         // Pre-cache the Supabase CDN script (no-cors = opaque response, still cacheable)
         fetch(CDN_SUPABASE, { mode: 'no-cors' })
           .then(r => cache.put(CDN_SUPABASE, r))
@@ -37,15 +41,18 @@ self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
   const isPage    = event.request.mode === 'navigate';
   const isJsDelivr = url.hostname === 'cdn.jsdelivr.net';
+  const isAsset   = ['favicon.png','icon-192.png','icon-512.png','manifest.json'].some(
+    f => url.pathname.endsWith(f)
+  );
 
-  // Only handle the app page and CDN scripts — let Supabase API calls through
-  if (!isPage && !isJsDelivr) return;
+  // Only handle the app page, static assets and CDN scripts — let Supabase API calls through
+  if (!isPage && !isJsDelivr && !isAsset) return;
 
   event.respondWith(
     caches.open(CACHE).then(cache =>
       cache.match(event.request).then(cached => {
         if (cached) {
-          // Serve from cache instantly; update in background
+          // Serve from cache instantly; update page in background
           if (isPage) {
             fetch(event.request)
               .then(r => { if (r && r.ok) cache.put(event.request, r.clone()); })
