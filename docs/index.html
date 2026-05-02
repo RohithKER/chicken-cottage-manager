@@ -783,7 +783,7 @@ body{
         <div class="rm-item" onclick="shareRota();closeRotaMenu()">📤 Share Rota</div>
         <div class="rm-item" onclick="openLog();closeRotaMenu()">📋 Activity Log</div>
         <div style="height:1px;background:var(--border);margin:4px 0"></div>
-        <div class="rm-item" onclick="closeSyncConfirm();syncAll();closeRotaMenu()">☁ Full Sync (push + pull)</div>
+        <div class="rm-item" onclick="confirmSyncAll();closeRotaMenu()">☁ Full Sync (push + pull)</div>
         <div style="height:1px;background:var(--border);margin:4px 0"></div>
         <div class="rm-item" onclick="copyWeek();closeRotaMenu()">🗐 Copy Week</div>
         <div class="rm-item" id="rm-paste" onclick="pasteWeek();closeRotaMenu()" style="display:none">📌 Paste Week</div>
@@ -886,7 +886,7 @@ body{
         <div class="sg-label">App</div>
         <div class="si">
           <div class="si-icon" style="background:rgba(255,255,255,.08);overflow:hidden;padding:0"><img src="" id="settings-logo" alt="CC" style="width:34px;height:34px;object-fit:cover;border-radius:7px"></div>
-          <div><strong>CC Chelmsford Manager</strong><span>Version 134 • Cloud sync</span></div>
+          <div><strong>CC Chelmsford Manager</strong><span>Version 135 • Cloud sync</span></div>
         </div>
       </div>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)">
