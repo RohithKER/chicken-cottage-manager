@@ -3860,13 +3860,18 @@ async function _pwaReconnect(){
   _pwaReconnecting = true;
 
   try{
+    // Step 1: Always reconnect WebSocket realtime channels —
+    // iOS/Android kill them within seconds of backgrounding.
+    // This is cheap and harmless even if already connected.
+    _realtimeSetup = false;
+    try{ await db.removeAllChannels(); }catch(_){}
+    setupRealtime();
+
+    // Step 2: Ping the REST API to check if auth/network is alive
     const alive = await _pwaPing();
-
     if(!alive){
-      // Connection is dead — full reconnect sequence
+      // HTTP also dead — refresh auth JWT then retry
       logActivity('Reconnecting…','saving');
-
-      // 1. Refresh auth JWT (may have expired while suspended)
       const {data:{session}, error:authErr} = await db.auth.refreshSession();
       if(authErr || !session){
         user = null;
@@ -3874,17 +3879,11 @@ async function _pwaReconnect(){
         return;
       }
       user = session.user;
-
-      // 2. Reconnect realtime WebSocket channels
-      _realtimeSetup = false;
-      try{ await db.removeAllChannels(); }catch(_){}
-      setupRealtime();
-
-      logActivity('Reconnected ✓','success');
       toast('Reconnected ✓');
+      logActivity('Reconnected ✓','success');
     }
 
-    // Always refresh data after returning to foreground (alive or not)
+    // Step 3: Always re-fetch fresh data on foreground return
     const {data:staffData} = await Promise.race([db.from('staff').select('*'), _pwaTout(8000)]);
     if(staffData && staffData.length > 0){
       state.staff.inside   = staffData.filter(s=>s.type==='inside'  ||s.type==='both').map(s=>s.name);
