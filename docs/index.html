@@ -891,7 +891,7 @@ body{
         <div class="sg-label">App</div>
         <div class="si">
           <div class="si-icon" style="background:rgba(255,255,255,.08);overflow:hidden;padding:0"><img src="" id="settings-logo" alt="CC" style="width:34px;height:34px;object-fit:cover;border-radius:7px"></div>
-          <div><strong>CC Chelmsford Manager</strong><span>Version 156 • Cloud sync</span></div>
+          <div><strong>CC Chelmsford Manager</strong><span>Version 157 • Cloud sync</span></div>
         </div>
       </div>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)">
@@ -2692,16 +2692,15 @@ async function shareRota(){
     ctx.fillStyle='rgba(255,255,255,0.12)';
     ctx.fillRect(PAD+DAY_W,rowY,2,ROW_H);
 
-    // day name + date — matches .td-day (--text) and .td-date (--text3)
-    const midY=rowY+Math.round(ROW_H/2);
+    // day name + date — top-aligned with padding, matches .rota-tbl td vertical-align:top padding:8px
+    const actualDay=new Date(ws); actualDay.setDate(ws.getDate()+di);
     ctx.textAlign='left'; ctx.textBaseline='alphabetic';
     ctx.fillStyle='rgba(255,255,255,0.9)';
     ctx.font=`bold 12px -apple-system,sans-serif`;
-    ctx.fillText(day.slice(0,3),PAD+11,midY-2);
-    const actualDay=new Date(ws); actualDay.setDate(ws.getDate()+di);
+    ctx.fillText(day.slice(0,3),PAD+9,rowY+20);
     ctx.fillStyle='rgba(255,255,255,0.32)';
     ctx.font=`10px -apple-system,sans-serif`;
-    ctx.fillText(`${actualDay.getDate()} ${MONTHS[actualDay.getMonth()]}`,PAD+11,midY+12);
+    ctx.fillText(`${actualDay.getDate()} ${MONTHS[actualDay.getMonth()]}`,PAD+9,rowY+33);
 
     // shift cells
     const CELL_PAD_X=10;
