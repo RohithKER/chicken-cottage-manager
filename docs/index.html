@@ -888,7 +888,7 @@ body{
         <div class="sg-label">App</div>
         <div class="si">
           <div class="si-icon" style="background:rgba(255,255,255,.08);overflow:hidden;padding:0"><img src="" id="settings-logo" alt="CC" style="width:34px;height:34px;object-fit:cover;border-radius:7px"></div>
-          <div><strong>CC Chelmsford Manager</strong><span>Version 138 • Cloud sync</span></div>
+          <div><strong>CC Chelmsford Manager</strong><span>Version 140 • Cloud sync</span></div>
         </div>
       </div>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)">
@@ -4148,5 +4148,25 @@ window.addEventListener('pageshow', e=>{ if(e.persisted && user) _pwaResume(); }
     <button onclick="closeColorSheet()" style="width:100%;padding:13px;background:var(--accent);border:none;color:#fff;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer">Done</button>
   </div>
 </div>
+<!-- Service Worker registration — required for update detection on iOS -->
+<script>
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('./sw.js').then(function(reg){
+    // When a new SW is found, wait for it to activate then reload
+    reg.addEventListener('updatefound', function(){
+      var newSW = reg.installing;
+      newSW.addEventListener('statechange', function(){
+        if(newSW.state === 'activated'){
+          window.location.reload();
+        }
+      });
+    });
+  });
+  // If controller changes (new SW claimed this page), reload immediately
+  navigator.serviceWorker.addEventListener('controllerchange', function(){
+    window.location.reload();
+  });
+}
+</script>
 </body>
 </html>
