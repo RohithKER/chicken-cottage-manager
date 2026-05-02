@@ -889,7 +889,7 @@ body{
         <div class="sg-label">App</div>
         <div class="si">
           <div class="si-icon" style="background:rgba(255,255,255,.08);overflow:hidden;padding:0"><img src="" id="settings-logo" alt="CC" style="width:34px;height:34px;object-fit:cover;border-radius:7px"></div>
-          <div><strong>CC Chelmsford Manager</strong><span>Version 147 • Cloud sync</span></div>
+          <div><strong>CC Chelmsford Manager</strong><span>Version 148 • Cloud sync</span></div>
         </div>
       </div>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)">
@@ -2396,8 +2396,30 @@ function _doRenameStaff(oldName, newName){
     }
   });
   _saveSchedCache(state.schedules);
-  // Update colour mapping
-  if(staffColors[oldName]){staffColors[newName]=staffColors[oldName];delete staffColors[oldName];}
+  // Update early shift sets — rename the person's name inside every Set
+  let earlyUpdated=0;
+  Object.entries(state.earlyShift).forEach(([k,set])=>{
+    if(set.has(oldName)){set.delete(oldName);set.add(newName);earlyUpdated++;}
+  });
+  if(earlyUpdated>0){
+    const toCache={};
+    Object.entries(state.earlyShift).forEach(([k,s])=>{toCache[k]=[...s];});
+    _saveEarlyCache(toCache);
+    // Push changed early-shift rows to cloud
+    Object.keys(state.earlyShift).filter(k=>state.earlyShift[k].has(newName)).forEach(k=>{
+      const [wk,day]=k.split('|');
+      saveEarlyToCloud(wk,day);
+    });
+  }
+  // Update colour mapping — handle both plain and typed keys (e.g. "Name|inside")
+  Object.keys(staffColors).forEach(k=>{
+    if(k===oldName){staffColors[newName]=staffColors[k];delete staffColors[k];}
+    else if(k.startsWith(oldName+'|')){
+      const suffix=k.slice(oldName.length);
+      staffColors[newName+suffix]=staffColors[k];
+      delete staffColors[k];
+    }
+  });
   localStorage.setItem('cc_staff_colors',JSON.stringify(staffColors));
   saveColorsToCloud();
   renderStaff();renderRota();
