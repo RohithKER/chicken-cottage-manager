@@ -129,7 +129,8 @@ body{
   font-size:16px;flex-shrink:0;
 }
 #header h1{font-size:15px;font-weight:700;letter-spacing:-0.4px;flex-shrink:0}
-.week-nav{margin-left:auto;display:flex;align-items:center;gap:0}
+.week-nav{display:flex;align-items:center;gap:0}
+#header-spacer{flex:1;min-width:0}
 .week-nav button{
   background:none;border:none;color:var(--text2);
   width:36px;height:36px;border-radius:8px;
@@ -764,6 +765,7 @@ body{
   <div id="header">
     <img class="logo" id="app-logo" src="" alt="CC" style="width:32px;height:32px;border-radius:50%;object-fit:cover;flex-shrink:0">
     <h1>CC Chelmsford</h1>
+    <div id="header-spacer"></div>
     <div class="week-nav">
       <button onclick="changeWeek(-1)">‹</button>
       <div id="week-label">This week</div>
@@ -889,7 +891,7 @@ body{
         <div class="sg-label">App</div>
         <div class="si">
           <div class="si-icon" style="background:rgba(255,255,255,.08);overflow:hidden;padding:0"><img src="" id="settings-logo" alt="CC" style="width:34px;height:34px;object-fit:cover;border-radius:7px"></div>
-          <div><strong>CC Chelmsford Manager</strong><span>Version 149 • Cloud sync</span></div>
+          <div><strong>CC Chelmsford Manager</strong><span>Version 150 • Cloud sync</span></div>
         </div>
       </div>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)">
