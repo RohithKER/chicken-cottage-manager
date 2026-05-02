@@ -888,7 +888,7 @@ body{
         <div class="sg-label">App</div>
         <div class="si">
           <div class="si-icon" style="background:rgba(255,255,255,.08);overflow:hidden;padding:0"><img src="" id="settings-logo" alt="CC" style="width:34px;height:34px;object-fit:cover;border-radius:7px"></div>
-          <div><strong>CC Chelmsford Manager</strong><span>Version 140 • Cloud sync</span></div>
+          <div><strong>CC Chelmsford Manager</strong><span>Version 141 • Cloud sync</span></div>
         </div>
       </div>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)">
@@ -964,7 +964,8 @@ body{
       </div>
       <!-- Notes section -->
       <div class="ss-section">
-        <div class="ss-row"><label>Notes</label><input type="text" id="sd-notes" inputmode="decimal" autocorrect="off" autocapitalize="sentences" placeholder="Add a note for this day…" oninput="saveReceiptNote()"></div>
+        <div class="ss-section-hdr">Notes</div>
+        <textarea id="sd-notes" oninput="saveReceiptNote()" placeholder="Add a note for this day…" rows="3" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:15px;padding:9px 10px;resize:none;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',sans-serif;outline:none;line-height:1.45;box-sizing:border-box"></textarea>
       </div>
     </div>
     <div class="ss-foot" style="flex-direction:column;gap:8px">
