@@ -897,7 +897,7 @@ body{
         <div class="sg-label">App</div>
         <div class="si">
           <div class="si-icon" style="background:rgba(255,255,255,.08);overflow:hidden;padding:0"><img src="" id="settings-logo" alt="CC" style="width:34px;height:34px;object-fit:cover;border-radius:7px"></div>
-          <div><strong>CC Chelmsford Manager</strong><span>Version 165 • Cloud sync</span></div>
+          <div><strong>CC Chelmsford Manager</strong><span>Version 166 • Cloud sync</span></div>
         </div>
       </div>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)">
@@ -3918,35 +3918,52 @@ function _renderDriverPayments(canEdit=true){
   const drivers=(state.staff&&state.staff.delivery)||[];
   list.innerHTML='';
   if(!_driverPayments.length){
-    list.innerHTML='<div style="font-size:13px;color:var(--text3);padding:4px 0">No driver payments added.</div>';
+    list.innerHTML='<div style="font-size:13px;color:var(--text3);padding:2px 0">No driver payments added.</div>';
     return;
   }
   _driverPayments.forEach((p,i)=>{
-    const row=document.createElement('div');
-    row.style.cssText='display:flex;align-items:center;gap:8px';
-    // Driver select
+    const card=document.createElement('div');
+    card.style.cssText='background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px';
+
+    // Row 1: driver picker + remove
     const driverOpts=drivers.map(d=>`<option value="${d}"${d===p.driver?' selected':''}>${d}</option>`).join('');
     const hasDriver=drivers.includes(p.driver);
     const extraOpt=(!hasDriver&&p.driver)?`<option value="${p.driver}" selected>${p.driver}</option>`:'';
-    const sel=canEdit
-      ?`<select onchange="_driverPayments[${i}].driver=this.value;_renderDriverPayments(true);_rebuildReceiptPreview()" style="flex:2;padding:7px 8px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:16px"><option value="">— Driver —</option>${driverOpts}${extraOpt}</select>`
-      :`<div style="flex:2;padding:7px 8px;font-size:15px;color:var(--text)">${p.driver||'—'}</div>`;
-    // Amount input
-    const amt=canEdit
-      ?`<input type="number" min="0" step="0.01" placeholder="0.00" value="${p.amount||''}" oninput="_driverPayments[${i}].amount=parseFloat(this.value)||0;_rebuildReceiptPreview()" style="flex:1;padding:7px 8px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:16px;min-width:0">`
-      :`<div style="flex:1;padding:7px 8px;font-size:15px;color:var(--text)">£${(p.amount||0).toFixed(2)}</div>`;
-    // Paid toggle
-    const paidColor=p.paid?'var(--green)':'var(--red)';
-    const paidTxt=p.paid?'Paid':'Unpaid';
-    const toggle=canEdit
-      ?`<button onclick="_driverPayments[${i}].paid=!_driverPayments[${i}].paid;_renderDriverPayments(true);_rebuildReceiptPreview()" style="flex:0 0 auto;padding:6px 10px;border-radius:8px;border:none;background:${paidColor};color:#fff;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">${paidTxt}</button>`
-      :`<div style="padding:6px 10px;border-radius:8px;background:${paidColor};color:#fff;font-size:12px;font-weight:700;white-space:nowrap">${paidTxt}</div>`;
-    // Remove button
-    const remove=canEdit
-      ?`<button onclick="_driverPayments.splice(${i},1);_renderDriverPayments(true);_rebuildReceiptPreview()" style="flex:0 0 auto;padding:6px 8px;border-radius:8px;border:1px solid rgba(255,107,122,.4);background:transparent;color:var(--red);font-size:14px;cursor:pointer;line-height:1">✕</button>`
-      :'';
-    row.innerHTML=sel+amt+toggle+remove;
-    list.appendChild(row);
+    const row1=canEdit
+      ?`<div style="display:flex;align-items:center;gap:8px">
+          <div style="position:relative;flex:1;min-width:0">
+            <select onchange="_driverPayments[${i}].driver=this.value;_renderDriverPayments(true);_rebuildReceiptPreview()"
+              style="width:100%;padding:9px 30px 9px 11px;border-radius:8px;border:1px solid var(--border2);background:var(--surface);color:var(--text);font-size:16px;-webkit-appearance:none;appearance:none;outline:none;font-family:inherit">
+              <option value="">— Select driver —</option>${driverOpts}${extraOpt}
+            </select>
+            <span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--text3);font-size:10px;line-height:1">▼</span>
+          </div>
+          <button onclick="_driverPayments.splice(${i},1);_renderDriverPayments(true);_rebuildReceiptPreview()"
+            style="flex:0 0 auto;width:34px;height:34px;border-radius:8px;border:1px solid rgba(255,107,122,.35);background:transparent;color:var(--red);font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center">✕</button>
+        </div>`
+      :`<div style="font-size:15px;font-weight:600;color:var(--text)">${p.driver||'Unknown driver'}</div>`;
+
+    // Row 2: amount + paid toggle
+    const row2=canEdit
+      ?`<div style="display:flex;align-items:center;gap:8px">
+          <div style="position:relative;flex:1;min-width:0">
+            <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text2);font-size:16px;pointer-events:none">£</span>
+            <input type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00" value="${p.amount||''}"
+              oninput="_driverPayments[${i}].amount=parseFloat(this.value)||0;_rebuildReceiptPreview()"
+              style="width:100%;padding:9px 10px 9px 24px;border-radius:8px;border:1px solid var(--border2);background:var(--surface);color:var(--text);font-size:16px;box-sizing:border-box;-webkit-appearance:none;-moz-appearance:textfield;outline:none;font-family:inherit">
+          </div>
+          <button onclick="_driverPayments[${i}].paid=!_driverPayments[${i}].paid;_renderDriverPayments(true);_rebuildReceiptPreview()"
+            style="flex:0 0 auto;padding:9px 0;width:88px;border-radius:8px;border:none;background:${p.paid?'var(--green)':'#666'};color:#fff;font-size:14px;font-weight:700;cursor:pointer;text-align:center;letter-spacing:-0.2px">
+            ${p.paid?'✓ Paid':'✗ Unpaid'}
+          </button>
+        </div>`
+      :`<div style="display:flex;align-items:center;justify-content:space-between">
+          <span style="font-size:15px;color:var(--text)">£${(p.amount||0).toFixed(2)}</span>
+          <span style="padding:6px 14px;border-radius:8px;background:${p.paid?'var(--green)':'#666'};color:#fff;font-size:13px;font-weight:700">${p.paid?'✓ Paid':'✗ Unpaid'}</span>
+        </div>`;
+
+    card.innerHTML=row1+row2;
+    list.appendChild(card);
   });
 }
 
