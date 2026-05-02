@@ -202,7 +202,7 @@ body{
 .view{display:none;padding:10px 10px 6px}
 .view.active{display:block}
 #view-rota{padding:0}
-#view-sales.active{display:flex;flex-direction:column;padding:0;height:100%}
+#view-sales.active{display:flex;flex-direction:column;padding:0;height:100%;position:relative;overflow:hidden}
 
 /* ─── Day Cards ──────────────────────────────────── */
 #cards-wrap{padding:12px}
@@ -897,7 +897,7 @@ body{
         <div class="sg-label">App</div>
         <div class="si">
           <div class="si-icon" style="background:rgba(255,255,255,.08);overflow:hidden;padding:0"><img src="" id="settings-logo" alt="CC" style="width:34px;height:34px;object-fit:cover;border-radius:7px"></div>
-          <div><strong>CC Chelmsford Manager</strong><span>Version 158 • Cloud sync</span></div>
+          <div><strong>CC Chelmsford Manager</strong><span>Version 159 • Cloud sync</span></div>
         </div>
       </div>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)">
@@ -905,6 +905,19 @@ body{
 
     <!-- ══ SALES VIEW ═══════════════════════════════ -->
     <div id="view-sales" class="view">
+
+      <!-- PIN Overlay — inside the sales view so nav bar stays visible -->
+      <div id="sales-pin-overlay" style="display:none;position:absolute;inset:0;z-index:100;background:var(--bg);flex-direction:column;align-items:center;justify-content:center;padding:24px">
+        <div style="text-align:center;margin-bottom:28px">
+          <div style="font-size:40px;margin-bottom:14px">🔐</div>
+          <div style="font-size:20px;font-weight:700;letter-spacing:-0.3px;margin-bottom:6px">Sales PIN Required</div>
+          <div style="font-size:13px;color:var(--text3)">Enter your PIN to access Sales</div>
+        </div>
+        <div id="pin-dots" style="display:flex;gap:14px;margin-bottom:8px"></div>
+        <div id="pin-error" style="color:var(--red);font-size:13px;font-weight:600;min-height:20px;margin-bottom:20px;text-align:center;transition:opacity .2s"></div>
+        <div id="pin-pad" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:100%;max-width:270px"></div>
+        <button onclick="cancelPinOverlay()" style="margin-top:28px;background:none;border:none;color:var(--text3);font-size:14px;cursor:pointer;padding:10px 20px;border-radius:8px">Cancel</button>
+      </div>
 
       <!-- Week Nav -->
       <div id="sales-week-nav">
@@ -943,19 +956,6 @@ body{
   </div>
 
 </div><!-- /main-app -->
-
-<!-- ══ SALES PIN OVERLAY ═══════════════════════════════ -->
-<div id="sales-pin-overlay" style="display:none;position:fixed;inset:0;z-index:9500;background:rgba(25,25,25,0.98);flex-direction:column;align-items:center;justify-content:center;padding:24px">
-  <div style="text-align:center;margin-bottom:28px">
-    <div style="font-size:40px;margin-bottom:14px">🔐</div>
-    <div style="font-size:20px;font-weight:700;letter-spacing:-0.3px;margin-bottom:6px">Sales PIN Required</div>
-    <div style="font-size:13px;color:var(--text3)">Enter your PIN to access Sales</div>
-  </div>
-  <div id="pin-dots" style="display:flex;gap:14px;margin-bottom:8px"></div>
-  <div id="pin-error" style="color:var(--red);font-size:13px;font-weight:600;min-height:20px;margin-bottom:20px;text-align:center;transition:opacity .2s"></div>
-  <div id="pin-pad" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:100%;max-width:270px"></div>
-  <button onclick="cancelPinOverlay()" style="margin-top:28px;background:none;border:none;color:var(--text3);font-size:14px;cursor:pointer;padding:10px 20px;border-radius:8px">Cancel</button>
-</div>
 
 <!-- ══ CHANGE PIN SHEET ══════════════════════════════ -->
 <div id="change-pin-overlay" onclick="if(event.target===this)closeChangePinSheet()" style="display:none;position:fixed;inset:0;z-index:9600;background:rgba(0,0,0,0.6);align-items:flex-end;justify-content:center">
@@ -2184,16 +2184,19 @@ function setViewMode(mode){
 function showView(v){
   if(v==='sales'){
     if(!_perms.is_admin&&!_perms.can_view_sales&&!_perms.can_edit_sales)return;
-    // Always require PIN every visit (admins bypass only if no PIN set yet)
+    // Activate the view first so the nav bar highlights correctly
+    _doShowView('sales');
+    // If a PIN is set, overlay it on top of the (now-visible) sales view
     if(_salesPin){
-      showSalesPinOverlay(()=>_doShowView('sales'));
+      showSalesPinOverlay(null); // callback not needed — overlay hides itself on success
       return;
     }
-    // No PIN set — admins go straight through; others are blocked
+    // No PIN set — admins go straight through; others see a message
     if(!_perms.is_admin){
       toast('⛔ Sales access restricted. Ask an admin to set a PIN.');
-      return;
+      _doShowView('rota');
     }
+    return;
   }
   _doShowView(v);
 }
@@ -2230,7 +2233,7 @@ function _updatePinStatusLabel(){
 
 function showSalesPinOverlay(onSuccess){
   _pinBuffer='';
-  _pinOnSuccess=onSuccess;
+  _pinOnSuccess=onSuccess||null;
   const errEl=document.getElementById('pin-error');
   if(errEl)errEl.textContent='';
   _renderPinDots();
@@ -2242,6 +2245,8 @@ function showSalesPinOverlay(onSuccess){
 function cancelPinOverlay(){
   document.getElementById('sales-pin-overlay').style.display='none';
   _pinBuffer='';
+  // Navigate away from Sales since PIN was cancelled
+  _doShowView('rota');
 }
 
 function _renderPinDots(){
