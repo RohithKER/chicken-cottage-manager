@@ -891,7 +891,7 @@ body{
         <div class="sg-label">App</div>
         <div class="si">
           <div class="si-icon" style="background:rgba(255,255,255,.08);overflow:hidden;padding:0"><img src="" id="settings-logo" alt="CC" style="width:34px;height:34px;object-fit:cover;border-radius:7px"></div>
-          <div><strong>CC Chelmsford Manager</strong><span>Version 150 • Cloud sync</span></div>
+          <div><strong>CC Chelmsford Manager</strong><span>Version 151 • Cloud sync</span></div>
         </div>
       </div>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)">
@@ -1345,14 +1345,14 @@ async function _refreshPermsBackground(userId,email,isHardcodedAdmin){
 }
 
 function _applyPermUI(){
-  const canSettings=_perms.is_admin||_perms.can_edit_settings;
-  const canEditSales=_perms.is_admin||_perms.can_edit_sales;
+  const canSettings=_perms.can_edit_settings;
+  const canEditSales=_perms.can_edit_sales;
   const adminPanel=document.getElementById('admin-panel');
   if(adminPanel)adminPanel.style.display=_perms.is_admin?'':'none';
   const adminItem=document.getElementById('um-admin');
   if(adminItem)adminItem.style.display=_perms.is_admin?'':'none';
   const salesBtn=document.getElementById('nav-sales');
-  if(salesBtn)salesBtn.style.display=(_perms.is_admin||_perms.can_view_sales||_perms.can_edit_sales)?'':'none';
+  if(salesBtn)salesBtn.style.display=(_perms.can_view_sales||_perms.can_edit_sales)?'':'none';
   // Sales edit controls — hidden for view-only users
   const saveSalesBtn=document.getElementById('save-sales-btn');
   if(saveSalesBtn)saveSalesBtn.style.display=canEditSales?'':'none';
@@ -1384,9 +1384,9 @@ function _setupPendingWatcher(userId,email){
 }
 
 // Show a toast and return false if user lacks a permission
-// Admins bypass all checks — is_admin grants full access to everything
+// is_admin only controls the admin panel visibility — individual permissions are checked directly
 function requirePerm(perm,label){
-  if(_perms.is_admin||_perms[perm])return true;
+  if(_perms[perm])return true;
   toast('⛔ No permission to '+label);
   return false;
 }
@@ -2109,7 +2109,7 @@ function renderTable(){
 }
 
 function renderStaff(){
-  const canEdit=_perms.is_admin||_perms.can_edit_staffs;
+  const canEdit=_perms.can_edit_staffs;
   // Show/hide the Add Member panel based on permission
   const addPanel=document.getElementById('staff-add-panel');
   if(addPanel)addPanel.style.display=canEdit?'':'none';
@@ -3601,7 +3601,7 @@ function _resetBreakdown(){
 // ─────────────────────────────────────────────────────────────────────────────
 
 function openDayEntry(dateStr){
-  const canEdit=_perms.is_admin||_perms.can_edit_sales;
+  const canEdit=_perms.can_edit_sales;
   const canView=canEdit||_perms.can_view_sales;
   if(!canView){toast('⛔ No permission to view sales');return;}
   salesOpenDate=dateStr;
