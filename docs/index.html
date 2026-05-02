@@ -897,7 +897,7 @@ body{
         <div class="sg-label">App</div>
         <div class="si">
           <div class="si-icon" style="background:rgba(255,255,255,.08);overflow:hidden;padding:0"><img src="" id="settings-logo" alt="CC" style="width:34px;height:34px;object-fit:cover;border-radius:7px"></div>
-          <div><strong>CC Chelmsford Manager</strong><span>Version 169 • Cloud sync</span></div>
+          <div><strong>CC Chelmsford Manager</strong><span>Version 170 • Cloud sync</span></div>
         </div>
       </div>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)">
@@ -2291,8 +2291,7 @@ function toggleSalesLock(){
     // Unlock: show PIN prompt
     if(!_salesPin){return;} // no PIN set, nothing to unlock
     showSalesPinOverlay(()=>{
-      _salesUnlocked=true;
-      _setUnlockGrace(); // PIN entered — start 6h grace period
+      _salesUnlocked=true; // session-only: locks again on tab switch or minimize
       _updateSalesLockBtn();
       renderSalesTable();
     });
@@ -2303,8 +2302,7 @@ function toggleSalesLock(){
 function requireSalesUnlock(callback){
   if(!_salesPin||_salesUnlocked){callback();return;}
   showSalesPinOverlay(()=>{
-    _salesUnlocked=true;
-    _setUnlockGrace(); // PIN entered — start 6h grace period
+    _salesUnlocked=true; // session-only: locks again on tab switch or minimize
     _updateSalesLockBtn();
     renderSalesTable();
     callback();
