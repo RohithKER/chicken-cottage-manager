@@ -888,7 +888,7 @@ body{
         <div class="sg-label">App</div>
         <div class="si">
           <div class="si-icon" style="background:rgba(255,255,255,.08);overflow:hidden;padding:0"><img src="" id="settings-logo" alt="CC" style="width:34px;height:34px;object-fit:cover;border-radius:7px"></div>
-          <div><strong>CC Chelmsford Manager</strong><span>Version 136 • Cloud sync</span></div>
+          <div><strong>CC Chelmsford Manager</strong><span>Version 137 • Cloud sync</span></div>
         </div>
       </div>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)">
@@ -1881,6 +1881,23 @@ function closeGenericConfirm(){
   document.getElementById('generic-confirm-overlay').style.display='none';
 }
 
+/* ─── Input (prompt replacement) dialog ─────────────────── */
+function showInputDialog(title, defaultValue, callback){
+  document.getElementById('inp-dlg-title').textContent = title;
+  const input = document.getElementById('inp-dlg-field');
+  input.value = defaultValue || '';
+  document.getElementById('inp-dlg-ok').onclick = function(){
+    const val = input.value.trim();
+    closeInputDialog();
+    callback(val);
+  };
+  document.getElementById('input-dialog-overlay').style.display='flex';
+  setTimeout(()=>{ input.focus(); input.select(); }, 80);
+}
+function closeInputDialog(){
+  document.getElementById('input-dialog-overlay').style.display='none';
+}
+
 /* ─── Save Rota + Staff to Cloud ─────────────────────── */
 async function saveRotaStaffToCloud(){
   if(!user){toast('Sign in to save');return;}
@@ -2327,8 +2344,12 @@ async function purgeStaffFromCloud(name){
 
 function renameStaff(type,oldName){
   if(!requirePerm('can_edit_staffs','manage staff'))return;
-  const newName=(prompt(`Rename "${oldName}":`,oldName)||'').trim();
-  if(!newName||newName===oldName)return;
+  showInputDialog(`Rename "${oldName}":`, oldName, function(newName){
+    if(!newName||newName===oldName)return;
+    _doRenameStaff(oldName, newName);
+  });
+}
+function _doRenameStaff(oldName, newName){
   // Update staff list in both types (person might be in both)
   ['inside','delivery'].forEach(t=>{
     state.staff[t]=state.staff[t].map(n=>n===oldName?newName:n);
@@ -3542,17 +3563,18 @@ function handleSalesOverlay(e){
 function getSdVal(id){return parseFloat(document.getElementById(id).value)||0;}
 
 function clearDayEntry(){
-  if(!confirm('Clear all sales for this day?'))return;
-  ['sd-je','sd-cc','sd-ue','sd-dr','sd-cash','sd-card'].forEach(id=>{
-    document.getElementById(id).value='';
+  showGenericConfirm('Clear Day Sales','Clear all sales for this day?','Clear',function(){
+    ['sd-je','sd-cc','sd-ue','sd-dr','sd-cash','sd-card'].forEach(id=>{
+      document.getElementById(id).value='';
+    });
+    _bdItems={ue:[],dr:[]};
+    ['ue','dr'].forEach(f=>{
+      const panel=document.getElementById(f+'-panel');
+      if(panel)panel.style.display='none';
+      _updateToggleBtn(f);
+    });
+    calcDaySales();
   });
-  _bdItems={ue:[],dr:[]};
-  ['ue','dr'].forEach(f=>{
-    const panel=document.getElementById(f+'-panel');
-    if(panel)panel.style.display='none';
-    _updateToggleBtn(f);
-  });
-  calcDaySales();
 }
 
 function calcDaySales(){
@@ -4075,6 +4097,18 @@ window.addEventListener('pageshow', e=>{ if(e.persisted && user) _pwaResume(); }
     <div style="display:flex;gap:10px">
       <button onclick="closeSyncConfirm()" style="flex:1;padding:12px;background:var(--surface2);border:1px solid var(--border);color:var(--text2);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">Cancel</button>
       <button onclick="closeSyncConfirm();syncAll()" style="flex:1;padding:12px;background:var(--accent);border:none;color:#fff;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">Sync</button>
+    </div>
+  </div>
+</div>
+
+<!-- Input Dialog (replaces native prompt() for staff rename) -->
+<div id="input-dialog-overlay" style="display:none;position:fixed;inset:0;z-index:9600;background:rgba(0,0,0,.65);align-items:center;justify-content:center;padding:24px">
+  <div style="width:100%;max-width:320px;background:#252525;border-radius:16px;padding:24px;box-shadow:0 8px 32px rgba(0,0,0,.6)">
+    <div id="inp-dlg-title" style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:12px"></div>
+    <input id="inp-dlg-field" type="text" style="width:100%;box-sizing:border-box;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;outline:none;margin-bottom:16px" onkeydown="if(event.key==='Enter')document.getElementById('inp-dlg-ok').click();if(event.key==='Escape')closeInputDialog()">
+    <div style="display:flex;gap:10px">
+      <button onclick="closeInputDialog()" style="flex:1;padding:12px;background:var(--surface2);border:1px solid var(--border);color:var(--text2);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">Cancel</button>
+      <button id="inp-dlg-ok" style="flex:1;padding:12px;background:var(--accent);border:none;color:#fff;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">Save</button>
     </div>
   </div>
 </div>
