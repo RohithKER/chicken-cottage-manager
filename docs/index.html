@@ -3835,56 +3835,56 @@ applyStaffColors();
 init();
 
 /* ─── PWA Foreground Reconnect ────────────────────────────
-   iOS/Android kill WebSocket connections within seconds of
-   backgrounding a homescreen PWA. Fix: on EVERY foreground
-   return, ping Supabase. If the ping fails → full reconnect.
-   If the ping succeeds → just refresh data silently.
+   Root cause: iOS/Android kill the Supabase WebSocket within
+   seconds of backgrounding a homescreen PWA. The auth JWT can
+   also become stale. On every foreground return we:
+     1. Refresh the auth JWT
+     2. Cycle the realtime socket (disconnect → connect)
+        Phoenix protocol auto-rejoins all channels — do NOT
+        call removeAllChannels() as that destroys the socket
+        and leaves channels unable to resubscribe.
+     3. Re-fetch fresh data from Supabase REST API
 ──────────────────────────────────────────────────────────── */
 let _pwaReconnecting = false;
 
 function _pwaTout(ms){ return new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),ms)); }
-
-async function _pwaPing(){
-  // Returns true if Supabase is reachable, false if dead/slow
-  try{
-    const res = await Promise.race([
-      db.from('staff').select('count').limit(1),
-      _pwaTout(3000)
-    ]);
-    return !res.error;
-  }catch{ return false; }
-}
 
 async function _pwaReconnect(){
   if(_pwaReconnecting || !user) return;
   _pwaReconnecting = true;
 
   try{
-    // Step 1: Always reconnect WebSocket realtime channels —
-    // iOS/Android kill them within seconds of backgrounding.
-    // This is cheap and harmless even if already connected.
-    _realtimeSetup = false;
-    try{ await db.removeAllChannels(); }catch(_){}
-    setupRealtime();
-
-    // Step 2: Ping the REST API to check if auth/network is alive
-    const alive = await _pwaPing();
-    if(!alive){
-      // HTTP also dead — refresh auth JWT then retry
-      logActivity('Reconnecting…','saving');
-      const {data:{session}, error:authErr} = await db.auth.refreshSession();
-      if(authErr || !session){
-        user = null;
-        showScreen('auth');
-        return;
-      }
-      user = session.user;
-      toast('Reconnected ✓');
-      logActivity('Reconnected ✓','success');
+    // ── 1. Refresh auth JWT ──────────────────────────────
+    // Always do this — iOS can suspend JS for hours and the
+    // 1-hour Supabase token will be stale or expired.
+    const {data:{session}, error:authErr} = await db.auth.refreshSession();
+    if(authErr || !session){
+      user = null;
+      showScreen('auth');
+      return;
     }
+    user = session.user;
+    // Push fresh token into realtime client so subscriptions auth correctly
+    try{ db.realtime.setAuth(session.access_token); }catch(_){}
 
-    // Step 3: Always re-fetch fresh data on foreground return
-    const {data:staffData} = await Promise.race([db.from('staff').select('*'), _pwaTout(8000)]);
+    // ── 2. Cycle the WebSocket ───────────────────────────
+    // disconnect() + connect() is the correct way to revive a
+    // dead Supabase realtime connection. Phoenix protocol will
+    // automatically rejoin all registered channels.
+    try{
+      db.realtime.disconnect();
+      await new Promise(r => setTimeout(r, 350));
+      db.realtime.connect();
+      // Give channels time to rejoin (Phoenix sends rejoin after socket opens)
+      await new Promise(r => setTimeout(r, 1200));
+    }catch(_){}
+
+    // ── 3. Re-fetch data via REST ────────────────────────
+    // REST calls use fresh JWT from step 1 so they will succeed
+    // even if realtime is still coming up.
+    const {data:staffData} = await Promise.race([
+      db.from('staff').select('*'), _pwaTout(8000)
+    ]);
     if(staffData && staffData.length > 0){
       state.staff.inside   = staffData.filter(s=>s.type==='inside'  ||s.type==='both').map(s=>s.name);
       state.staff.delivery = staffData.filter(s=>s.type==='delivery'||s.type==='both').map(s=>s.name);
@@ -3895,26 +3895,26 @@ async function _pwaReconnect(){
     await Promise.race([loadSalesWeek(),  _pwaTout(8000)]);
     renderRota(); renderStaff(); applyStaffColors();
 
+    logActivity('Reconnected ✓', 'success');
   }catch(e){
-    logActivity('Reconnect error: '+e.message,'error');
+    logActivity('Reconnect error: '+e.message, 'error');
+    toast('Connection error — tap ↻ to retry');
   }finally{
     _pwaReconnecting = false;
   }
 }
 
-// Fire on EVERY foreground return — no time threshold
+// Every time the app comes back to foreground (no time threshold)
 document.addEventListener('visibilitychange', ()=>{
-  if(document.visibilityState === 'visible'){
-    setTimeout(_pwaReconnect, 400);
-  }
+  if(document.visibilityState === 'visible') setTimeout(_pwaReconnect, 400);
 });
 
-// iOS PWA bfcache restore (swipe-back navigation)
+// iOS PWA: page restored from bfcache
 window.addEventListener('pageshow', e=>{
   if(e.persisted) setTimeout(_pwaReconnect, 400);
 });
 
-// Android PWA focus restore
+// Android PWA: window focus restored
 window.addEventListener('focus', ()=>{
   setTimeout(_pwaReconnect, 400);
 });
