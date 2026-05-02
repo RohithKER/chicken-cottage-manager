@@ -897,7 +897,7 @@ body{
         <div class="sg-label">App</div>
         <div class="si">
           <div class="si-icon" style="background:rgba(255,255,255,.08);overflow:hidden;padding:0"><img src="" id="settings-logo" alt="CC" style="width:34px;height:34px;object-fit:cover;border-radius:7px"></div>
-          <div><strong>CC Chelmsford Manager</strong><span>Version 162 • Cloud sync</span></div>
+          <div><strong>CC Chelmsford Manager</strong><span>Version 163 • Cloud sync</span></div>
         </div>
       </div>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)">
@@ -924,6 +924,7 @@ body{
         <button onclick="changeSalesWeek(-1)">‹</button>
         <div id="sales-week-label">Loading…</div>
         <button onclick="changeSalesWeek(1)">›</button>
+        <button id="sales-lock-btn" onclick="toggleSalesLock()" style="margin-left:6px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:6px 10px;font-size:16px;cursor:pointer;line-height:1" title="Unlock sales figures">🔒</button>
       </div>
       <!-- Sales save row -->
       <div style="padding:8px 10px 10px">
@@ -2224,19 +2225,9 @@ function setViewMode(mode){
 function showView(v){
   if(v==='sales'){
     if(!_perms.is_admin&&!_perms.can_view_sales&&!_perms.can_edit_sales)return;
-    // Activate the view first so the nav bar highlights correctly
-    _doShowView('sales');
-    // If a PIN is set, overlay it on top of the (now-visible) sales view
-    if(_salesPin){
-      showSalesPinOverlay(null); // callback not needed — overlay hides itself on success
-      return;
-    }
-    // No PIN set — admins go straight through; others see a message
-    if(!_perms.is_admin){
-      toast('⛔ Sales access restricted. Ask an admin to set a PIN.');
-      _doShowView('rota');
-    }
-    return;
+    // Reset lock state every visit — numbers are hidden until PIN is entered
+    _salesUnlocked=false;
+    _updateSalesLockBtn();
   }
   _doShowView(v);
 }
@@ -2252,6 +2243,7 @@ function _doShowView(v){
   if(wkNav)wkNav.style.display=v==='rota'?'flex':'none';
   if(v==='staff'){renderStaff();populateNewStaffPalette();}
   if(v==='sales'){
+    _updateSalesLockBtn();
     // If data is already loaded for this week, render instantly (realtime keeps it fresh).
     // Only fetch from DB if the offset changed or data was never loaded.
     if(_salesLoadedOffset===salesWeekOffset)renderSalesTable();
@@ -2262,13 +2254,51 @@ function _doShowView(v){
 }
 
 /* ─── Sales PIN ──────────────────────────────────────────── */
-let _salesPin = null;   // string (e.g. "1234") or null if not set
+let _salesPin = null;      // string (e.g. "1234") or null if not set
+let _salesUnlocked = false; // true once correct PIN entered; resets on every visit
 let _pinBuffer = '';
 let _pinOnSuccess = null;
 
 function _updatePinStatusLabel(){
   const el=document.getElementById('sales-pin-status');
   if(el) el.textContent=_salesPin?`PIN set (${_salesPin.length} digits)`:'No PIN set — tap to create one';
+}
+
+function _updateSalesLockBtn(){
+  const btn=document.getElementById('sales-lock-btn');
+  if(!btn)return;
+  if(!_salesPin){btn.style.display='none';return;}
+  btn.style.display='';
+  btn.textContent=_salesUnlocked?'🔓':'🔒';
+  btn.title=_salesUnlocked?'Numbers visible — tap to lock':'Tap to unlock sales figures';
+}
+
+function toggleSalesLock(){
+  if(_salesUnlocked){
+    // Re-lock: hide numbers again
+    _salesUnlocked=false;
+    _updateSalesLockBtn();
+    renderSalesTable();
+  } else {
+    // Unlock: show PIN prompt
+    if(!_salesPin){return;} // no PIN set, nothing to unlock
+    showSalesPinOverlay(()=>{
+      _salesUnlocked=true;
+      _updateSalesLockBtn();
+      renderSalesTable();
+    });
+  }
+}
+
+// Called when tapping a filled day row while locked — prompt PIN then open the day
+function requireSalesUnlock(callback){
+  if(!_salesPin||_salesUnlocked){callback();return;}
+  showSalesPinOverlay(()=>{
+    _salesUnlocked=true;
+    _updateSalesLockBtn();
+    renderSalesTable();
+    callback();
+  });
 }
 
 function showSalesPinOverlay(onSuccess){
@@ -2285,8 +2315,7 @@ function showSalesPinOverlay(onSuccess){
 function cancelPinOverlay(){
   document.getElementById('sales-pin-overlay').style.display='none';
   _pinBuffer='';
-  // Navigate away from Sales since PIN was cancelled
-  _doShowView('rota');
+  // Just dismiss — stay on Sales tab, numbers remain masked
 }
 
 function _renderPinDots(){
@@ -3717,6 +3746,12 @@ function fmtS(v){return v%1===0?v.toLocaleString():v.toFixed(2);}
 function renderSalesTable(dates){
   if(!dates) dates=getSalesWeekDates(salesWeekOffset);
   const el=document.getElementById('sales-week-table');
+  const locked=_salesPin&&!_salesUnlocked;
+  // Helper: show value if unlocked or zero, otherwise mask
+  const show=(v)=>{
+    if(!locked||v===0)return'£'+fmtS(v);
+    return`<span style="letter-spacing:2px;color:var(--text3);font-size:13px">••••</span>`;
+  };
 
   let gCard=0,gCash=0,gDel=0,gTotal=0;
 
@@ -3729,16 +3764,18 @@ function renderSalesTable(dates){
     const r=salesWeekData[key];
     const dayLabel=DAY_NAMES[i];
     const dateLabel=d.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+    // When locked, clicking a filled row prompts for PIN first
+    const clickHandler=locked&&r?`requireSalesUnlock(()=>openDayEntry('${key}'))`:`openDayEntry('${key}')`;
     if(r){
       const del=(r.just_eat||0)+(r.cc_app||0)+(r.uber_eats||0)+(r.deliveroo||0);
       const total=del+(r.cash||0)+(r.card||0);
       gCard+=(r.card||0); gCash+=(r.cash||0); gDel+=del; gTotal+=total;
-      html+=`<tr class="row-filled" onclick="openDayEntry('${key}')">
+      html+=`<tr class="row-filled" onclick="${clickHandler}">
         <td><div class="stbl-day">${dayLabel}</div><div style="font-size:9px;color:var(--text3)">${dateLabel}</div></td>
-        <td class="stbl-val">£${fmtS(r.card||0)}</td>
-        <td class="stbl-val">£${fmtS(r.cash||0)}</td>
-        <td class="stbl-val">£${fmtS(del)}</td>
-        <td class="stbl-total">£${fmtS(total)}</td>
+        <td class="stbl-val">${show(r.card||0)}</td>
+        <td class="stbl-val">${show(r.cash||0)}</td>
+        <td class="stbl-val">${show(del)}</td>
+        <td class="stbl-total">${show(total)}</td>
       </tr>`;
     } else {
       html+=`<tr class="row-empty" onclick="openDayEntry('${key}')">
@@ -3749,12 +3786,13 @@ function renderSalesTable(dates){
     }
   });
 
+  const showTotal=(v)=>(locked&&v>0)?`<span style="letter-spacing:2px;color:var(--text3);font-size:13px">••••</span>`:`£${fmtS(v)}`;
   html+=`</tbody><tfoot><tr class="stbl-grand">
     <td class="stbl-day">Total</td>
-    <td class="stbl-total">£${fmtS(gCard)}</td>
-    <td class="stbl-total">£${fmtS(gCash)}</td>
-    <td class="stbl-total">£${fmtS(gDel)}</td>
-    <td class="stbl-total">£${fmtS(gTotal)}</td>
+    <td class="stbl-total">${showTotal(gCard)}</td>
+    <td class="stbl-total">${showTotal(gCash)}</td>
+    <td class="stbl-total">${showTotal(gDel)}</td>
+    <td class="stbl-total">${showTotal(gTotal)}</td>
   </tr></tfoot></table>`;
 
   el.innerHTML=html;
