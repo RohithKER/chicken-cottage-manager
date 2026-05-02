@@ -888,7 +888,7 @@ body{
         <div class="sg-label">App</div>
         <div class="si">
           <div class="si-icon" style="background:rgba(255,255,255,.08);overflow:hidden;padding:0"><img src="" id="settings-logo" alt="CC" style="width:34px;height:34px;object-fit:cover;border-radius:7px"></div>
-          <div><strong>CC Chelmsford Manager</strong><span>Version 143 • Cloud sync</span></div>
+          <div><strong>CC Chelmsford Manager</strong><span>Version 144 • Cloud sync</span></div>
         </div>
       </div>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)">
@@ -965,7 +965,7 @@ body{
       <!-- Notes section -->
       <div class="ss-section">
         <div class="ss-section-hdr">Notes</div>
-        <textarea id="sd-notes" oninput="saveReceiptNote()" placeholder="Add a note for this day…" rows="3" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:15px;padding:9px 10px;resize:none;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',sans-serif;outline:none;line-height:1.45;box-sizing:border-box"></textarea>
+        <textarea id="sd-notes" oninput="saveReceiptNote()" placeholder="Add a note for this day…" rows="3" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:16px;padding:9px 10px;resize:none;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',sans-serif;outline:none;line-height:1.45;box-sizing:border-box"></textarea>
       </div>
     </div>
     <div class="ss-foot" style="flex-direction:column;gap:8px">
@@ -1470,6 +1470,33 @@ function _buildUserPermRow(u){
   });
 
   wrap.appendChild(permsGrid);
+
+  // Remove user button — hidden for the currently signed-in user
+  if(!user||u.user_id!==user.id){
+    const rmBtn=document.createElement('button');
+    rmBtn.textContent='Remove User';
+    rmBtn.style.cssText='margin-top:12px;width:100%;padding:9px;background:transparent;border:1px solid rgba(255,107,122,.4);color:var(--red);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer';
+    rmBtn.onclick=()=>{
+      showGenericConfirm(
+        'Remove User',
+        `Remove ${u.email||u.user_id}? They will be signed out and must wait for approval to rejoin.`,
+        'Remove',
+        async()=>{
+          try{
+            const{error}=await db.from('user_permissions').delete().eq('user_id',u.user_id);
+            if(error)throw error;
+            toast('User removed ✓');
+            _loadPermsData();
+          }catch(e){
+            toast('❌ Failed to remove user');
+            console.error('removeUser:',e);
+          }
+        }
+      );
+    };
+    wrap.appendChild(rmBtn);
+  }
+
   return wrap;
 }
 
@@ -3427,6 +3454,7 @@ function changeSalesWeek(dir){
 // ── Order Breakdown (Uber Eats / Deliveroo) ──────────────────────────────────
 let _bdItems={ue:[],dr:[]};
 let _bdFocusNew=false; // flag: focus newly added item row instead of "Add amount"
+let _pendingBd={ue:'',dr:''}; // tracks live value in "Add amount" input before confirmed
 function _updateToggleBtn(f){
   const btn=document.getElementById(f+'-toggle');
   const panel=document.getElementById(f+'-panel');
@@ -3448,6 +3476,7 @@ function toggleBreakdown(f){
   const panel=document.getElementById(f+'-panel');
   if(!panel)return;
   const open=panel.style.display==='none';
+  if(!open)_flushPendingBdInputs(); // capture typed-but-unconfirmed value before collapsing
   panel.style.display=open?'block':'none';
   if(open)_renderBdItems(f);
   _updateToggleBtn(f);
@@ -3477,6 +3506,7 @@ function _renderBdItems(f){
   row.className='breakdown-item';
   const addInp=document.createElement('input');
   addInp.type='number';addInp.step='0.01';addInp.min='0';addInp.placeholder='Add amount…';
+  addInp.oninput=()=>{_pendingBd[f]=addInp.value;}; // track live value
   addInp.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();_addBdItemFromInput(f,addInp);}};
   const addBtn=document.createElement('button');
   addBtn.className='breakdown-add';addBtn.textContent='+';addBtn.type='button';
@@ -3489,6 +3519,7 @@ function _renderBdItems(f){
 function _addBdItem(f){_bdFocusNew=true;_bdItems[f].push(0);_renderBdItems(f);_syncBdTotal(f);}
 function _addBdItemFromInput(f,inp){
   const v=parseFloat(inp.value)||0;
+  _pendingBd[f]=''; // clear tracked pending so flush doesn't double-count
   if(v){_bdItems[f].push(v);_syncBdTotal(f);_renderBdItems(f);}
 }
 function _syncBdTotal(f){
@@ -3597,18 +3628,11 @@ function calcDaySales(){
 }
 
 function _flushPendingBdInputs(){
-  // If user typed in "Add amount" but didn't press Enter/+, capture it before saving
+  // Capture any value typed in "Add amount" but not yet confirmed with Enter/+
   ['ue','dr'].forEach(f=>{
-    const wrap=document.getElementById(f+'-items');
-    if(!wrap)return;
-    // The last input in the panel is the "Add amount" field (has no × button sibling)
-    const rows=wrap.querySelectorAll('.breakdown-item');
-    const lastRow=rows[rows.length-1];
-    if(!lastRow)return;
-    const inp=lastRow.querySelector('input');
-    if(!inp)return;
-    const v=parseFloat(inp.value)||0;
-    if(v){_bdItems[f].push(v);_syncBdTotal(f);inp.value='';}
+    const v=parseFloat(_pendingBd[f])||0;
+    if(v){_bdItems[f].push(v);_syncBdTotal(f);}
+    _pendingBd[f]='';
   });
 }
 async function saveDaySales(){
