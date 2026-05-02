@@ -3833,6 +3833,81 @@ function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').
 applyStaffColors();
 
 init();
+
+/* ─── PWA Background Reconnect ───────────────────────────
+   When the app is added to homescreen and backgrounded, iOS/Android
+   suspend the JS runtime. WebSocket (Supabase realtime) connections
+   die silently. Auth JWTs can also expire. On returning to foreground
+   we detect this and transparently reconnect + re-fetch data.
+──────────────────────────────────────────────────────────── */
+let _lastHiddenAt = 0;
+let _pwаReconnecting = false;
+
+async function _pwаReconnect(){
+  if(_pwаReconnecting || !user) return;
+  const awayMs = Date.now() - _lastHiddenAt;
+  if(awayMs < 15000) return; // only reconnect if away >15 seconds
+
+  _pwаReconnecting = true;
+  logActivity('Reconnecting…', 'saving');
+
+  try{
+    // 1. Refresh JWT — may have expired while suspended
+    const { data: { session }, error: authErr } = await db.auth.refreshSession();
+    if(authErr || !session){
+      // Session fully expired — send to sign-in
+      logActivity('Session expired — please sign in again', 'error');
+      user = null;
+      showScreen('auth');
+      _pwаReconnecting = false;
+      return;
+    }
+    user = session.user;
+
+    // 2. Tear down dead realtime channels and re-setup
+    _realtimeSetup = false;
+    try{ await db.removeAllChannels(); }catch(_){}
+    setupRealtime();
+
+    // 3. Re-fetch all live data (staff, schedules, early shifts, sales)
+    const _tout = ms => new Promise((_,rej) => setTimeout(() => rej(new Error('timeout')), ms));
+    const { data: staffData } = await Promise.race([db.from('staff').select('*'), _tout(8000)]);
+    if(staffData && staffData.length > 0){
+      state.staff.inside   = staffData.filter(s => s.type === 'inside'   || s.type === 'both').map(s => s.name);
+      state.staff.delivery = staffData.filter(s => s.type === 'delivery' || s.type === 'both').map(s => s.name);
+    }
+    await Promise.race([loadSchedules(),   _tout(8000)]);
+    await Promise.race([loadEarlyShift(),  _tout(8000)]);
+    await Promise.race([loadSalesWeek(),   _tout(8000)]);
+    renderRota(); renderStaff(); applyStaffColors();
+
+    logActivity('Reconnected ✓', 'success');
+    toast('Reconnected ✓');
+  }catch(e){
+    logActivity('Reconnect failed: ' + e.message, 'error');
+    toast('Connection lost — tap ↻ to retry');
+  }finally{
+    _pwаReconnecting = false;
+  }
+}
+
+// Track when app goes to background
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState === 'hidden'){
+    _lastHiddenAt = Date.now();
+  } else {
+    // Small delay so the UI paints first before we start network calls
+    setTimeout(_pwаReconnect, 300);
+  }
+});
+
+// iOS PWA: page restored from bfcache (e.g. swipe back)
+window.addEventListener('pageshow', e => {
+  if(e.persisted){
+    _lastHiddenAt = Date.now() - 60000; // treat as if away for 60s
+    setTimeout(_pwаReconnect, 300);
+  }
+});
 </script>
 <!-- Thermal Receipt (hidden, shown only during print) -->
 <div id="print-receipt">
