@@ -886,7 +886,7 @@ body{
         <div class="sg-label">App</div>
         <div class="si">
           <div class="si-icon" style="background:rgba(255,255,255,.08);overflow:hidden;padding:0"><img src="" id="settings-logo" alt="CC" style="width:34px;height:34px;object-fit:cover;border-radius:7px"></div>
-          <div><strong>CC Chelmsford Manager</strong><span>Version 130 • Cloud sync</span></div>
+          <div><strong>CC Chelmsford Manager</strong><span>Version 131 • Cloud sync</span></div>
         </div>
       </div>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)">
@@ -3110,10 +3110,28 @@ async function _startSession(u){
   user=u;
   document.getElementById('um-email').textContent=u.email;
   document.getElementById('user-email-display').textContent=u.email;
-  await loadPermissions(u.id,u.email);
-  // loadPermissions shows pending screen itself if status=pending; skip rest
-  if(_userStatus==='pending')return;
-  await loadFromCloud();
+
+  // Hard bail-out: never stay stuck on loading screen more than 8 seconds.
+  // If permissions or cloud data hangs (broken network after iOS wakeup),
+  // show the app with local cached data so the user isn't locked out.
+  let _bailed=false;
+  const _bail=setTimeout(()=>{
+    if(_bailed)return; _bailed=true;
+    if(_userStatus==='pending')return; // pending screen handles itself
+    document.getElementById('week-label').textContent=weekLabel(state.weekOffset);
+    renderRota(); showScreen('main'); setupRealtime();
+    toast('⚠ Loading timed out — using local data');
+  },8000);
+
+  try{
+    await loadPermissions(u.id,u.email);
+    if(_userStatus==='pending'){clearTimeout(_bail);return;}
+    await loadFromCloud();
+  }catch(e){console.warn('Session start error:',e);}
+
+  clearTimeout(_bail);
+  if(_bailed)return; // bail already fired
+  _bailed=true;
   document.getElementById('week-label').textContent=weekLabel(state.weekOffset);
   renderRota();
   showScreen('main');

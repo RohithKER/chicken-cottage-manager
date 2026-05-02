@@ -1,16 +1,23 @@
-/* CC Manager Service Worker — v130
-   Caches the app shell (index.html) so window.location.reload()
-   is served instantly from cache with no network needed.
-   This lets us reload on iOS PWA resumption without the
-   frozen network stack blocking the page load.                */
+/* CC Manager Service Worker — v131
+   Caches BOTH the HTML page AND the Supabase CDN script so that
+   window.location.reload() serves everything instantly from cache
+   with zero network dependency. The fresh Supabase client then
+   makes brand-new TCP connections which work fine.             */
 
-const CACHE = 'cc-v130';
+const CACHE = 'cc-v131';
+const CDN_SUPABASE = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
 
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE).then(cache =>
-      // Pre-cache the app shell
-      cache.addAll(['./', './index.html']).catch(() => {})
+      Promise.all([
+        cache.add('./').catch(() => {}),
+        cache.add('./index.html').catch(() => {}),
+        // Pre-cache the Supabase CDN script (no-cors = opaque response, still cacheable)
+        fetch(CDN_SUPABASE, { mode: 'no-cors' })
+          .then(r => cache.put(CDN_SUPABASE, r))
+          .catch(() => {})
+      ])
     )
   );
   self.skipWaiting();
@@ -27,24 +34,33 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', event => {
-  // Only intercept navigation requests (the HTML page itself)
-  // Let Supabase API, CDN scripts, etc. go straight to network
-  if (event.request.mode !== 'navigate') return;
+  const url = new URL(event.request.url);
+  const isPage    = event.request.mode === 'navigate';
+  const isJsDelivr = url.hostname === 'cdn.jsdelivr.net';
+
+  // Only handle the app page and CDN scripts — let Supabase API calls through
+  if (!isPage && !isJsDelivr) return;
 
   event.respondWith(
     caches.open(CACHE).then(cache =>
       cache.match(event.request).then(cached => {
-        // Always try to fetch a fresh copy in the background
-        const networkFetch = fetch(event.request).then(response => {
-          if (response && response.ok) {
-            cache.put(event.request, response.clone());
+        if (cached) {
+          // Serve from cache instantly; update in background
+          if (isPage) {
+            fetch(event.request)
+              .then(r => { if (r && r.ok) cache.put(event.request, r.clone()); })
+              .catch(() => {});
           }
-          return response;
-        }).catch(() => null);
-
-        // Serve cache immediately (stale-while-revalidate)
-        // If no cache yet, wait for network
-        return cached || networkFetch;
+          return cached;
+        }
+        // Not in cache yet — fetch from network and cache
+        return fetch(event.request, isJsDelivr ? { mode: 'no-cors' } : undefined)
+          .then(response => {
+            if (response) {
+              cache.put(event.request, response.clone()).catch(() => {});
+            }
+            return response;
+          });
       })
     )
   );
