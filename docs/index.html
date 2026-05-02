@@ -889,7 +889,7 @@ body{
         <div class="sg-label">App</div>
         <div class="si">
           <div class="si-icon" style="background:rgba(255,255,255,.08);overflow:hidden;padding:0"><img src="" id="settings-logo" alt="CC" style="width:34px;height:34px;object-fit:cover;border-radius:7px"></div>
-          <div><strong>CC Chelmsford Manager</strong><span>Version 148 • Cloud sync</span></div>
+          <div><strong>CC Chelmsford Manager</strong><span>Version 149 • Cloud sync</span></div>
         </div>
       </div>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)">
@@ -2355,6 +2355,13 @@ function _doRemoveStaff(type,name){
     // Still in another list — just update their type, do NOT blacklist
     const newType=stillInInside&&stillInDelivery?'both':stillInInside?'inside':'delivery';
     saveStaffToCloud(name,newType).catch(()=>{});
+    // Also purge their schedule entries for the removed type — otherwise a sync will bring them back
+    Object.keys(state.schedules).forEach(k=>{
+      if(k.startsWith(type+'|')&&state.schedules[k]&&state.schedules[k].includes(name))
+        state.schedules[k]=state.schedules[k].filter(n=>n!==name);
+    });
+    _saveSchedCache(state.schedules);
+    purgeStaffFromTypeCloud(name,type).catch(()=>{});
     logActivity(`${name} removed from ${type} (still in ${newType})`, 'info');
   }
   renderStaff();renderRota();toast(`${name} removed from ${type}`);
@@ -2370,6 +2377,20 @@ async function purgeStaffFromCloud(name){
     }));
     await db.from('schedules').upsert(updates,{onConflict:'schedule_type,week_key,day,shift_col'});
   }catch(e){console.warn('Purge failed:',e);}
+}
+// Purge a person's schedule entries only for the given schedule type (e.g. 'inside')
+async function purgeStaffFromTypeCloud(name,schedType){
+  if(!user)return;
+  try{
+    const{data}=await db.from('schedules').select('*')
+      .eq('schedule_type',schedType).contains('staff_names',[name]);
+    if(!data||!data.length)return;
+    const updates=data.map(row=>({
+      ...row,staff_names:row.staff_names.filter(n=>n!==name),
+      updated_at:new Date().toISOString()
+    }));
+    await db.from('schedules').upsert(updates,{onConflict:'schedule_type,week_key,day,shift_col'});
+  }catch(e){console.warn('Type purge failed:',e);}
 }
 
 function renameStaff(type,oldName){
