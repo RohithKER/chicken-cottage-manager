@@ -897,7 +897,7 @@ body{
         <div class="sg-label">App</div>
         <div class="si">
           <div class="si-icon" style="background:rgba(255,255,255,.08);overflow:hidden;padding:0"><img src="" id="settings-logo" alt="CC" style="width:34px;height:34px;object-fit:cover;border-radius:7px"></div>
-          <div><strong>CC Chelmsford Manager</strong><span>Version 173 • Cloud sync</span></div>
+          <div><strong>CC Chelmsford Manager</strong><span>Version 174 • Cloud sync</span></div>
         </div>
       </div>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)">
@@ -907,15 +907,17 @@ body{
     <div id="view-sales" class="view">
 
       <!-- PIN Overlay — inside the sales view so nav bar stays visible -->
-      <div id="sales-pin-overlay" style="display:none;position:absolute;inset:0;z-index:100;background:var(--bg);flex-direction:column;align-items:center;justify-content:center;padding:24px">
-        <div style="text-align:center;margin-bottom:28px">
-          <div style="font-size:40px;margin-bottom:14px">🔐</div>
-          <div style="font-size:20px;font-weight:700;letter-spacing:-0.3px;margin-bottom:6px">Sales PIN Required</div>
-          <div style="font-size:13px;color:var(--text3)">Enter your PIN to access Sales</div>
+      <div id="sales-pin-overlay" style="display:none;position:absolute;inset:0;z-index:100;background:var(--bg);flex-direction:column;align-items:center;justify-content:center;padding:16px">
+        <div style="width:100%;max-width:240px;display:flex;flex-direction:column;align-items:center">
+          <div style="text-align:center;margin-bottom:18px">
+            <div style="font-size:32px;margin-bottom:10px">🔐</div>
+            <div style="font-size:17px;font-weight:700;letter-spacing:-0.3px;margin-bottom:4px">Sales PIN Required</div>
+            <div style="font-size:12px;color:var(--text3)">Enter your PIN to access Sales</div>
+          </div>
+          <div id="pin-dots" style="display:flex;gap:12px;margin-bottom:6px"></div>
+          <div id="pin-error" style="color:var(--red);font-size:12px;font-weight:600;min-height:18px;margin-bottom:14px;text-align:center;transition:opacity .2s"></div>
+          <div id="pin-pad" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:100%"></div>
         </div>
-        <div id="pin-dots" style="display:flex;gap:14px;margin-bottom:8px"></div>
-        <div id="pin-error" style="color:var(--red);font-size:13px;font-weight:600;min-height:20px;margin-bottom:20px;text-align:center;transition:opacity .2s"></div>
-        <div id="pin-pad" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:100%;max-width:270px"></div>
       </div>
 
       <!-- Week Nav -->
@@ -2348,8 +2350,8 @@ function _buildPinPad(){
       ontouchstart="this.style.color='var(--text)'"
       ontouchend="this.style.color='var(--text3)'">Cancel</button>`;
     return `<button onclick="pinPadPress('${k}')"
-      style="padding:18px 0;font-size:${k==='⌫'?'20px':'22px'};font-weight:600;
-      background:var(--surface);border:1px solid var(--border2);border-radius:12px;
+      style="padding:14px 0;font-size:${k==='⌫'?'18px':'20px'};font-weight:600;
+      background:var(--surface);border:1px solid var(--border2);border-radius:10px;
       color:var(--text);cursor:pointer;transition:background .12s,transform .08s;
       -webkit-tap-highlight-color:transparent;user-select:none"
       ontouchstart="this.style.background='var(--surface2)';this.style.transform='scale(0.95)'"
