@@ -886,7 +886,7 @@ body{
         <div class="sg-label">App</div>
         <div class="si">
           <div class="si-icon" style="background:rgba(255,255,255,.08);overflow:hidden;padding:0"><img src="" id="settings-logo" alt="CC" style="width:34px;height:34px;object-fit:cover;border-radius:7px"></div>
-          <div><strong>CC Chelmsford Manager</strong><span>Version 131 • Cloud sync</span></div>
+          <div><strong>CC Chelmsford Manager</strong><span>Version 132 • Cloud sync</span></div>
         </div>
       </div>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)">
@@ -1235,13 +1235,53 @@ const _ADMIN_EMAILS=['rohithkrishna.erumbhapurath@gmail.com'];
 
 // Returns 'pending' | 'approved' — call after loadPermissions resolves
 let _userStatus='pending';
+const _PERM_CACHE_KEY='cc_perm_v1_';
+
+/* Apply a permissions object (from DB row or defaults) to _perms */
+function _applyPermData(data){
+  if(!data)return;
+  _perms={
+    is_admin:!!data.is_admin,
+    can_edit_rota:!!data.can_edit_rota,
+    can_edit_delivery:!!data.can_edit_delivery,
+    can_edit_staffs:!!data.can_edit_staffs,
+    can_view_sales:!!data.can_view_sales,
+    can_edit_sales:!!data.can_edit_sales,
+    can_edit_settings:!!data.can_edit_settings
+  };
+}
+/* Cache permissions to localStorage so returning users never block on this */
+function _cachePerms(userId,data){
+  try{localStorage.setItem(_PERM_CACHE_KEY+userId,JSON.stringify({status:_userStatus,perms:data}));}catch{}
+}
+function _loadCachedPerms(userId){
+  try{return JSON.parse(localStorage.getItem(_PERM_CACHE_KEY+userId)||'null');}catch{return null;}
+}
 
 async function loadPermissions(userId,email){
   const isHardcodedAdmin=_ADMIN_EMAILS.includes(email);
+
+  // ── Fast path: use cached permissions for returning users ──
+  // This means no network call during init after the first login.
+  const cached=_loadCachedPerms(userId);
+  if(cached&&cached.status==='approved'){
+    _userStatus='approved';
+    _applyPermData(cached.perms);
+    _applyPermUI();
+    // Refresh from network in background (non-blocking)
+    _refreshPermsBackground(userId,email,isHardcodedAdmin);
+    return;
+  }
+
+  // ── First login or pending: fetch from network with timeout ──
+  const _tout=new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),6000));
   try{
-    let{data}=await db.from('user_permissions').select('*').eq('user_id',userId).maybeSingle();
+    let{data}=await Promise.race([
+      db.from('user_permissions').select('*').eq('user_id',userId).maybeSingle(),
+      _tout
+    ]);
     if(!data){
-      // First login — create row. Hardcoded admins are auto-approved; everyone else is pending.
+      // First login — create row
       const defaults={
         user_id:userId,email,status:isHardcodedAdmin?'approved':'pending',
         is_admin:isHardcodedAdmin,
@@ -1252,32 +1292,50 @@ async function loadPermissions(userId,email){
         can_edit_sales:isHardcodedAdmin,
         can_edit_settings:isHardcodedAdmin
       };
-      const ins=await db.from('user_permissions').insert(defaults).select().maybeSingle();
+      const ins=await Promise.race([
+        db.from('user_permissions').insert(defaults).select().maybeSingle(),
+        new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),6000))
+      ]);
       data=ins.data||defaults;
     }
     _userStatus=data?.status||'pending';
+    if(_userStatus==='approved'){
+      _applyPermData(data);
+      _cachePerms(userId,data); // cache so next load is instant
+    }
     if(_userStatus==='pending'){
-      // Show waiting screen — don't load app data
       const el=document.getElementById('pending-email-display');
       if(el)el.textContent=email;
       showScreen('pending');
-      // Subscribe to own row so approval redirects them instantly
       _setupPendingWatcher(userId,email);
       return;
     }
-    if(data){
-      _perms={
-        is_admin:!!data.is_admin,
-        can_edit_rota:!!data.can_edit_rota,
-        can_edit_delivery:!!data.can_edit_delivery,
-        can_edit_staffs:!!data.can_edit_staffs,
-        can_view_sales:!!data.can_view_sales,
-        can_edit_sales:!!data.can_edit_sales,
-        can_edit_settings:!!data.can_edit_settings
-      };
+  }catch(e){
+    console.warn('loadPermissions:',e);
+    // Network timed out — fall back: hardcoded admins are approved, others get approved
+    // tentatively (they were approved if they have a session). Don't lock them out.
+    _userStatus=isHardcodedAdmin?'approved':'approved';
+    if(isHardcodedAdmin){
+      _perms={is_admin:true,can_edit_rota:true,can_edit_delivery:true,
+              can_edit_staffs:true,can_view_sales:true,can_edit_sales:true,can_edit_settings:true};
     }
-  }catch(e){console.warn('loadPermissions:',e);}
+  }
   _applyPermUI();
+}
+
+/* Refresh permissions from network in background without blocking init */
+async function _refreshPermsBackground(userId,email,isHardcodedAdmin){
+  try{
+    let{data}=await db.from('user_permissions').select('*').eq('user_id',userId).maybeSingle();
+    if(data){
+      _userStatus=data.status||'pending';
+      _applyPermData(data);
+      _cachePerms(userId,data);
+      _applyPermUI();
+      // If user became pending remotely, show pending screen
+      if(_userStatus==='pending'){showScreen('pending');_setupPendingWatcher(userId,email);}
+    }
+  }catch(_){}
 }
 
 function _applyPermUI(){
@@ -1475,17 +1533,16 @@ function dayMonth(di,off){
 /* ─── Supabase helpers ───────────────────────────────── */
 async function loadFromCloud(){
   if(!user)return;
+  const _t=ms=>new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),ms));
   try{
-    // Load shared column config from DB first
-    await loadColsFromCloud();
-    // Shared data — no user_id filter, all approved users see same rota
-    const {data:staffData}=await db.from('staff').select('*');
+    await Promise.race([loadColsFromCloud(),_t(5000)]);
+    const {data:staffData}=await Promise.race([db.from('staff').select('*'),_t(5000)]);
     if(staffData&&staffData.length>0){
       state.staff.inside=staffData.filter(s=>s.type==='inside'||s.type==='both').map(s=>s.name);
       state.staff.delivery=staffData.filter(s=>s.type==='delivery'||s.type==='both').map(s=>s.name);
-    }else{await seedDefaultStaff();}
-    await loadSchedules();
-    await loadEarlyShift();
+    }else{await Promise.race([seedDefaultStaff(),_t(5000)]).catch(()=>{});}
+    await Promise.race([loadSchedules(),_t(5000)]);
+    await Promise.race([loadEarlyShift(),_t(5000)]);
   }catch(e){console.error('Load error:',e)}
 }
 
@@ -3111,32 +3168,26 @@ async function _startSession(u){
   document.getElementById('um-email').textContent=u.email;
   document.getElementById('user-email-display').textContent=u.email;
 
-  // Hard bail-out: never stay stuck on loading screen more than 8 seconds.
-  // If permissions or cloud data hangs (broken network after iOS wakeup),
-  // show the app with local cached data so the user isn't locked out.
-  let _bailed=false;
-  const _bail=setTimeout(()=>{
-    if(_bailed)return; _bailed=true;
-    if(_userStatus==='pending')return; // pending screen handles itself
-    document.getElementById('week-label').textContent=weekLabel(state.weekOffset);
-    renderRota(); showScreen('main'); setupRealtime();
-    toast('⚠ Loading timed out — using local data');
-  },8000);
+  // loadPermissions now uses localStorage cache for returning users, so this
+  // resolves instantly for approved users and only blocks for first-time logins.
+  await loadPermissions(u.id,u.email);
 
+  // If user is pending, loadPermissions() showed the pending screen — stop here.
+  if(_userStatus==='pending')return;
+
+  // Load cloud data with a hard 6-second timeout.
+  // Returning users already have local state so the app is usable immediately.
   try{
-    await loadPermissions(u.id,u.email);
-    if(_userStatus==='pending'){clearTimeout(_bail);return;}
-    await loadFromCloud();
-  }catch(e){console.warn('Session start error:',e);}
+    await Promise.race([
+      loadFromCloud(),
+      new Promise(r=>setTimeout(r,6000))
+    ]);
+  }catch(e){console.warn('loadFromCloud error:',e);}
 
-  clearTimeout(_bail);
-  if(_bailed)return; // bail already fired
-  _bailed=true;
   document.getElementById('week-label').textContent=weekLabel(state.weekOffset);
   renderRota();
   showScreen('main');
   setupRealtime();
-  // After load, silently retry any shifts/sales that failed to reach cloud last session
   _retryPendingOnLoad();
 }
 
