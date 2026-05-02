@@ -891,7 +891,7 @@ body{
         <div class="sg-label">App</div>
         <div class="si">
           <div class="si-icon" style="background:rgba(255,255,255,.08);overflow:hidden;padding:0"><img src="" id="settings-logo" alt="CC" style="width:34px;height:34px;object-fit:cover;border-radius:7px"></div>
-          <div><strong>CC Chelmsford Manager</strong><span>Version 155 • Cloud sync</span></div>
+          <div><strong>CC Chelmsford Manager</strong><span>Version 156 • Cloud sync</span></div>
         </div>
       </div>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)">
@@ -2646,14 +2646,18 @@ async function shareRota(){
   ctx.fillStyle='rgba(255,255,255,0.07)';
   ctx.fillRect(PAD,TBL_Y+TH_H-1,W-PAD*2,1);
 
-  // column header labels — matches --text2 rgba(255,255,255,0.55), OFF uses --text3
+  // column header labels — matches --text2 rgba(255,255,255,0.55), OFF uses red tint
+  const _offIdx=cols.indexOf('OFF');
+  if(_offIdx>=0){
+    ctx.fillStyle='rgba(220,60,60,0.15)';
+    ctx.fillRect(PAD+DAY_W+_offIdx*COL_W,TBL_Y,COL_W,TH_H);
+  }
   ctx.textAlign='left'; ctx.textBaseline='middle';
   ctx.font=`bold 11px -apple-system,sans-serif`;
   ctx.fillStyle='rgba(255,255,255,0.55)';
   ctx.fillText('DAY',PAD+10,TBL_Y+TH_H/2);
-  const _offIdx=cols.indexOf('OFF');
   cols.forEach((c,i)=>{
-    ctx.fillStyle=c==='OFF'?'rgba(255,255,255,0.32)':'rgba(255,255,255,0.55)';
+    ctx.fillStyle=c==='OFF'?'rgba(232,100,100,0.85)':'rgba(255,255,255,0.55)';
     ctx.fillText(c.toUpperCase(),PAD+DAY_W+i*COL_W+10,TBL_Y+TH_H/2);
   });
 
@@ -2710,8 +2714,8 @@ async function shareRota(){
       const cellX=PAD+DAY_W+ci*COL_W;
       // column divider — matches --border2 rgba(255,255,255,0.12)
       if(ci>0){ctx.fillStyle='rgba(255,255,255,0.12)';ctx.fillRect(cellX,rowY,1,ROW_H);}
-      // OFF cell — matches .rota-tbl td.off-cell rgba(255,255,255,0.014), no red
-      if(col==='OFF'){ctx.fillStyle='rgba(255,255,255,0.014)';ctx.fillRect(cellX,rowY,COL_W,ROW_H);}
+      // OFF cell — red tint matching original design
+      if(col==='OFF'){ctx.fillStyle='rgba(220,60,60,0.08)';ctx.fillRect(cellX,rowY,COL_W,ROW_H);}
 
       const staff=getShift(state.type,state.weekOffset,day,col);
       if(staff.length===0){
@@ -2750,11 +2754,12 @@ async function shareRota(){
           ctx.textAlign='left'; ctx.textBaseline='alphabetic';
           ctx.fillText(displayName,curX+8,curY+15);
           if(earlyTime){
-            // Draw badge matching HTML .early-tag style — dark overlay, white text
-            const badgeX=curX+8+tw+5;
+            // Draw badge — clamp inside pill so it never overflows when pill is width-clamped
+            const badgeW=etw+TAG_PAD*2;
+            const badgeX=Math.min(curX+8+tw+5, curX+pw-badgeW-3);
             const badgeY=curY+(PILL_H-TAG_H)/2;
             ctx.fillStyle='rgba(0,0,0,0.28)';
-            roundRect(ctx,badgeX,badgeY,etw+TAG_PAD*2,TAG_H,4);
+            roundRect(ctx,badgeX,badgeY,badgeW,TAG_H,4);
             ctx.fill();
             ctx.fillStyle='#ffffff';
             ctx.font=`bold 9px -apple-system,sans-serif`;
