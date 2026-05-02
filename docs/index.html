@@ -897,7 +897,7 @@ body{
         <div class="sg-label">App</div>
         <div class="si">
           <div class="si-icon" style="background:rgba(255,255,255,.08);overflow:hidden;padding:0"><img src="" id="settings-logo" alt="CC" style="width:34px;height:34px;object-fit:cover;border-radius:7px"></div>
-          <div><strong>CC Chelmsford Manager</strong><span>Version 166 • Cloud sync</span></div>
+          <div><strong>CC Chelmsford Manager</strong><span>Version 167 • Cloud sync</span></div>
         </div>
       </div>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)">
@@ -3777,8 +3777,9 @@ function renderSalesTable(dates){
     const r=salesWeekData[key];
     const dayLabel=DAY_NAMES[i];
     const dateLabel=d.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
-    // When locked, clicking a filled row prompts for PIN first
-    const clickHandler=locked&&r?`requireSalesUnlock(()=>openDayEntry('${key}'))`:`openDayEntry('${key}')`;
+    // When locked, only prompt PIN if the row has actual saved data (non-zero totals)
+    const hasData=r&&((r.just_eat||0)+(r.cc_app||0)+(r.uber_eats||0)+(r.deliveroo||0)+(r.cash||0)+(r.card||0))>0;
+    const clickHandler=locked&&hasData?`requireSalesUnlock(()=>openDayEntry('${key}'))`:`openDayEntry('${key}')`;
     if(r){
       const del=(r.just_eat||0)+(r.cc_app||0)+(r.uber_eats||0)+(r.deliveroo||0);
       const total=del+(r.cash||0)+(r.card||0);
