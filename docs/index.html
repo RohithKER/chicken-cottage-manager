@@ -475,7 +475,7 @@ body{
 .early-btn.off{background:var(--surface2);color:var(--text3)}
 .early-btn.on{background:rgba(255,170,0,.2);color:#ffb347;border:1px solid rgba(255,170,0,.35)}
 /* Time tag on rota pills */
-.early-tag{display:inline-block;font-size:9px;font-weight:700;background:rgba(255,140,0,.25);color:#ffc060;border-radius:6px;padding:1px 4px;margin-left:4px;vertical-align:middle;letter-spacing:.2px;white-space:nowrap;line-height:1.4}
+.early-tag{display:inline-block;font-size:9px;font-weight:700;background:rgba(0,0,0,0.28);color:#fff;border-radius:4px;padding:1px 5px;margin-left:5px;vertical-align:middle;letter-spacing:.2px;white-space:nowrap;line-height:1.4}
 
 /* ─── User Menu ──────────────────────────────────── */
 #user-menu{
@@ -891,7 +891,7 @@ body{
         <div class="sg-label">App</div>
         <div class="si">
           <div class="si-icon" style="background:rgba(255,255,255,.08);overflow:hidden;padding:0"><img src="" id="settings-logo" alt="CC" style="width:34px;height:34px;object-fit:cover;border-radius:7px"></div>
-          <div><strong>CC Chelmsford Manager</strong><span>Version 153 • Cloud sync</span></div>
+          <div><strong>CC Chelmsford Manager</strong><span>Version 154 • Cloud sync</span></div>
         </div>
       </div>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)">
@@ -2753,13 +2753,13 @@ async function shareRota(){
           ctx.textAlign='left'; ctx.textBaseline='alphabetic';
           ctx.fillText(displayName,curX+8,curY+15);
           if(earlyTime){
-            // Draw badge matching HTML .early-tag style
+            // Draw badge matching HTML .early-tag style — dark overlay, white text
             const badgeX=curX+8+tw+5;
             const badgeY=curY+(PILL_H-TAG_H)/2;
-            ctx.fillStyle='rgba(255,140,0,0.28)';
+            ctx.fillStyle='rgba(0,0,0,0.28)';
             roundRect(ctx,badgeX,badgeY,etw+TAG_PAD*2,TAG_H,4);
             ctx.fill();
-            ctx.fillStyle='#ffc060';
+            ctx.fillStyle='#ffffff';
             ctx.font=`bold 9px -apple-system,sans-serif`;
             ctx.textBaseline='middle';
             ctx.fillText(earlyTime,badgeX+TAG_PAD,badgeY+TAG_H/2);
