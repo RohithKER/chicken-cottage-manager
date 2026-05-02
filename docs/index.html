@@ -888,7 +888,7 @@ body{
         <div class="sg-label">App</div>
         <div class="si">
           <div class="si-icon" style="background:rgba(255,255,255,.08);overflow:hidden;padding:0"><img src="" id="settings-logo" alt="CC" style="width:34px;height:34px;object-fit:cover;border-radius:7px"></div>
-          <div><strong>CC Chelmsford Manager</strong><span>Version 142 • Cloud sync</span></div>
+          <div><strong>CC Chelmsford Manager</strong><span>Version 143 • Cloud sync</span></div>
         </div>
       </div>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)">
@@ -3596,8 +3596,24 @@ function calcDaySales(){
   document.getElementById('sd-day-total').textContent='£'+total.toFixed(2);
 }
 
+function _flushPendingBdInputs(){
+  // If user typed in "Add amount" but didn't press Enter/+, capture it before saving
+  ['ue','dr'].forEach(f=>{
+    const wrap=document.getElementById(f+'-items');
+    if(!wrap)return;
+    // The last input in the panel is the "Add amount" field (has no × button sibling)
+    const rows=wrap.querySelectorAll('.breakdown-item');
+    const lastRow=rows[rows.length-1];
+    if(!lastRow)return;
+    const inp=lastRow.querySelector('input');
+    if(!inp)return;
+    const v=parseFloat(inp.value)||0;
+    if(v){_bdItems[f].push(v);_syncBdTotal(f);inp.value='';}
+  });
+}
 async function saveDaySales(){
   if(!salesOpenDate){closeDayEntry();return;}
+  _flushPendingBdInputs(); // capture any un-confirmed "Add amount" values
   const payload={
     sale_date:salesOpenDate,
     just_eat:getSdVal('sd-je'),
@@ -3726,6 +3742,7 @@ function saveReceiptNote(){
 
 function printDaySales(){
   if(!salesOpenDate){toast('No day selected');return;}
+  _flushPendingBdInputs();
   const je=getSdVal('sd-je'),cc=getSdVal('sd-cc'),ue=getSdVal('sd-ue'),dr=getSdVal('sd-dr');
   const cash=getSdVal('sd-cash'),card=getSdVal('sd-card');
   const dateLabel=new Date(salesOpenDate+'T12:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'});
