@@ -886,7 +886,7 @@ body{
         <div class="sg-label">App</div>
         <div class="si">
           <div class="si-icon" style="background:rgba(255,255,255,.08);overflow:hidden;padding:0"><img src="" id="settings-logo" alt="CC" style="width:34px;height:34px;object-fit:cover;border-radius:7px"></div>
-          <div><strong>CC Chelmsford Manager</strong><span>Version 132 • Cloud sync</span></div>
+          <div><strong>CC Chelmsford Manager</strong><span>Version 133 • Cloud sync</span></div>
         </div>
       </div>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)">
@@ -1069,7 +1069,7 @@ const SUPABASE_URL = 'https://bnwicexckfuhebornsjc.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJud2ljZXhja2Z1aGVib3Juc2pjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc0ODEzNzMsImV4cCI6MjA5MzA1NzM3M30.VjYKew3lnOFDgk9TwLoBTUUvERx3IqT1m_X8yIPBPWs';
 
 const { createClient } = supabase;
-const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
@@ -3903,46 +3903,74 @@ applyStaffColors();
 
 init();
 
-/* ─── PWA Foreground Reconnect v130 ───────────────────────
-   Root cause: after iOS/Android suspends a homescreen PWA,
-   HTTP fetch() calls hang indefinitely — the TCP stack is
-   broken. You can't probe or heal it from within.
+/* ─── PWA Foreground Reconnect v133 ───────────────────────
+   Root cause: iOS suspends the PWA's WKWebView. When resumed,
+   the browser's HTTP connection pool still holds stale TCP
+   connections to Supabase. The Supabase JS client reuses those
+   dead connections → every fetch hangs for 60–120 s (TCP timeout).
 
-   Fix — mirrors what a normal webapp does in Safari:
-   Safari automatically reloads the page on resumption.
-   We do the same: detect the JS freeze via a heartbeat gap,
-   then call window.location.reload(). The service worker
-   (sw.js) serves the cached page instantly with no network
-   needed. The fresh Supabase client makes brand-new TCP
-   connections that work perfectly.
+   Why force-closing from recents works: it destroys the old
+   client and creates a fresh one. No stale connections.
 
-   Service worker registration is below the closing </script>
-   so it runs after the app is fully initialised.
+   Fix: do exactly that IN JavaScript. When the heartbeat
+   detects the JS freeze gap (iOS suspended → resumed), recreate
+   the Supabase client entirely. The new client has a clean HTTP
+   pool with no stale connections. No page reload needed.
 ──────────────────────────────────────────────────────────── */
+let _hbLast = Date.now();
+let _hbBusy  = false;
+
+async function _pwaResume(){
+  if(_hbBusy || !user) return;
+  _hbBusy = true;
+  try{
+    // 1. Recreate the Supabase client — fresh HTTP pool, no stale TCP connections.
+    //    This is identical to what force-close from recents does.
+    //    The new client reads the existing session from localStorage automatically.
+    db = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // 2. Verify we still have a valid session on the new client
+    const {data:{session}} = await db.auth.getSession();
+    if(!session){ user=null; showScreen('auth'); return; }
+    user = session.user;
+
+    // 3. Re-setup realtime on the fresh client
+    _realtimeSetup = false;
+    setupRealtime();
+
+    // 4. Reload data — all calls now go through fresh HTTP connections
+    const _t = ms => new Promise(r=>setTimeout(r,ms));
+    const {data:staffData} = await Promise.race([
+      db.from('staff').select('*'),
+      _t(6000).then(()=>({data:null}))
+    ]);
+    if(staffData && staffData.length > 0){
+      state.staff.inside   = staffData.filter(s=>s.type==='inside'  ||s.type==='both').map(s=>s.name);
+      state.staff.delivery = staffData.filter(s=>s.type==='delivery'||s.type==='both').map(s=>s.name);
+    }
+    await Promise.race([loadSchedules(),  _t(6000)]);
+    await Promise.race([loadEarlyShift(), _t(6000)]);
+    _salesLoadedOffset = null;
+    await Promise.race([loadSalesWeek(),  _t(6000)]);
+    renderRota(); renderStaff(); applyStaffColors();
+  }catch(e){
+    console.warn('PWA resume error:', e);
+  }finally{
+    _hbBusy = false;
+  }
+}
 
 // Heartbeat: ticks every 1 s while JS is running.
-// When iOS freezes the app, ticks stop. On resume the next
-// tick sees a gap larger than normal jitter → reload.
-let _hbLast = Date.now();
+// iOS freezes JS when suspending → gap > 1.5 s on resume.
 setInterval(()=>{
   const now = Date.now();
   const gap = now - _hbLast;
   _hbLast   = now;
-  // gap > 1500 ms means JS was suspended (normal jitter < 100 ms)
-  // Only reload when user is signed in (no point reloading auth screen)
-  if(gap > 1500 && user) window.location.reload();
+  if(gap > 1500 && user) _pwaResume();
 }, 1000);
 
-// iOS bfcache restore — always reload for a clean state
-window.addEventListener('pageshow', e=>{
-  if(e.persisted && user) window.location.reload();
-});
-</script>
-<!-- Service Worker: caches index.html so reload() is instant from cache -->
-<script>
-if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('./sw.js').catch(()=>{});
-}
+// iOS bfcache restore
+window.addEventListener('pageshow', e=>{ if(e.persisted && user) _pwaResume(); });
 </script>
 <!-- Thermal Receipt (hidden, shown only during print) -->
 <div id="print-receipt">
