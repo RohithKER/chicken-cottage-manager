@@ -891,7 +891,7 @@ body{
         <div class="sg-label">App</div>
         <div class="si">
           <div class="si-icon" style="background:rgba(255,255,255,.08);overflow:hidden;padding:0"><img src="" id="settings-logo" alt="CC" style="width:34px;height:34px;object-fit:cover;border-radius:7px"></div>
-          <div><strong>CC Chelmsford Manager</strong><span>Version 154 • Cloud sync</span></div>
+          <div><strong>CC Chelmsford Manager</strong><span>Version 155 • Cloud sync</span></div>
         </div>
       </div>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)">
@@ -2588,22 +2588,19 @@ async function shareRota(){
   const ctx=canvas.getContext('2d');
   ctx.scale(scale,scale);
 
-  // ── Background — clean neutral dark ─────────────────
-  ctx.fillStyle='#0e0e0e';
+  // ── Background — matches app --bg #191919 ────────────
+  ctx.fillStyle='#191919';
   ctx.fillRect(0,0,W,H);
 
-  // ── Header Card ──────────────────────────────────────
-  ctx.fillStyle='rgba(0,0,0,0.5)';
-  roundRect(ctx,PAD,HDR_Y+4,W-PAD*2,HDR_H,CR);
-  ctx.fill();
-  ctx.fillStyle='#1c1c1c';
+  // ── Header Card — matches app header bar ─────────────
+  ctx.fillStyle='#252525';
   roundRect(ctx,PAD,HDR_Y,W-PAD*2,HDR_H,CR);
   ctx.fill();
   ctx.strokeStyle='rgba(255,255,255,0.07)'; ctx.lineWidth=1;
   roundRect(ctx,PAD,HDR_Y,W-PAD*2,HDR_H,CR);
   ctx.stroke();
 
-  // icon — clean circular crop, no glow
+  // icon — clean circular crop
   ctx.save();
   ctx.beginPath();
   ctx.arc(ICON_X+ICON_SZ/2, ICON_Y+ICON_SZ/2, ICON_SZ/2, 0, Math.PI*2);
@@ -2613,30 +2610,27 @@ async function shareRota(){
   ctx.drawImage(_ccLogoImg, 162, 12, 276, 276, ICON_X, ICON_Y, ICON_SZ, ICON_SZ);
   ctx.restore();
 
-  // header text
+  // header text — matches app header typography
   ctx.textAlign='left'; ctx.textBaseline='alphabetic';
-  ctx.fillStyle='#f0f0f0';
+  ctx.fillStyle='rgba(255,255,255,0.9)';
   ctx.font=`bold 17px -apple-system,sans-serif`;
   ctx.fillText('CC Chelmsford',TEXT_X,HDR_Y+30);
-  ctx.fillStyle='#888888';
+  ctx.fillStyle='rgba(255,255,255,0.55)';
   ctx.font=`13px -apple-system,sans-serif`;
   const typeLabel=state.type==='inside'?'Staff':'Delivery';
   ctx.fillText(typeLabel,TEXT_X,HDR_Y+49);
   const ws=weekStart(state.weekOffset);
   const we=new Date(ws); we.setDate(we.getDate()+6);
   const dateStr=`${ws.getDate()} ${MONTHS[ws.getMonth()]} – ${we.getDate()} ${MONTHS[we.getMonth()]}`;
-  ctx.fillStyle='#555555';
+  ctx.fillStyle='rgba(255,255,255,0.32)';
   ctx.font=`12px -apple-system,sans-serif`;
   ctx.fillText(dateStr,TEXT_X,HDR_Y+67);
 
-  // ── Table Card ───────────────────────────────────────
-  ctx.fillStyle='rgba(0,0,0,0.5)';
-  roundRect(ctx,PAD,TBL_Y+4,W-PAD*2,TBL_H,CR);
-  ctx.fill();
-  ctx.fillStyle='#161616';
+  // ── Table Card — matches app --bg #191919, border rgba(255,255,255,0.07) ──
+  ctx.fillStyle='#191919';
   roundRect(ctx,PAD,TBL_Y,W-PAD*2,TBL_H,CR);
   ctx.fill();
-  ctx.strokeStyle='rgba(255,255,255,0.06)'; ctx.lineWidth=1;
+  ctx.strokeStyle='rgba(255,255,255,0.07)'; ctx.lineWidth=1;
   roundRect(ctx,PAD,TBL_Y,W-PAD*2,TBL_H,CR);
   ctx.stroke();
 
@@ -2645,34 +2639,27 @@ async function shareRota(){
   roundRect(ctx,PAD,TBL_Y,W-PAD*2,TBL_H,CR);
   ctx.clip();
 
-  // column header row — flat, clean
-  ctx.fillStyle='#1e1e1e';
+  // column header row — matches .rota-tbl th: bg --surface2 #2d2d2d
+  ctx.fillStyle='#2d2d2d';
   ctx.fillRect(PAD,TBL_Y,W-PAD*2,TH_H);
-  ctx.fillStyle='rgba(255,255,255,0.06)';
+  // header bottom border — matches --border rgba(255,255,255,0.07)
+  ctx.fillStyle='rgba(255,255,255,0.07)';
   ctx.fillRect(PAD,TBL_Y+TH_H-1,W-PAD*2,1);
 
-  // Tint OFF column header background
-  const _offIdx=cols.indexOf('OFF');
-  if(_offIdx>=0){
-    const _offHdrX=PAD+DAY_W+_offIdx*COL_W;
-    ctx.fillStyle='rgba(220,60,60,0.12)';
-    ctx.fillRect(_offHdrX,TBL_Y,COL_W,TH_H);
-  }
-
-  // column header labels
+  // column header labels — matches --text2 rgba(255,255,255,0.55), OFF uses --text3
   ctx.textAlign='left'; ctx.textBaseline='middle';
-  ctx.font=`bold 10px -apple-system,sans-serif`;
-  ctx.fillStyle='#4a4a4a';
+  ctx.font=`bold 11px -apple-system,sans-serif`;
+  ctx.fillStyle='rgba(255,255,255,0.55)';
   ctx.fillText('DAY',PAD+10,TBL_Y+TH_H/2);
-  ctx.fillStyle='#4a4a4a';
+  const _offIdx=cols.indexOf('OFF');
   cols.forEach((c,i)=>{
-    ctx.fillStyle=c==='OFF'?'rgba(232,100,100,0.75)':'#4a4a4a';
+    ctx.fillStyle=c==='OFF'?'rgba(255,255,255,0.32)':'rgba(255,255,255,0.55)';
     ctx.fillText(c.toUpperCase(),PAD+DAY_W+i*COL_W+10,TBL_Y+TH_H/2);
   });
 
-  // day column divider
-  ctx.fillStyle='rgba(255,255,255,0.06)';
-  ctx.fillRect(PAD+DAY_W,TBL_Y,1,TH_H);
+  // day column divider — 2px, matches --border2 rgba(255,255,255,0.12)
+  ctx.fillStyle='rgba(255,255,255,0.12)';
+  ctx.fillRect(PAD+DAY_W,TBL_Y,2,TH_H);
 
   // data rows
   let _rowY=TBL_Y+TH_H;
@@ -2681,27 +2668,35 @@ async function shareRota(){
     const ROW_H=rowHeights[di];
     _rowY+=ROW_H;
 
-    // row background — very subtle alternation
-    ctx.fillStyle=di%2===0?'#161616':'#1a1a1a';
+    // row background — matches #191919 base + .rota-tbl tr:nth-child(even) rgba(255,255,255,.022)
+    ctx.fillStyle='#191919';
     ctx.fillRect(PAD,rowY,W-PAD*2,ROW_H);
+    if(di%2!==0){
+      ctx.fillStyle='rgba(255,255,255,0.022)';
+      ctx.fillRect(PAD,rowY,W-PAD*2,ROW_H);
+    }
 
-    // row separator — barely visible
-    ctx.fillStyle='rgba(255,255,255,0.04)';
+    // day cell background — matches .rota-tbl td.day-cell: --surface2 #2d2d2d
+    ctx.fillStyle='#2d2d2d';
+    ctx.fillRect(PAD,rowY,DAY_W,ROW_H);
+
+    // row separator — matches --border rgba(255,255,255,0.07)
+    ctx.fillStyle='rgba(255,255,255,0.07)';
     ctx.fillRect(PAD,rowY+ROW_H-1,W-PAD*2,1);
 
-    // day column divider
-    ctx.fillStyle='rgba(255,255,255,0.05)';
-    ctx.fillRect(PAD+DAY_W,rowY,1,ROW_H);
+    // day column divider — 2px, matches border-right: 2px solid --border2
+    ctx.fillStyle='rgba(255,255,255,0.12)';
+    ctx.fillRect(PAD+DAY_W,rowY,2,ROW_H);
 
-    // day name + date
+    // day name + date — matches .td-day (--text) and .td-date (--text3)
     const midY=rowY+Math.round(ROW_H/2);
     ctx.textAlign='left'; ctx.textBaseline='alphabetic';
-    ctx.fillStyle='#e0e0e0';
-    ctx.font=`bold 13px -apple-system,sans-serif`;
+    ctx.fillStyle='rgba(255,255,255,0.9)';
+    ctx.font=`bold 12px -apple-system,sans-serif`;
     ctx.fillText(day.slice(0,3),PAD+11,midY-2);
     const actualDay=new Date(ws); actualDay.setDate(ws.getDate()+di);
-    ctx.fillStyle='#505050';
-    ctx.font=`11px -apple-system,sans-serif`;
+    ctx.fillStyle='rgba(255,255,255,0.32)';
+    ctx.font=`10px -apple-system,sans-serif`;
     ctx.fillText(`${actualDay.getDate()} ${MONTHS[actualDay.getMonth()]}`,PAD+11,midY+12);
 
     // shift cells
@@ -2713,14 +2708,16 @@ async function shareRota(){
     const dayEarlySet=EARLY_DAYS[day]?getEarlySet(state.weekOffset,day):null;
     cols.forEach((col,ci)=>{
       const cellX=PAD+DAY_W+ci*COL_W;
-      if(ci>0){ctx.fillStyle='rgba(255,255,255,0.04)';ctx.fillRect(cellX,rowY,1,ROW_H);}
-      // Red tint for OFF column
-      if(col==='OFF'){ctx.fillStyle='rgba(220,60,60,0.07)';ctx.fillRect(cellX,rowY,COL_W,ROW_H);}
+      // column divider — matches --border2 rgba(255,255,255,0.12)
+      if(ci>0){ctx.fillStyle='rgba(255,255,255,0.12)';ctx.fillRect(cellX,rowY,1,ROW_H);}
+      // OFF cell — matches .rota-tbl td.off-cell rgba(255,255,255,0.014), no red
+      if(col==='OFF'){ctx.fillStyle='rgba(255,255,255,0.014)';ctx.fillRect(cellX,rowY,COL_W,ROW_H);}
 
       const staff=getShift(state.type,state.weekOffset,day,col);
       if(staff.length===0){
-        ctx.fillStyle='#333333';
-        ctx.font=`13px -apple-system,sans-serif`;
+        // matches .td-empty --text3 at 0.55 opacity
+        ctx.fillStyle='rgba(255,255,255,0.18)';
+        ctx.font=`11px -apple-system,sans-serif`;
         ctx.textBaseline='middle'; ctx.textAlign='left';
         ctx.fillText('—',cellX+CELL_PAD_X,rowY+ROW_H/2);
       } else {
