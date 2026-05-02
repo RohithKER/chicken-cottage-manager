@@ -701,6 +701,8 @@ body{
 .rm-item:active{background:var(--surface2)}
 /* ─── Sync-confirm overlay fix ───────────────── */
 #sync-confirm-overlay{position:fixed;inset:0;z-index:9400;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;padding:24px}
+/* ─── Generic confirm overlay ────────────────── */
+#generic-confirm-overlay{position:fixed;inset:0;z-index:9500;background:rgba(0,0,0,.65);display:none;align-items:center;justify-content:center;padding:24px}
 </style>
 </head>
 <body>
@@ -886,7 +888,7 @@ body{
         <div class="sg-label">App</div>
         <div class="si">
           <div class="si-icon" style="background:rgba(255,255,255,.08);overflow:hidden;padding:0"><img src="" id="settings-logo" alt="CC" style="width:34px;height:34px;object-fit:cover;border-radius:7px"></div>
-          <div><strong>CC Chelmsford Manager</strong><span>Version 135 • Cloud sync</span></div>
+          <div><strong>CC Chelmsford Manager</strong><span>Version 136 • Cloud sync</span></div>
         </div>
       </div>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)">
@@ -1862,6 +1864,21 @@ function confirmSyncAll(){
 }
 function closeSyncConfirm(){
   document.getElementById('sync-confirm-overlay').style.display='none';
+}
+
+/* ─── Generic confirm dialog ────────────────────────────── */
+function showGenericConfirm(title, msg, btnLabel, callback){
+  document.getElementById('gc-title').textContent = title;
+  document.getElementById('gc-msg').textContent = msg;
+  document.getElementById('gc-ok-btn').textContent = btnLabel || 'Confirm';
+  document.getElementById('gc-ok-btn').onclick = function(){
+    closeGenericConfirm();
+    callback();
+  };
+  document.getElementById('generic-confirm-overlay').style.display='flex';
+}
+function closeGenericConfirm(){
+  document.getElementById('generic-confirm-overlay').style.display='none';
 }
 
 /* ─── Save Rota + Staff to Cloud ─────────────────────── */
@@ -2858,42 +2875,54 @@ function copyWeek(){
   toast(`${count} shift${count!==1?'s':''} copied ✓`);
 }
 
-async function pasteWeek(){
+function pasteWeek(){
   if(!weekClipboard){toast('Copy a week first');return;}
   const _pastePerm=state.type==='delivery'?'can_edit_delivery':'can_edit_rota';
   if(!requirePerm(_pastePerm,'paste to the rota'))return;
-  if(!confirm(`Paste copied shifts to ${weekLabel(state.weekOffset)}?\nThis will overwrite existing shifts.`))return;
-  const type = state.type;
-  const wk = weekKey();
-  const cols = COLS[type];
-  let pasted = 0;
-  for(const [dayCol, names] of Object.entries(weekClipboard.data)){
-    const sep = dayCol.lastIndexOf('|');
-    const day = dayCol.slice(0,sep);
-    const col = dayCol.slice(sep+1);
-    if(cols.includes(col)){
-      setShift(type, state.weekOffset, day, col, [...names]);
-      pasted++;
+  showGenericConfirm(
+    'Paste Week',
+    `Paste copied shifts to ${weekLabel(state.weekOffset)}? This will overwrite existing shifts.`,
+    'Paste',
+    function(){
+      const type = state.type;
+      const wk = weekKey();
+      const cols = COLS[type];
+      let pasted = 0;
+      for(const [dayCol, names] of Object.entries(weekClipboard.data)){
+        const sep = dayCol.lastIndexOf('|');
+        const day = dayCol.slice(0,sep);
+        const col = dayCol.slice(sep+1);
+        if(cols.includes(col)){
+          setShift(type, state.weekOffset, day, col, [...names]);
+          pasted++;
+        }
+      }
+      renderRota();
+      toast(pasted ? `${pasted} shift${pasted!==1?'s':''} pasted ✓` : 'No matching columns to paste');
     }
-  }
-  renderRota();
-  toast(pasted ? `${pasted} shift${pasted!==1?'s':''} pasted ✓` : 'No matching columns to paste');
+  );
 }
 
 function clearWeek(){
   const perm=state.type==='delivery'?'can_edit_delivery':'can_edit_rota';
   if(!requirePerm(perm,'clear this week'))return;
-  if(!confirm(`Clear all shifts for ${weekLabel(state.weekOffset)}?`))return;
-  const wk=weekKey();
-  Object.keys(state.schedules).forEach(k=>{if(k.startsWith(`${state.type}|${wk}|`))delete state.schedules[k];});
-  _saveSchedCache(state.schedules); // persist clear immediately — force-close won't revert it
-  renderRota();
-  db.from('schedules').delete()
-    .eq('schedule_type',state.type).eq('week_key',wk)
-    .then(({error})=>{
-      if(error){logActivity('Clear week cloud failed: '+error.message,'error');toast('⚠ Cleared locally — will sync on ↻');}
-      else{logActivity(`Week ${wk} (${state.type}) cleared ✓`,'success');toast('Week cleared ✓');}
-    }).catch(()=>{toast('⚠ Cleared locally — check connection');});
+  showGenericConfirm(
+    'Clear Week',
+    `Clear all shifts for ${weekLabel(state.weekOffset)}?`,
+    'Clear',
+    function(){
+      const wk=weekKey();
+      Object.keys(state.schedules).forEach(k=>{if(k.startsWith(`${state.type}|${wk}|`))delete state.schedules[k];});
+      _saveSchedCache(state.schedules); // persist clear immediately — force-close won't revert it
+      renderRota();
+      db.from('schedules').delete()
+        .eq('schedule_type',state.type).eq('week_key',wk)
+        .then(({error})=>{
+          if(error){logActivity('Clear week cloud failed: '+error.message,'error');toast('⚠ Cleared locally — will sync on ↻');}
+          else{logActivity(`Week ${wk} (${state.type}) cleared ✓`,'success');toast('Week cleared ✓');}
+        }).catch(()=>{toast('⚠ Cleared locally — check connection');});
+    }
+  );
 }
 
 /* ─── Auth ───────────────────────────────────────────── */
@@ -4046,6 +4075,18 @@ window.addEventListener('pageshow', e=>{ if(e.persisted && user) _pwaResume(); }
     <div style="display:flex;gap:10px">
       <button onclick="closeSyncConfirm()" style="flex:1;padding:12px;background:var(--surface2);border:1px solid var(--border);color:var(--text2);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">Cancel</button>
       <button onclick="closeSyncConfirm();syncAll()" style="flex:1;padding:12px;background:var(--accent);border:none;color:#fff;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">Sync</button>
+    </div>
+  </div>
+</div>
+
+<!-- Generic Confirm Dialog (replaces native confirm() for Paste Week, Clear Week) -->
+<div id="generic-confirm-overlay">
+  <div style="width:100%;max-width:320px;background:#252525;border-radius:16px;padding:24px;box-shadow:0 8px 32px rgba(0,0,0,.6)">
+    <div id="gc-title" style="font-size:17px;font-weight:700;color:var(--text);margin-bottom:8px"></div>
+    <div id="gc-msg" style="font-size:13px;color:var(--text2);line-height:1.5;margin-bottom:20px"></div>
+    <div style="display:flex;gap:10px">
+      <button onclick="closeGenericConfirm()" style="flex:1;padding:12px;background:var(--surface2);border:1px solid var(--border);color:var(--text2);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">Cancel</button>
+      <button id="gc-ok-btn" style="flex:1;padding:12px;background:var(--accent);border:none;color:#fff;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">Confirm</button>
     </div>
   </div>
 </div>
