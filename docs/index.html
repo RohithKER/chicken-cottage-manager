@@ -886,7 +886,7 @@ body{
         <div class="sg-label">App</div>
         <div class="si">
           <div class="si-icon" style="background:rgba(255,255,255,.08);overflow:hidden;padding:0"><img src="" id="settings-logo" alt="CC" style="width:34px;height:34px;object-fit:cover;border-radius:7px"></div>
-          <div><strong>CC Chelmsford Manager</strong><span>Version 128 • Cloud sync</span></div>
+          <div><strong>CC Chelmsford Manager</strong><span>Version 129 • Cloud sync</span></div>
         </div>
       </div>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)">
@@ -3834,33 +3834,32 @@ applyStaffColors();
 
 init();
 
-/* ─── PWA Foreground Reconnect v128 ───────────────────────
-   Root cause: iOS/Android suspend the JS WebView within
-   1-2 seconds of backgrounding a homescreen PWA. The Supabase
-   JS client gets into an internally broken state that cannot
-   be healed from within (4 attempts proved this).
+/* ─── PWA Foreground Reconnect v129 ───────────────────────
+   Root cause: iOS homescreen PWA does NOT reliably fire
+   visibilitychange, pageshow, or focus events when returning
+   from background. JS is simply frozen and resumed with no event.
 
-   Fix: mirror what "force-close from recents" does — it always
-   works because it triggers a fresh page load. We do the same:
-   when the app returns to foreground, probe the REST API with a
-   short timeout. If the probe fails → window.location.reload().
-   The page reloads from browser cache in ~300ms with a clean
-   Supabase client. Invisible to the user.
+   Fix: heartbeat interval. While the app is running, a timer
+   ticks every 1 second and records the timestamp. When iOS
+   freezes JS, the timer stops. When JS resumes, the next tick
+   sees a gap (e.g. 10s instead of 1s) — that gap IS the signal
+   that the app just came back from suspension. We then probe
+   the connection and reload if broken. No events needed.
 ──────────────────────────────────────────────────────────── */
-let _pwaChecking = false;
+let _hbLast = Date.now();
+let _hbBusy  = false;
 
 async function _pwaForeground(){
-  if(_pwaChecking || !user) return;
-  _pwaChecking = true;
+  if(_hbBusy || !user) return;
+  _hbBusy = true;
   try{
-    // Probe REST API — 3 second timeout
+    // Probe REST — 3 s timeout
     const probe = await Promise.race([
       db.from('staff').select('count').limit(1),
       new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),3000))
     ]);
-    // If Supabase returned an error, connection is broken
     if(probe.error) throw probe.error;
-    // Connection is alive — just refresh data quietly
+    // Connection alive — quietly refresh data
     const {data:staffData} = await db.from('staff').select('*');
     if(staffData && staffData.length > 0){
       state.staff.inside   = staffData.filter(s=>s.type==='inside'  ||s.type==='both').map(s=>s.name);
@@ -3872,28 +3871,31 @@ async function _pwaForeground(){
     await loadSalesWeek();
     renderRota(); renderStaff(); applyStaffColors();
   }catch(_){
-    // Connection broken or timeout — reload the page (same effect
-    // as force-closing from recents, loads from cache instantly)
+    // Connection broken — reload exactly like force-closing from recents
     window.location.reload();
   }finally{
-    _pwaChecking = false;
+    _hbBusy = false;
   }
 }
 
-// Every time the app comes back to foreground
+// Heartbeat: runs every 1 s. When iOS freezes JS and then thaws it,
+// the next tick sees a large gap — that's our "returned from background" signal.
+setInterval(()=>{
+  const now  = Date.now();
+  const gap  = now - _hbLast;
+  _hbLast    = now;
+  // Gap > 2 s means JS was suspended (1 s interval can't drift that much normally)
+  if(gap > 2000) _pwaForeground();
+}, 1000);
+
+// Keep these as backup for Android / browsers that do fire events
 document.addEventListener('visibilitychange', ()=>{
   if(document.visibilityState === 'visible') _pwaForeground();
 });
-
-// iOS PWA: page restored from bfcache
 window.addEventListener('pageshow', e=>{
   if(e.persisted) _pwaForeground();
 });
-
-// Android PWA: window focus restored
-window.addEventListener('focus', ()=>{
-  _pwaForeground();
-});
+window.addEventListener('focus', ()=>{ _pwaForeground(); });
 </script>
 <!-- Thermal Receipt (hidden, shown only during print) -->
 <div id="print-receipt">
