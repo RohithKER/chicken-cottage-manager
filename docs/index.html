@@ -897,7 +897,7 @@ body{
         <div class="sg-label">App</div>
         <div class="si">
           <div class="si-icon" style="background:rgba(255,255,255,.08);overflow:hidden;padding:0"><img src="" id="settings-logo" alt="CC" style="width:34px;height:34px;object-fit:cover;border-radius:7px"></div>
-          <div><strong>CC Chelmsford Manager</strong><span>Version 168 • Cloud sync</span></div>
+          <div><strong>CC Chelmsford Manager</strong><span>Version 169 • Cloud sync</span></div>
         </div>
       </div>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)">
@@ -2233,8 +2233,8 @@ function setViewMode(mode){
 function showView(v){
   if(v==='sales'){
     if(!_perms.is_admin&&!_perms.can_view_sales&&!_perms.can_edit_sales)return;
-    // Reset lock state every visit — numbers are hidden until PIN is entered
-    _salesUnlocked=false;
+    // Auto-unlock if within 6-hour grace period after last save; otherwise lock
+    _salesUnlocked=_salesPin?_inUnlockGrace():true;
     _updateSalesLockBtn();
   }
   _doShowView(v);
@@ -2292,6 +2292,7 @@ function toggleSalesLock(){
     if(!_salesPin){return;} // no PIN set, nothing to unlock
     showSalesPinOverlay(()=>{
       _salesUnlocked=true;
+      _setUnlockGrace(); // PIN entered — start 6h grace period
       _updateSalesLockBtn();
       renderSalesTable();
     });
@@ -2303,6 +2304,7 @@ function requireSalesUnlock(callback){
   if(!_salesPin||_salesUnlocked){callback();return;}
   showSalesPinOverlay(()=>{
     _salesUnlocked=true;
+    _setUnlockGrace(); // PIN entered — start 6h grace period
     _updateSalesLockBtn();
     renderSalesTable();
     callback();
@@ -4122,6 +4124,8 @@ async function saveDaySales(){
     logActivity(`Sales ${salesOpenDate} saved to cloud ✓`, 'success');
     _pendingSaleSet.delete(salesOpenDate);
     _savePendingSales();
+    _setUnlockGrace(); // keep sales visible for 6h after saving
+    _salesUnlocked=true;
     if(btn){btn.textContent='✓ Saved!';btn.style.background='var(--green)';}
     setTimeout(()=>closeDayEntry(),700);
   }catch(e){
@@ -4214,6 +4218,10 @@ let _currentReceiptTitle='';
 let _receiptParams=null; // stored so notes can rebuild receipt text live
 
 const _NOTES_KEY='cc_day_notes_';
+const _UNLOCK_UNTIL_KEY='cc_unlock_until'; // timestamp: numbers stay visible for 6h after save
+const _UNLOCK_HOURS=6;
+function _setUnlockGrace(){localStorage.setItem(_UNLOCK_UNTIL_KEY,Date.now()+_UNLOCK_HOURS*3600*1000);}
+function _inUnlockGrace(){return Date.now()<parseInt(localStorage.getItem(_UNLOCK_UNTIL_KEY)||0);}
 
 function _getReceiptText(){
   if(!_receiptParams)return _currentReceiptText;
