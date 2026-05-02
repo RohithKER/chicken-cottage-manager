@@ -888,7 +888,7 @@ body{
         <div class="sg-label">App</div>
         <div class="si">
           <div class="si-icon" style="background:rgba(255,255,255,.08);overflow:hidden;padding:0"><img src="" id="settings-logo" alt="CC" style="width:34px;height:34px;object-fit:cover;border-radius:7px"></div>
-          <div><strong>CC Chelmsford Manager</strong><span>Version 137 • Cloud sync</span></div>
+          <div><strong>CC Chelmsford Manager</strong><span>Version 138 • Cloud sync</span></div>
         </div>
       </div>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)">
@@ -962,6 +962,11 @@ body{
         <div class="ss-row"><label>Card</label><input type="number" id="sd-card" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
         <div class="ss-total-row"><label>Day Total</label><div class="ss-total-val" id="sd-day-total" style="color:var(--green)">£0.00</div></div>
       </div>
+      <!-- Notes section -->
+      <div class="ss-section">
+        <div class="ss-section-hdr">Notes</div>
+        <textarea id="sd-notes" oninput="saveReceiptNote()" placeholder="Add a note for this day…" rows="2" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:15px;padding:9px 10px;resize:none;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',sans-serif;outline:none;line-height:1.45;box-sizing:border-box"></textarea>
+      </div>
     </div>
     <div class="ss-foot" style="flex-direction:column;gap:8px">
       <button class="btn-sm primary" id="day-save-btn" style="width:100%;padding:13px;font-size:15px" onclick="saveDaySales()">Save</button>
@@ -982,11 +987,7 @@ body{
       <div onclick="closeReceiptModal()" style="cursor:pointer;font-size:20px;color:var(--text3);padding:4px 8px">×</div>
     </div>
     <pre id="receipt-text-preview" style="font-family:'Courier New',Courier,monospace;font-size:12px;color:var(--text2);background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;overflow-y:auto;flex:1;white-space:pre;line-height:1.5;margin:0"></pre>
-    <!-- Per-day notes — printed at bottom of receipt -->
-    <div style="flex-shrink:0">
-      <div style="font-size:12px;font-weight:600;color:var(--text3);margin-bottom:5px">📝 Notes <span style="font-weight:400">(saved per day · prints at bottom)</span></div>
-      <textarea id="rcp-notes" oninput="saveReceiptNote()" placeholder="Add a note for this day…" rows="3" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:16px;padding:9px 10px;resize:none;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',sans-serif;outline:none;line-height:1.45"></textarea>
-    </div>
+    <!-- Notes now live in the Day Entry sheet instead -->
     <!-- BT Print button — shown on Android Chrome only -->
     <button onclick="btPrintFromModal()" id="rcp-bt-btn" style="display:none;width:100%;padding:14px;border-radius:10px;border:none;background:var(--accent);color:#fff;font-size:15px;font-weight:700;cursor:pointer;letter-spacing:-0.2px">🖨 Print to Bluetooth Printer</button>
     <div style="display:flex;gap:8px;flex-shrink:0">
@@ -3525,6 +3526,9 @@ function openDayEntry(dateStr){
   document.getElementById('sd-dr').value=r.deliveroo||'';
   document.getElementById('sd-cash').value=r.cash||'';
   document.getElementById('sd-card').value=r.card||'';
+  // Load saved note for this day
+  const _noteEl=document.getElementById('sd-notes');
+  if(_noteEl)_noteEl.value=localStorage.getItem(_NOTES_KEY+dateStr)||'';
   _resetBreakdown();
   _bdItems.ue=(Array.isArray(r.uber_eats_items)?r.uber_eats_items:[]).map(Number);
   _bdItems.dr=(Array.isArray(r.deliveroo_items)?r.deliveroo_items:[]).map(Number);
@@ -3533,7 +3537,7 @@ function openDayEntry(dateStr){
   calcDaySales();
 
   // Show/hide edit controls based on permission
-  ['sd-je','sd-cc','sd-ue','sd-dr','sd-cash','sd-card'].forEach(id=>{
+  ['sd-je','sd-cc','sd-ue','sd-dr','sd-cash','sd-card','sd-notes'].forEach(id=>{
     const el=document.getElementById(id);
     if(el)el.readOnly=!canEdit;
   });
@@ -3564,9 +3568,10 @@ function getSdVal(id){return parseFloat(document.getElementById(id).value)||0;}
 
 function clearDayEntry(){
   showGenericConfirm('Clear Day Sales','Clear all sales for this day?','Clear',function(){
-    ['sd-je','sd-cc','sd-ue','sd-dr','sd-cash','sd-card'].forEach(id=>{
+    ['sd-je','sd-cc','sd-ue','sd-dr','sd-cash','sd-card','sd-notes'].forEach(id=>{
       document.getElementById(id).value='';
     });
+    if(salesOpenDate)localStorage.removeItem(_NOTES_KEY+salesOpenDate);
     _bdItems={ue:[],dr:[]};
     ['ue','dr'].forEach(f=>{
       const panel=document.getElementById(f+'-panel');
@@ -3695,13 +3700,13 @@ const _NOTES_KEY='cc_day_notes_';
 
 function _getReceiptText(){
   if(!_receiptParams)return _currentReceiptText;
-  const notes=(document.getElementById('rcp-notes')||{}).value||'';
+  const notes=(document.getElementById('sd-notes')||{}).value||'';
   return _receiptText(..._receiptParams,notes);
 }
 
 function saveReceiptNote(){
   if(!salesOpenDate)return;
-  const val=(document.getElementById('rcp-notes')||{}).value||'';
+  const val=(document.getElementById('sd-notes')||{}).value||'';
   if(val.trim()) localStorage.setItem(_NOTES_KEY+salesOpenDate,val);
   else localStorage.removeItem(_NOTES_KEY+salesOpenDate);
   // Rebuild preview live
@@ -3721,7 +3726,7 @@ function printDaySales(){
   _currentReceiptTitle='CC Chelmsford — '+dateLabel;
 
   // Load saved note for this day
-  const notesEl=document.getElementById('rcp-notes');
+  const notesEl=document.getElementById('sd-notes');
   if(notesEl) notesEl.value=localStorage.getItem(_NOTES_KEY+salesOpenDate)||'';
   _currentReceiptText=_getReceiptText();
 
