@@ -888,7 +888,7 @@ body{
         <div class="sg-label">App</div>
         <div class="si">
           <div class="si-icon" style="background:rgba(255,255,255,.08);overflow:hidden;padding:0"><img src="" id="settings-logo" alt="CC" style="width:34px;height:34px;object-fit:cover;border-radius:7px"></div>
-          <div><strong>CC Chelmsford Manager</strong><span>Version 144 • Cloud sync</span></div>
+          <div><strong>CC Chelmsford Manager</strong><span>Version 145 • Cloud sync</span></div>
         </div>
       </div>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)">
@@ -1012,7 +1012,7 @@ body{
       <div style="font-size:16px;font-weight:700;color:var(--text)">⚙️ Manage Permissions</div>
       <div onclick="closePermsPanel()" style="cursor:pointer;font-size:20px;color:var(--text3);padding:4px 8px">×</div>
     </div>
-    <div id="perms-list" style="overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:12px">
+    <div id="perms-list" style="overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1;min-height:0;display:flex;flex-direction:column;gap:12px;padding-bottom:8px">
       <div style="color:var(--text3);font-size:13px;text-align:center;padding:20px">Loading users…</div>
     </div>
   </div>
