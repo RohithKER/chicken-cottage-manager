@@ -897,7 +897,7 @@ body{
         <div class="sg-label">App</div>
         <div class="si">
           <div class="si-icon" style="background:rgba(255,255,255,.08);overflow:hidden;padding:0"><img src="" id="settings-logo" alt="CC" style="width:34px;height:34px;object-fit:cover;border-radius:7px"></div>
-          <div><strong>CC Chelmsford Manager</strong><span>Version 171 • Cloud sync</span></div>
+          <div><strong>CC Chelmsford Manager</strong><span>Version 172 • Cloud sync</span></div>
         </div>
       </div>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)">
@@ -3777,14 +3777,14 @@ function renderSalesTable(dates){
     const r=salesWeekData[key];
     const dayLabel=DAY_NAMES[i];
     const dateLabel=d.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
-    // Per-row: row is visible if globally unlocked (PIN this session) OR within its own 6h grace period
-    const rowUnlocked=!locked||_inUnlockGrace(key);
+    // Per-row: visible if globally unlocked (PIN this session) OR within 6h grace period (stored in DB)
+    const rowUnlocked=!locked||_rowInGrace(r);
     const showRow=(v)=>{
       if(!locked||v===0||rowUnlocked)return'£'+fmtS(v);
       return`<span style="letter-spacing:2px;color:var(--text3);font-size:13px">••••</span>`;
     };
     const hasData=r&&((r.just_eat||0)+(r.cc_app||0)+(r.uber_eats||0)+(r.deliveroo||0)+(r.cash||0)+(r.card||0))>0;
-    // Only prompt PIN if row has data AND is not already in its grace period AND not globally unlocked
+    // Only prompt PIN if row has data AND not in grace period AND not globally unlocked this session
     const needsPin=locked&&hasData&&!rowUnlocked;
     const clickHandler=needsPin?`requireSalesUnlock(()=>openDayEntry('${key}'))`:`openDayEntry('${key}')`;
     if(r){
@@ -4108,7 +4108,8 @@ async function saveDaySales(){
     uber_eats_items:_bdItems.ue,
     deliveroo_items:_bdItems.dr,
     notes:(document.getElementById('sd-notes')||{}).value||'',
-    driver_payments:_driverPayments
+    driver_payments:_driverPayments,
+    unlocked_until:_unlockUntilISO() // 6h grace — visible to all accounts after save
   };
   // Save locally first so data is never lost even if cloud fails
   salesWeekData[salesOpenDate]=payload;
@@ -4129,7 +4130,6 @@ async function saveDaySales(){
     logActivity(`Sales ${salesOpenDate} saved to cloud ✓`, 'success');
     _pendingSaleSet.delete(salesOpenDate);
     _savePendingSales();
-    _setUnlockGrace(salesOpenDate); // keep this day's numbers visible for 6h
     if(btn){btn.textContent='✓ Saved!';btn.style.background='var(--green)';}
     setTimeout(()=>closeDayEntry(),700);
   }catch(e){
@@ -4223,9 +4223,9 @@ let _receiptParams=null; // stored so notes can rebuild receipt text live
 
 const _NOTES_KEY='cc_day_notes_';
 const _UNLOCK_HOURS=6;
-// Per-date grace period — only the saved day stays visible for 6h
-function _setUnlockGrace(dateStr){localStorage.setItem('cc_unlock_'+dateStr,Date.now()+_UNLOCK_HOURS*3600*1000);}
-function _inUnlockGrace(dateStr){return Date.now()<parseInt(localStorage.getItem('cc_unlock_'+dateStr)||0);}
+// Grace period stored on the DB row — works across all accounts/devices
+function _unlockUntilISO(){return new Date(Date.now()+_UNLOCK_HOURS*3600*1000).toISOString();}
+function _rowInGrace(r){return r&&r.unlocked_until&&new Date(r.unlocked_until)>new Date();}
 
 function _getReceiptText(){
   if(!_receiptParams)return _currentReceiptText;
