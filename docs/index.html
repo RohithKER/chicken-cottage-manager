@@ -897,7 +897,7 @@ body{
         <div class="sg-label">App</div>
         <div class="si">
           <div class="si-icon" style="background:rgba(255,255,255,.08);overflow:hidden;padding:0"><img src="" id="settings-logo" alt="CC" style="width:34px;height:34px;object-fit:cover;border-radius:7px"></div>
-          <div><strong>CC Chelmsford Manager</strong><span>Version 174 • Cloud sync</span></div>
+          <div><strong>CC Chelmsford Manager</strong><span>Version 175 • Cloud sync</span></div>
         </div>
       </div>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)">
@@ -4228,7 +4228,7 @@ let _currentReceiptTitle='';
 let _receiptParams=null; // stored so notes can rebuild receipt text live
 
 const _NOTES_KEY='cc_day_notes_';
-const _UNLOCK_HOURS=6;
+const _UNLOCK_HOURS=15;
 // Grace period stored on the DB row — works across all accounts/devices
 function _unlockUntilISO(){return new Date(Date.now()+_UNLOCK_HOURS*3600*1000).toISOString();}
 function _rowInGrace(r){return r&&r.unlocked_until&&new Date(r.unlocked_until)>new Date();}
