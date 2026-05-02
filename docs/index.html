@@ -897,7 +897,7 @@ body{
         <div class="sg-label">App</div>
         <div class="si">
           <div class="si-icon" style="background:rgba(255,255,255,.08);overflow:hidden;padding:0"><img src="" id="settings-logo" alt="CC" style="width:34px;height:34px;object-fit:cover;border-radius:7px"></div>
-          <div><strong>CC Chelmsford Manager</strong><span>Version 161 • Cloud sync</span></div>
+          <div><strong>CC Chelmsford Manager</strong><span>Version 162 • Cloud sync</span></div>
         </div>
       </div>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)">
@@ -3507,6 +3507,17 @@ function setupRealtime(){
       const merged={..._loadSalesCache(),[row.sale_date]:row};
       _saveSalesCache(merged);
       renderSalesTable();
+      // If the day entry sheet is open for this date, refresh notes live
+      if(salesOpenDate===row.sale_date){
+        const noteEl=document.getElementById('sd-notes');
+        // Only overwrite if the user isn't actively typing in the notes field
+        if(noteEl&&document.activeElement!==noteEl&&row.notes!=null){
+          noteEl.value=row.notes;
+          // Rebuild receipt preview if visible
+          const pre=document.getElementById('receipt-text-preview');
+          if(pre)pre.textContent=_getReceiptText();
+        }
+      }
       logActivity(`Sales ${row.sale_date} updated live ✓`,'success');
     })
     .subscribe();
@@ -3865,9 +3876,9 @@ function openDayEntry(dateStr){
   document.getElementById('sd-dr').value=r.deliveroo||'';
   document.getElementById('sd-cash').value=r.cash||'';
   document.getElementById('sd-card').value=r.card||'';
-  // Load saved note for this day
+  // Load notes — prefer DB row value, fall back to localStorage
   const _noteEl=document.getElementById('sd-notes');
-  if(_noteEl)_noteEl.value=localStorage.getItem(_NOTES_KEY+dateStr)||localStorage.getItem('cc_default_note')||'';
+  if(_noteEl)_noteEl.value=r.notes||localStorage.getItem(_NOTES_KEY+dateStr)||'';
   _resetBreakdown();
   _bdItems.ue=(Array.isArray(r.uber_eats_items)?r.uber_eats_items:[]).map(Number);
   _bdItems.dr=(Array.isArray(r.deliveroo_items)?r.deliveroo_items:[]).map(Number);
@@ -3950,7 +3961,8 @@ async function saveDaySales(){
     cash:getSdVal('sd-cash'),
     card:getSdVal('sd-card'),
     uber_eats_items:_bdItems.ue,
-    deliveroo_items:_bdItems.dr
+    deliveroo_items:_bdItems.dr,
+    notes:(document.getElementById('sd-notes')||{}).value||''
   };
   // Save locally first so data is never lost even if cloud fails
   salesWeekData[salesOpenDate]=payload;
