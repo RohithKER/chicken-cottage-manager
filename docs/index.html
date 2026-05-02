@@ -889,7 +889,7 @@ body{
         <div class="sg-label">App</div>
         <div class="si">
           <div class="si-icon" style="background:rgba(255,255,255,.08);overflow:hidden;padding:0"><img src="" id="settings-logo" alt="CC" style="width:34px;height:34px;object-fit:cover;border-radius:7px"></div>
-          <div><strong>CC Chelmsford Manager</strong><span>Version 146 • Cloud sync</span></div>
+          <div><strong>CC Chelmsford Manager</strong><span>Version 147 • Cloud sync</span></div>
         </div>
       </div>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)">
@@ -2168,7 +2168,8 @@ function setType(t){
 function changeWeek(d){
   state.weekOffset+=d;
   document.getElementById('week-label').textContent=weekLabel(state.weekOffset);
-  loadSchedules().then(renderRota);
+  // Load schedules AND early shifts for the new window — early tags need fresh data too
+  Promise.all([loadSchedules(),loadEarlyShift()]).then(renderRota);
 }
 
 /* ─── Modal ──────────────────────────────────────────── */
