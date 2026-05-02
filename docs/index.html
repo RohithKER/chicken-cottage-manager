@@ -886,7 +886,7 @@ body{
         <div class="sg-label">App</div>
         <div class="si">
           <div class="si-icon" style="background:rgba(255,255,255,.08);overflow:hidden;padding:0"><img src="" id="settings-logo" alt="CC" style="width:34px;height:34px;object-fit:cover;border-radius:7px"></div>
-          <div><strong>CC Chelmsford Manager</strong><span>Version 133 • Cloud sync</span></div>
+          <div><strong>CC Chelmsford Manager</strong><span>Version 134 • Cloud sync</span></div>
         </div>
       </div>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)">
@@ -2081,6 +2081,9 @@ function showView(v){
   document.getElementById(`view-${v}`).classList.add('active');
   document.getElementById(`nav-${v}`).classList.add('active');
   document.getElementById('type-tabs').style.display=v==='rota'?'flex':'none';
+  // Hide rota-specific header controls when not on rota view
+  const wkNav=document.querySelector('.week-nav');
+  if(wkNav)wkNav.style.display=v==='rota'?'flex':'none';
   if(v==='staff'){renderStaff();populateNewStaffPalette();}
   if(v==='sales'){
     // If data is already loaded for this week, render instantly (realtime keeps it fresh).
@@ -2332,7 +2335,11 @@ function renameStaff(type,oldName){
   renderStaff();renderRota();
   toast(`Renamed to ${newName}`+(updatedShifts?` · ${updatedShifts} shift${updatedShifts!==1?'s':''} updated`:''));
   // cloud: add new, remove old staff record
-  saveStaffToCloud(newName,type).catch(()=>{});
+  // Compute the correct type — person may be in both lists after rename
+  const _rInside=state.staff.inside.includes(newName);
+  const _rDelivery=state.staff.delivery.includes(newName);
+  const _rType=_rInside&&_rDelivery?'both':_rInside?'inside':'delivery';
+  saveStaffToCloud(newName,_rType).catch(()=>{});
   deleteStaffFromCloud(oldName).catch(()=>{});
 }
 
@@ -2853,6 +2860,8 @@ function copyWeek(){
 
 async function pasteWeek(){
   if(!weekClipboard){toast('Copy a week first');return;}
+  const _pastePerm=state.type==='delivery'?'can_edit_delivery':'can_edit_rota';
+  if(!requirePerm(_pastePerm,'paste to the rota'))return;
   if(!confirm(`Paste copied shifts to ${weekLabel(state.weekOffset)}?\nThis will overwrite existing shifts.`))return;
   const type = state.type;
   const wk = weekKey();
@@ -2872,13 +2881,19 @@ async function pasteWeek(){
 }
 
 function clearWeek(){
+  const perm=state.type==='delivery'?'can_edit_delivery':'can_edit_rota';
+  if(!requirePerm(perm,'clear this week'))return;
   if(!confirm(`Clear all shifts for ${weekLabel(state.weekOffset)}?`))return;
   const wk=weekKey();
   Object.keys(state.schedules).forEach(k=>{if(k.startsWith(`${state.type}|${wk}|`))delete state.schedules[k];});
+  _saveSchedCache(state.schedules); // persist clear immediately — force-close won't revert it
+  renderRota();
   db.from('schedules').delete()
     .eq('schedule_type',state.type).eq('week_key',wk)
-    .then(()=>toast('Week cleared'));
-  renderRota();
+    .then(({error})=>{
+      if(error){logActivity('Clear week cloud failed: '+error.message,'error');toast('⚠ Cleared locally — will sync on ↻');}
+      else{logActivity(`Week ${wk} (${state.type}) cleared ✓`,'success');toast('Week cleared ✓');}
+    }).catch(()=>{toast('⚠ Cleared locally — check connection');});
 }
 
 /* ─── Auth ───────────────────────────────────────────── */
