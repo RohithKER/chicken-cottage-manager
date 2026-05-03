@@ -861,6 +861,11 @@ body{
           <div><strong>Sales Page PIN</strong><span id="sales-pin-status">Set PIN for sales access</span></div>
           <div class="si-arr">›</div>
         </div>
+        <div class="si" onclick="lockSalesNow()">
+          <div class="si-icon" style="background:rgba(232,112,112,.15)">🔒</div>
+          <div><strong>Lock Sales Now</strong><span>Immediately hide all recently entered sales figures</span></div>
+          <div class="si-arr">›</div>
+        </div>
         <div style="height:8px"></div>
       </div>
 
@@ -902,7 +907,7 @@ body{
         <div class="sg-label">App</div>
         <div class="si">
           <div class="si-icon" style="background:rgba(255,255,255,.08);overflow:hidden;padding:0"><img src="" id="settings-logo" alt="CC" style="width:34px;height:34px;object-fit:cover;border-radius:7px"></div>
-          <div><strong>CC Chelmsford Manager</strong><span>Version 177 • Cloud sync</span></div>
+          <div><strong>CC Chelmsford Manager</strong><span>Version 178 • Cloud sync</span></div>
         </div>
       </div>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)">
@@ -3416,6 +3421,49 @@ function _confirmNo(){
   document.getElementById('confirm-overlay').classList.remove('open');
   setTimeout(()=>{document.getElementById('confirm-overlay').style.display='none';},200);
   _confirmCb=null;
+}
+
+/* ─── Lock Sales Now (admin) ────────────────────────── */
+function lockSalesNow(){
+  if(!_perms.is_admin)return;
+  showConfirm(
+    'Lock Sales Now?',
+    'This will immediately hide all recently entered sales figures for all accounts. Days with no data are unaffected.',
+    async ()=>{
+      try{
+        // 1. Bulk-update Supabase — expire the grace period on all unlocked rows
+        await db.from('daily_sales')
+          .update({unlocked_until:null})
+          .gt('unlocked_until',new Date().toISOString());
+
+        // 2. Mirror change in in-memory salesWeekData
+        const now=new Date();
+        Object.keys(salesWeekData).forEach(k=>{
+          const r=salesWeekData[k];
+          if(r&&r.unlocked_until&&new Date(r.unlocked_until)>now){
+            salesWeekData[k]={...r,unlocked_until:null};
+          }
+        });
+
+        // 3. Mirror change in localStorage cache so other tabs see it too
+        const allCached=_loadSalesCache();
+        Object.keys(allCached).forEach(k=>{
+          const r=allCached[k];
+          if(r&&r.unlocked_until&&new Date(r.unlocked_until)>now){
+            allCached[k]={...r,unlocked_until:null};
+          }
+        });
+        _saveSalesCache(allCached);
+
+        // 4. Re-render the sales table if it is currently visible
+        renderSalesTable();
+        toast('Sales locked 🔒');
+      }catch(e){
+        console.error('lockSalesNow error:',e);
+        toast('❌ Failed to lock sales');
+      }
+    }
+  );
 }
 
 /* ─── Pending Approvals (Settings tab) ──────────────── */
