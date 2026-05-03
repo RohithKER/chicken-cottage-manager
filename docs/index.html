@@ -487,8 +487,7 @@ body{
 .early-toggle-btn{width:100%;text-align:left;background:none;border:none;border-top:1px solid var(--border2);padding:11px 16px;font-size:12px;color:var(--text3);cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:7px;flex-shrink:0;transition:color .15s}
 .early-toggle-btn.active{color:#ffb347}
 .early-chevron{font-size:10px;opacity:.8;margin-left:auto}
-.early-section{border-top:1px solid var(--border2);padding:10px 16px 6px;flex-shrink:0;max-height:220px;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain}
-.early-section-hdr{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text3);margin-bottom:8px;display:flex;align-items:center;justify-content:space-between}
+.early-section{padding:4px 16px 6px;flex-shrink:0;max-height:220px;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain}
 .early-item{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.04)}
 .early-item:last-child{border-bottom:none}
 .early-item .pill{flex:1;min-width:0}
@@ -1114,10 +1113,6 @@ body{
     <div class="picker-list" id="picker-list"></div>
     <button class="early-toggle-btn" id="early-toggle-btn" style="display:none" onclick="toggleEarlyExpanded()">⏰ Add early shifts</button>
     <div class="early-section" id="early-section" style="display:none">
-      <div class="early-section-hdr" id="early-section-hdr" onclick="toggleEarlyExpanded()" style="cursor:pointer">
-        <span id="early-section-hdr-text">⏰ EARLY SHIFTS</span>
-        <span class="early-chevron">▲</span>
-      </div>
       <div id="early-list"></div>
     </div>
     <div class="sh-foot">
@@ -2517,13 +2512,12 @@ function _renderEarlySection(day){
   const list=document.getElementById('early-list');
   const hasStaff=modalSel.length>0&&modalCtx?.col!=='OFF';
   if(!sec)return;
-  // Show/hide the "Add early shifts" toggle button
+  // Toggle button is always the single header — shows ▼ (collapsed) or ▲ (expanded)
   if(toggleBtn){
-    // Only show toggle btn when section is collapsed
-    toggleBtn.style.display=(hasStaff&&!earlyExpanded)?'flex':'none';
+    toggleBtn.style.display=hasStaff?'flex':'none';
     const cnt=modalEarlyMap.size;
     const label=cnt>0?`⏰ Early shifts (${cnt})`:'⏰ Add early shifts';
-    toggleBtn.innerHTML=`<span>${label}</span><span class="early-chevron">▼</span>`;
+    toggleBtn.innerHTML=`<span>${label}</span><span class="early-chevron">${earlyExpanded?'▲':'▼'}</span>`;
     toggleBtn.className='early-toggle-btn'+(cnt>0?' active':'');
   }
   if(!hasStaff||!earlyExpanded){
@@ -2546,7 +2540,14 @@ function _renderEarlySection(day){
 function pickEarlyTime(name,time){
   if(time){modalEarlyMap.set(name,time);}
   else{modalEarlyMap.delete(name);}
-  // Toggle btn is hidden when expanded — nothing to update here
+  // Update toggle button count
+  const toggleBtn=document.getElementById('early-toggle-btn');
+  if(toggleBtn){
+    const cnt=modalEarlyMap.size;
+    const label=cnt>0?`⏰ Early shifts (${cnt})`:'⏰ Add early shifts';
+    toggleBtn.innerHTML=`<span>${label}</span><span class="early-chevron">▲</span>`;
+    toggleBtn.className='early-toggle-btn'+(cnt>0?' active':'');
+  }
   // Update select style live
   const sel=document.getElementById('ets-'+name);
   if(sel)sel.className='early-time-sel'+(time?'':' off');
