@@ -208,13 +208,23 @@ body{
 
 /* ─── Day Cards ──────────────────────────────────── */
 #cards-wrap{padding:12px}
-.day-card{
+/* Unified table container — wraps all day-cards into one bordered card */
+.day-cards-container{
   border:1px solid var(--border);
-  border-radius:var(--r);margin-bottom:10px;overflow:hidden;
+  border-radius:var(--r);
+  overflow:hidden;
   box-shadow:var(--shadow-sm);
 }
-#cards-wrap .day-card:nth-child(odd){background:var(--bg)}
-#cards-wrap .day-card:nth-child(even){background:var(--surface)}
+.day-card{
+  border:none;
+  border-radius:0;
+  margin-bottom:0;
+  overflow:hidden;
+  border-bottom:1px solid var(--border);
+}
+.day-card:last-child{border-bottom:none}
+.day-cards-container .day-card:nth-child(odd){background:var(--bg)}
+.day-cards-container .day-card:nth-child(even){background:var(--surface)}
 .day-header{
   background:rgba(255,255,255,0.025);padding:11px 14px 9px;
   border-bottom:1px solid var(--border);
@@ -909,7 +919,7 @@ body{
         <div class="sg-label">App</div>
         <div class="si">
           <div class="si-icon" style="background:rgba(255,255,255,.08);overflow:hidden;padding:0"><img src="" id="settings-logo" alt="CC" style="width:34px;height:34px;object-fit:cover;border-radius:7px"></div>
-          <div><strong>CC Chelmsford Manager</strong><span>Version 180 • Cloud sync</span></div>
+          <div><strong>CC Chelmsford Manager</strong><span>Version 181 • Cloud sync</span></div>
         </div>
       </div>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)">
@@ -2177,7 +2187,7 @@ function renderCards(){
     });
     html+='</div>';
   });
-  document.getElementById('cards-wrap').innerHTML=html;
+  document.getElementById('cards-wrap').innerHTML=`<div class="day-cards-container">${html}</div>`;
 }
 
 function renderTable(){
