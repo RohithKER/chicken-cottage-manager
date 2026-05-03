@@ -484,12 +484,17 @@ body{
 .sh-foot{padding:14px 16px 0;flex-shrink:0;border-top:1px solid var(--border);display:flex;gap:8px}
 .sh-foot .btn-sm{padding:13px}
 /* Early shift section inside modal */
-.early-section{border-top:2px solid var(--border2);padding:10px 16px 6px;flex-shrink:0;max-height:190px;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain}
+.early-toggle-btn{width:100%;text-align:left;background:none;border:none;border-top:1px solid var(--border2);padding:11px 16px;font-size:12px;color:var(--text3);cursor:pointer;display:flex;align-items:center;gap:7px;flex-shrink:0;transition:color .15s}
+.early-toggle-btn.active{color:#ffb347}
+.early-section{border-top:1px solid var(--border2);padding:10px 16px 6px;flex-shrink:0;max-height:220px;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain}
 .early-section-hdr{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text3);margin-bottom:8px}
 .early-item{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.04)}
 .early-item:last-child{border-bottom:none}
-.early-item .pill{flex:1}
-.early-btn{border:none;border-radius:20px;font-size:11px;font-weight:700;padding:4px 10px;cursor:pointer;letter-spacing:.3px;transition:background .15s,color .15s}
+.early-item .pill{flex:1;min-width:0}
+.early-time-sel{background:var(--surface2);border:1px solid var(--border2);border-radius:16px;color:var(--text1);font-size:11px;font-weight:700;padding:4px 8px;cursor:pointer;outline:none;-webkit-appearance:none;appearance:none;transition:opacity .15s}
+.early-time-sel:disabled{opacity:.35;cursor:default}
+.early-time-sel:focus{border-color:rgba(255,170,0,.5)}
+.early-btn{border:none;border-radius:20px;font-size:13px;font-weight:700;padding:4px 10px;cursor:pointer;letter-spacing:.3px;transition:background .15s,color .15s;line-height:1}
 .early-btn.off{background:var(--surface2);color:var(--text3)}
 .early-btn.on{background:rgba(255,170,0,.2);color:#ffb347;border:1px solid rgba(255,170,0,.35)}
 /* Time tag on rota pills */
@@ -1109,8 +1114,9 @@ body{
     </div>
     <div class="sh-sub" id="sh-sub"></div>
     <div class="picker-list" id="picker-list"></div>
+    <button class="early-toggle-btn" id="early-toggle-btn" style="display:none" onclick="toggleEarlyExpanded()">⏰ Add early shifts</button>
     <div class="early-section" id="early-section" style="display:none">
-      <div class="early-section-hdr" id="early-section-hdr">⏰ Early start</div>
+      <div class="early-section-hdr" id="early-section-hdr">⏰ Early shifts</div>
       <div id="early-list"></div>
     </div>
     <div class="sh-foot">
@@ -1158,7 +1164,7 @@ let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 /* ─── Constants ──────────────────────────────────────── */
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
 // Days with early starters and their start time label
-const EARLY_DAYS = {Friday:'4pm', Saturday:'5pm'};
+const EARLY_DEFAULT_TIME = '4pm'; // default early-start time when none set
 const DEFAULT_COLS = {
   inside: ['MORNING','NIGHT','OFF'],
   delivery: ['DAY','4:00','5:00']
@@ -1645,7 +1651,8 @@ let state = {
 let viewMode = localStorage.getItem('cc_view') || 'table';
 let modalCtx = null;
 let modalSel = [];
-let modalEarlySet = new Set(); // early starters being edited in current modal
+let modalEarlyMap = new Map(); // early starters {name→time} being edited in current modal
+let earlyExpanded = false;    // whether the early shifts section is open in modal
 let _modalClosedAt = 0; // timestamp of last closeModal() call
 let authMode = 'signin';
 let colEditorType = 'inside';
@@ -1811,26 +1818,30 @@ async function seedDefaultStaff(){
 }
 
 // ── Early Shift tracking ─────────────────────────────────────────────────────
-// state.earlyShift: { 'weekKey|day': Set<staffName> }
-// Only Friday (4pm) and Saturday (5pm) use this
-const _EARLY_CACHE_KEY='cc_early_shifts_v1';
+// state.earlyShift: { 'weekKey|day': Map<staffName, timeString> }
+// Available for all days; each person gets a selectable early start time
+const _EARLY_CACHE_KEY='cc_early_shifts_v2';
 function _loadEarlyCache(){try{const d=JSON.parse(localStorage.getItem(_EARLY_CACHE_KEY)||'{}');return d;}catch{return{};}}
 function _saveEarlyCache(obj){try{localStorage.setItem(_EARLY_CACHE_KEY,JSON.stringify(obj));}catch{}}
 function _earlyKey(wk,day){return`${wk}|${day}`;}
-function getEarlySet(off,day){
+function getEarlyMap(off,day){
   const k=_earlyKey(weekKey(off),day);
-  return state.earlyShift[k]||new Set();
+  return state.earlyShift[k]||new Map();
 }
-function isEarlyStaff(off,day,name){return getEarlySet(off,day).has(name);}
-function _setEarlySet(wk,day,set){
+function getEarlySet(off,day){return new Set(getEarlyMap(off,day).keys());}
+function getEarlyTime(off,day,name){return getEarlyMap(off,day).get(name)||null;}
+function _setEarlyMap(wk,day,map){
   const k=_earlyKey(wk,day);
-  if(set.size)state.earlyShift[k]=set; else delete state.earlyShift[k];
+  if(map.size)state.earlyShift[k]=map; else delete state.earlyShift[k];
 }
 async function loadEarlyShift(){
   const wks=[weekKey(-1),weekKey(0),weekKey(1)];
   // Seed from cache first so tags show instantly
   const cached=_loadEarlyCache();
-  Object.keys(cached).forEach(k=>{state.earlyShift[k]=new Set(cached[k]||[]);});
+  Object.keys(cached).forEach(k=>{
+    const obj=cached[k]||{};
+    state.earlyShift[k]=new Map(Object.entries(obj));
+  });
   if(!user)return;
   try{
     const{data,error}=await db.from('shift_early').select('*').in('week_key',wks);
@@ -1838,12 +1849,16 @@ async function loadEarlyShift(){
     if(data&&data.length){
       data.forEach(row=>{
         const k=_earlyKey(row.week_key,row.day);
-        state.earlyShift[k]=new Set(row.staff_names||[]);
+        const names=row.staff_names||[];
+        const times=row.staff_times||{};
+        const m=new Map();
+        names.forEach(n=>m.set(n,times[n]||EARLY_DEFAULT_TIME));
+        state.earlyShift[k]=m;
       });
       logActivity(`Early shifts loaded ✓ (${data.length} row(s))`,'success');
       // Persist merged to cache
       const toCache={};
-      Object.entries(state.earlyShift).forEach(([k,s])=>{toCache[k]=[...s];});
+      Object.entries(state.earlyShift).forEach(([k,m])=>{toCache[k]=Object.fromEntries(m);});
       _saveEarlyCache(toCache);
     }else{
       logActivity('Early shifts: none found for this week','');
@@ -1854,13 +1869,15 @@ async function loadEarlyShift(){
 async function saveEarlyToCloud(wk,day){
   if(!user)return;
   const k=_earlyKey(wk,day);
-  const names=[...(state.earlyShift[k]||new Set())];
+  const m=state.earlyShift[k]||new Map();
+  const names=[...m.keys()];
+  const times=Object.fromEntries(m);
   // Persist to cache
   const cached=_loadEarlyCache();
-  cached[k]=names;
+  cached[k]=times;
   _saveEarlyCache(cached);
   try{
-    await db.from('shift_early').upsert({week_key:wk,day,staff_names:names,updated_at:new Date().toISOString()},{onConflict:'week_key,day'});
+    await db.from('shift_early').upsert({week_key:wk,day,staff_names:names,staff_times:times,updated_at:new Date().toISOString()},{onConflict:'week_key,day'});
   }catch(e){logActivity('Early shift save failed: '+e.message,'error');}
 }
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2121,23 +2138,6 @@ async function saveSalesWeekToCloud(){
   }
 }
 
-/* ─── Sync Sales Only ────────────────────────────────── */
-async function syncSalesOnly(){
-  if(!user){toast('Sign in to sync');return;}
-  const btn=document.getElementById('sync-sales-btn');
-  if(btn){btn.classList.add('saving');btn.textContent='↻ Syncing…';}
-  try{
-    await loadSalesWeek();
-    logActivity('Sales synced from cloud ✓', 'success');
-    toast('Sales synced ✓');
-    if(btn){btn.classList.remove('saving');btn.classList.add('ok');btn.textContent='✓ Synced';}
-    setTimeout(()=>{if(btn){btn.classList.remove('ok');btn.textContent='↻ Sync Sales';}},2500);
-  }catch(e){
-    logActivity('Sales sync failed: '+e.message, 'error');
-    toast('Sync failed: '+e.message);
-    if(btn){btn.classList.remove('saving');btn.textContent='↻ Sync Sales';}
-  }
-}
 async function deleteStaffFromCloud(name){
   if(!user)return;
   await db.from('staff').delete().eq('name',name);
@@ -2157,11 +2157,6 @@ function setShift(type,off,day,col,names){
 }
 
 /* ─── Render ─────────────────────────────────────────── */
-function pill(name,type=null){
-  // Always use inline style so type-aware colours override CSS class
-  return `<span class="pill" style="${pillStyle(name,type)}">${name}</span>`;
-}
-
 function renderRota(){
   if(viewMode==='table') renderTable();
   else renderCards();
@@ -2175,9 +2170,10 @@ function renderCards(){
       <div class="day-header"><div class="day-dot"></div><b class="day-name">${day}</b><span class="day-date">${dayDate(di,state.weekOffset)} ${dayMonth(di,state.weekOffset)}</span></div>`;
     cols.forEach(col=>{
       const staff=getShift(state.type,state.weekOffset,day,col);
-      const earlySet=EARLY_DAYS[day]?getEarlySet(state.weekOffset,day):null;
+      const earlyMap=getEarlyMap(state.weekOffset,day);
       const pills=staff.length?staff.map(n=>{
-        const tag=earlySet&&earlySet.has(n)?`<span class="early-tag">${EARLY_DAYS[day]}</span>`:'';
+        const et=earlyMap.get(n);
+        const tag=et?`<span class="early-tag">${et}</span>`:'';
         return `<span class="pill" style="${pillStyle(n,state.type)}">${n}${tag}</span>`;
       }).join(''):`<span class="empty-label">Tap to assign</span>`;
       html+=`<div class="shift-row${col==='OFF'?' off-row':''}" onclick="openModal('${day}','${col}')">
@@ -2205,10 +2201,11 @@ function renderTable(){
       </td>`;
     cols.forEach(col=>{
       const staff=getShift(state.type,state.weekOffset,day,col);
-      const earlySet=EARLY_DAYS[day]?getEarlySet(state.weekOffset,day):null;
+      const earlyMap=getEarlyMap(state.weekOffset,day);
       const pills=staff.length
         ?staff.map(n=>{
-            const tag=earlySet&&earlySet.has(n)?`<span class="early-tag">${EARLY_DAYS[day]}</span>`:'';
+            const et=earlyMap.get(n);
+            const tag=et?`<span class="early-tag">${et}</span>`:'';
             return`<span class="pill" style="${pillStyle(n,state.type)}">${n}${tag}</span>`;
           }).join('')
         :`<span class="td-empty">—</span>`;
@@ -2502,8 +2499,9 @@ function openModal(day,col){
       <span class="pi-name">${n}</span>
     </div>`;
   }).join('');
-  // Early shift section — only for Fri/Sat
-  modalEarlySet=new Set(getEarlySet(state.weekOffset,day));
+  // Early shift section — all days
+  modalEarlyMap=new Map(getEarlyMap(state.weekOffset,day));
+  earlyExpanded=modalEarlyMap.size>0;
   _renderEarlySection(day);
 
   const ov=document.getElementById('overlay');
@@ -2511,27 +2509,55 @@ function openModal(day,col){
   requestAnimationFrame(()=>ov.classList.add('open'));
 }
 
+const EARLY_TIMES=['3pm','3:30pm','4pm','4:30pm','5pm','5:30pm','6pm','6:30pm','7pm'];
 function _renderEarlySection(day){
   const sec=document.getElementById('early-section');
-  const hdr=document.getElementById('early-section-hdr');
+  const toggleBtn=document.getElementById('early-toggle-btn');
   const list=document.getElementById('early-list');
-  if(!sec||!EARLY_DAYS[day]||modalSel.length===0||modalCtx?.col==='OFF'){
-    if(sec)sec.style.display='none';
+  const hasStaff=modalSel.length>0&&modalCtx?.col!=='OFF';
+  if(!sec)return;
+  // Show/hide the "Add early shifts" toggle button
+  if(toggleBtn){
+    toggleBtn.style.display=hasStaff?'flex':'none';
+    const cnt=modalEarlyMap.size;
+    if(earlyExpanded){
+      toggleBtn.textContent='▲ Hide early shifts';
+    }else{
+      toggleBtn.textContent=cnt>0?`⏰ Early shifts (${cnt})`:'⏰ Add early shifts';
+    }
+    toggleBtn.className='early-toggle-btn'+(earlyExpanded||cnt>0?' active':'');
+  }
+  if(!hasStaff||!earlyExpanded){
+    sec.style.display='none';
     return;
   }
   sec.style.display='block';
-  hdr.textContent=`⏰ Early start — ${EARLY_DAYS[day]}`;
   list.innerHTML=modalSel.map(n=>{
-    const on=modalEarlySet.has(n);
+    const on=modalEarlyMap.has(n);
+    const t=modalEarlyMap.get(n)||EARLY_DEFAULT_TIME;
+    const opts=EARLY_TIMES.map(v=>`<option value="${v}"${v===t?' selected':''}>${v}</option>`).join('');
     return `<div class="early-item">
       <span class="pill" style="${pillStyle(n,state.type)}">${n}</span>
-      <button class="early-btn ${on?'on':'off'}" onclick="toggleEarlyModal('${n}')">${on?EARLY_DAYS[day]:'7pm'}</button>
+      <select class="early-time-sel" id="ets-${n}" onchange="setEarlyTime('${n}',this.value)"${on?'':' disabled'}>${opts}</select>
+      <button class="early-btn ${on?'on':'off'}" onclick="toggleEarlyModal('${n}')">${on?'✓ on':'+'}</button>
     </div>`;
   }).join('');
 }
 
 function toggleEarlyModal(name){
-  if(modalEarlySet.has(name))modalEarlySet.delete(name); else modalEarlySet.add(name);
+  if(modalEarlyMap.has(name)){
+    modalEarlyMap.delete(name);
+  }else{
+    const sel=document.getElementById('ets-'+name);
+    modalEarlyMap.set(name,sel?sel.value:EARLY_DEFAULT_TIME);
+  }
+  if(modalCtx)_renderEarlySection(modalCtx.day);
+}
+function setEarlyTime(name,time){
+  if(modalEarlyMap.has(name))modalEarlyMap.set(name,time);
+}
+function toggleEarlyExpanded(){
+  earlyExpanded=!earlyExpanded;
   if(modalCtx)_renderEarlySection(modalCtx.day);
 }
 
@@ -2540,7 +2566,7 @@ function togglePick(el,name){
   if(i===-1){modalSel.push(name);el.classList.add('sel');el.querySelector('.pi-check').textContent='✓';}
   else{
     modalSel.splice(i,1);el.classList.remove('sel');el.querySelector('.pi-check').textContent='';
-    modalEarlySet.delete(name); // remove from early if deselected
+    modalEarlyMap.delete(name); // remove from early if deselected
   }
   if(modalCtx)_renderEarlySection(modalCtx.day);
 }
@@ -2564,10 +2590,10 @@ function saveShift(){
     });
   }
 
-  // Save early shift assignment for Fri/Sat
-  if(EARLY_DAYS[day]){
+  // Save early shift assignment for all days
+  {
     const wk=weekKey(state.weekOffset);
-    _setEarlySet(wk,day,modalEarlySet);
+    _setEarlyMap(wk,day,modalEarlyMap);
     saveEarlyToCloud(wk,day);
   }
 
@@ -2872,7 +2898,7 @@ async function shareRota(){
     let cx=0,rows=1;
     names.forEach((n,i)=>{
       const dn=n.length>9?n.slice(0,8)+'…':n;
-      const extraW=(earlySet&&earlySet.has(n)&&EARLY_DAYS[day])?30:0;
+      const extraW=(earlySet&&earlySet.get(n))?30:0;
       const pw=Math.min(dn.length*8+18+extraW,maxW);
       if(i>0&&cx+pw>maxW){cx=0;rows++;}
       cx+=pw+PW_GAP;
@@ -2880,11 +2906,11 @@ async function shareRota(){
     return rows;
   }
   const rowHeights=DAYS.map(day=>{
-    const _es=EARLY_DAYS[day]?getEarlySet(state.weekOffset,day):null;
+    const _em=getEarlyMap(state.weekOffset,day);
     return Math.max(52,Math.max(...cols.map(col=>{
       const st=getShift(state.type,state.weekOffset,day,col);
       if(!st.length)return 52;
-      return estPillRows(st,COL_W,12,_es,day)*27+20;
+      return estPillRows(st,COL_W,12,_em,day)*27+20;
     })));
   });
   const TBL_H=TH_H+rowHeights.reduce((a,b)=>a+b,0);
@@ -3013,7 +3039,7 @@ async function shareRota(){
     const PILL_H=21;
     const PILL_GAP=5;
     const PILL_GAP_X=5;
-    const dayEarlySet=EARLY_DAYS[day]?getEarlySet(state.weekOffset,day):null;
+    const dayEarlySet=getEarlyMap(state.weekOffset,day);
     cols.forEach((col,ci)=>{
       const cellX=PAD+DAY_W+ci*COL_W;
       // column divider — matches --border2 rgba(255,255,255,0.12)
@@ -3037,7 +3063,7 @@ async function shareRota(){
         const startY=rowY+Math.max(CELL_PAD_Y,Math.floor((ROW_H-totalH)/2));
         let curX=cellX+CELL_PAD_X, curY=startY;
         staff.forEach((name,si)=>{
-          const earlyTime=dayEarlySet&&dayEarlySet.has(name)?EARLY_DAYS[day]:null;
+          const earlyTime=dayEarlySet.get(name)||null;
           const c=getStaffCanvasColor(name,state.type);
           ctx.font=`600 13px -apple-system,sans-serif`;
           const displayName=name.length>9?name.slice(0,8)+'…':name;
