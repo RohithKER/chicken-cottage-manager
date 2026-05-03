@@ -283,11 +283,12 @@ body{
   padding:8px 8px;vertical-align:top;
   min-width:92px;
 }
-.rota-tbl tr:nth-child(even) td{background:rgba(255,255,255,.022)}
+.rota-tbl tr:nth-child(even) td{background:var(--surface)}
 .rota-tbl td.day-cell{
-  background:var(--surface2);cursor:default;
+  background:var(--bg2);cursor:default;
   width:72px;min-width:72px;border-right:2px solid var(--border2);
 }
+.rota-tbl tr:nth-child(even) td.day-cell{background:var(--surface2)}
 .rota-tbl td.shift-cell{
   cursor:pointer;transition:background .12s;
 }
@@ -305,7 +306,7 @@ body{
 .shift-row.off-row:active{background:var(--surface2)}
 .shift-row.off-row .shift-label{color:var(--text3)}
 .rota-tbl th.off-th{background:var(--surface2);color:var(--text3)}
-.rota-tbl td.off-cell{background:rgba(255,255,255,0.014)}
+.rota-tbl td.off-cell{background:transparent}
 .rota-tbl td.off-cell:active{background:rgba(255,255,255,.05)}
 
 /* Staff colors — Notion-style: soft 10% bg, muted text, no border */
@@ -919,7 +920,7 @@ body{
         <div class="sg-label">App</div>
         <div class="si">
           <div class="si-icon" style="background:rgba(255,255,255,.08);overflow:hidden;padding:0"><img src="" id="settings-logo" alt="CC" style="width:34px;height:34px;object-fit:cover;border-radius:7px"></div>
-          <div><strong>CC Chelmsford Manager</strong><span>Version 181 • Cloud sync</span></div>
+          <div><strong>CC Chelmsford Manager</strong><span>Version 182 • Cloud sync</span></div>
         </div>
       </div>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)">
