@@ -16,13 +16,15 @@
 <style>
 /* ─── Reset ──────────────────────────────────────── */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%;overflow:hidden}
+html,body{height:100%;overflow:hidden;overscroll-behavior:none}
 body{
   font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',sans-serif;
   background:#191919;color:rgba(255,255,255,0.88);
   -webkit-tap-highlight-color:transparent;
   touch-action:manipulation;
   -webkit-text-size-adjust:100%;
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
 }
 :root{
   --bg:#191919;--bg2:#1e1e1e;--surface:#252525;--surface2:#2d2d2d;
@@ -198,7 +200,7 @@ body{
 .vt-btn.active{background:var(--surface2);color:var(--text);font-weight:700}
 
 /* ─── Content ────────────────────────────────────── */
-#content{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding-bottom:calc(58px + var(--safe-bottom))}
+#content{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain;padding-bottom:calc(58px + var(--safe-bottom))}
 .view{display:none;padding:10px 10px 6px}
 .view.active{display:block}
 #view-rota{padding:0}
@@ -365,9 +367,10 @@ body{
   transition:transform .28s cubic-bezier(.32,.72,0,1);
   max-height:80dvh;display:flex;flex-direction:column;
   box-shadow:0 -4px 40px rgba(0,0,0,.6);
+  will-change:transform;
 }
 #col-sheet-overlay.open #col-sheet{transform:translateY(0)}
-.col-editor-body{overflow-y:auto;flex:1;padding:14px 16px}
+.col-editor-body{overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain;flex:1;padding:14px 16px}
 .col-row{display:flex;align-items:center;gap:8px;margin-bottom:8px}
 .col-input{
   flex:1;background:var(--bg2);border:1px solid var(--border2);
@@ -442,6 +445,7 @@ body{
   transition:transform .28s cubic-bezier(.32,.72,0,1);
   max-height:85dvh;display:flex;flex-direction:column;
   box-shadow:0 -4px 40px rgba(0,0,0,.6);
+  will-change:transform;
 }
 #overlay.open #sheet{transform:translateY(0)}
 .sh-handle{width:40px;height:4px;background:var(--border2);border-radius:2px;margin:12px auto 0;flex-shrink:0}
@@ -450,7 +454,7 @@ body{
 .sh-close{background:var(--surface2);border:none;width:32px;height:32px;border-radius:50%;color:var(--text2);font-size:14px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .15s}
 .sh-close:active{background:var(--border2)}
 .sh-sub{font-size:12px;color:var(--text3);padding:10px 16px 4px;flex-shrink:0}
-.picker-list{overflow-y:auto;flex:1;min-height:0;padding:6px 0}
+.picker-list{overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain;flex:1;min-height:0;padding:6px 0}
 .pi{
   display:flex;align-items:center;gap:14px;padding:14px 16px;
   cursor:pointer;transition:background .1s;border-bottom:1px solid var(--border);
@@ -467,7 +471,7 @@ body{
 .sh-foot{padding:14px 16px 0;flex-shrink:0;border-top:1px solid var(--border);display:flex;gap:8px}
 .sh-foot .btn-sm{padding:13px}
 /* Early shift section inside modal */
-.early-section{border-top:2px solid var(--border2);padding:10px 16px 6px;flex-shrink:0;max-height:190px;overflow-y:auto}
+.early-section{border-top:2px solid var(--border2);padding:10px 16px 6px;flex-shrink:0;max-height:190px;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain}
 .early-section-hdr{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text3);margin-bottom:8px}
 .early-item{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.04)}
 .early-item:last-child{border-bottom:none}
@@ -623,6 +627,7 @@ body{
   transition:transform .28s cubic-bezier(.32,.72,0,1);
   max-height:88dvh;display:flex;flex-direction:column;
   box-shadow:0 -4px 40px rgba(0,0,0,.6);
+  will-change:transform;
 }
 #sales-overlay.open #sales-sheet{transform:translateY(0)}
 .ss-handle{width:40px;height:4px;background:var(--border2);border-radius:2px;margin:12px auto 0;flex-shrink:0}
@@ -630,7 +635,7 @@ body{
 .ss-title{font-size:17px;font-weight:700;letter-spacing:-0.3px}
 .ss-close{background:var(--surface2);border:none;width:32px;height:32px;border-radius:50%;color:var(--text2);font-size:14px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .15s}
 .ss-close:active{background:var(--border2)}
-.ss-body{overflow-y:auto;flex:1;padding:14px 14px}
+.ss-body{overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain;flex:1;padding:14px 14px}
 .ss-section{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);margin-bottom:12px;overflow:hidden;box-shadow:var(--shadow-sm)}
 .ss-section-hdr{padding:10px 14px;border-bottom:1px solid var(--border);font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.7px}
 .ss-row{display:flex;align-items:center;padding:11px 14px;gap:10px;border-bottom:1px solid rgba(255,255,255,.04);min-height:50px}
@@ -677,9 +682,9 @@ body{
 .rcp-staff-hdr{font-weight:bold;margin:2mm 0 1mm;font-size:12px}
 .rcp-staff-row{display:flex;justify-content:space-between;font-size:11px;margin:0.5mm 0}
 /* ─── Activity Log ───────────────────────────── */
-#log-overlay{position:fixed;inset:0;z-index:8500;background:rgba(0,0,0,.65);display:none;align-items:flex-end;justify-content:center}
+#log-overlay{position:fixed;inset:0;z-index:8500;background:rgba(0,0,0,.65);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);display:none;align-items:flex-end;justify-content:center}
 #log-panel{width:100%;max-width:480px;background:var(--surface);border-radius:20px 20px 0 0;border-top:1px solid var(--border2);padding:16px 16px 32px;max-height:65dvh;display:flex;flex-direction:column;gap:10px}
-#log-list{overflow-y:auto;flex:1;padding-right:2px}
+#log-list{overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain;flex:1;padding-right:2px}
 .log-entry{display:flex;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px;line-height:1.4}
 .log-entry:last-child{border-bottom:none}
 .log-time{color:var(--text3);font-size:11px;flex-shrink:0;padding-top:1px;min-width:64px;font-variant-numeric:tabular-nums}
@@ -819,7 +824,7 @@ body{
       <div class="staff-list" id="sl-delivery"></div>
       <div class="add-form" id="staff-add-panel">
         <label>Add Staff Member</label>
-        <input class="input" id="ns-name" placeholder="Full name" style="margin-bottom:8px">
+        <input class="input" id="ns-name" placeholder="Full name" autocorrect="off" autocapitalize="words" style="margin-bottom:8px">
         <select class="input" id="ns-type">
           <option value="inside">Staff</option>
           <option value="delivery">Delivery</option>
@@ -897,7 +902,7 @@ body{
         <div class="sg-label">App</div>
         <div class="si">
           <div class="si-icon" style="background:rgba(255,255,255,.08);overflow:hidden;padding:0"><img src="" id="settings-logo" alt="CC" style="width:34px;height:34px;object-fit:cover;border-radius:7px"></div>
-          <div><strong>CC Chelmsford Manager</strong><span>Version 175 • Cloud sync</span></div>
+          <div><strong>CC Chelmsford Manager</strong><span>Version 176 • Cloud sync</span></div>
         </div>
       </div>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)">
@@ -933,7 +938,7 @@ body{
       </div>
 
       <!-- Weekly Table -->
-      <div style="flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:0 14px 16px">
+      <div style="flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain;padding:0 14px 16px">
         <div id="sales-week-table"></div>
         <div class="stbl-tap-hint" id="sales-tap-hint">Tap a day to enter sales</div>
       </div>
@@ -997,19 +1002,19 @@ body{
       <!-- Delivery section -->
       <div class="ss-section">
         <div class="ss-section-hdr">Delivery Platforms</div>
-        <div class="ss-row"><label>Just Eat</label><input type="number" id="sd-je" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
-        <div class="ss-row"><label>CC App</label><input type="number" id="sd-cc" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
-        <div class="ss-row"><div class="ss-row-lbl"><label>Uber Eats</label><button class="breakdown-toggle" id="ue-toggle" onclick="toggleBreakdown('ue')"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="ue-badge">Add breakdown</span></button></div><input type="number" id="sd-ue" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
+        <div class="ss-row"><label>Just Eat</label><input type="number" inputmode="decimal" autocomplete="off" id="sd-je" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
+        <div class="ss-row"><label>CC App</label><input type="number" inputmode="decimal" autocomplete="off" id="sd-cc" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
+        <div class="ss-row"><div class="ss-row-lbl"><label>Uber Eats</label><button class="breakdown-toggle" id="ue-toggle" onclick="toggleBreakdown('ue')"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="ue-badge">Add breakdown</span></button></div><input type="number" inputmode="decimal" autocomplete="off" id="sd-ue" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
         <div id="ue-panel" style="display:none" class="breakdown-panel"><div id="ue-items"></div><button class="breakdown-collapse" onclick="toggleBreakdown('ue')">▲ Collapse</button></div>
-        <div class="ss-row"><div class="ss-row-lbl"><label>Deliveroo</label><button class="breakdown-toggle" id="dr-toggle" onclick="toggleBreakdown('dr')"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="dr-badge">Add breakdown</span></button></div><input type="number" id="sd-dr" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
+        <div class="ss-row"><div class="ss-row-lbl"><label>Deliveroo</label><button class="breakdown-toggle" id="dr-toggle" onclick="toggleBreakdown('dr')"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="dr-badge">Add breakdown</span></button></div><input type="number" inputmode="decimal" autocomplete="off" id="sd-dr" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
         <div id="dr-panel" style="display:none" class="breakdown-panel"><div id="dr-items"></div><button class="breakdown-collapse" onclick="toggleBreakdown('dr')">▲ Collapse</button></div>
         <div class="ss-total-row"><label>Delivery Total</label><div class="ss-total-val" id="sd-del-total" style="color:var(--accent2)">£0.00</div></div>
       </div>
       <!-- Payments section -->
       <div class="ss-section">
         <div class="ss-section-hdr">Payments</div>
-        <div class="ss-row"><label>Cash</label><input type="number" id="sd-cash" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
-        <div class="ss-row"><label>Card</label><input type="number" id="sd-card" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
+        <div class="ss-row"><label>Cash</label><input type="number" inputmode="decimal" autocomplete="off" id="sd-cash" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
+        <div class="ss-row"><label>Card</label><input type="number" inputmode="decimal" autocomplete="off" id="sd-card" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
         <div class="ss-total-row"><label>Day Total</label><div class="ss-total-val" id="sd-day-total" style="color:var(--green)">£0.00</div></div>
       </div>
       <!-- Driver Payments section -->
@@ -2345,7 +2350,7 @@ function _buildPinPad(){
   pad.innerHTML=keys.map(k=>{
     if(k==='cancel')return `<button onclick="cancelPinOverlay()"
       style="padding:18px 0;font-size:14px;font-weight:600;
-      background:transparent;border:none;border-radius:12px;
+      background:transparent;border:none;border-radius:12px;min-height:44px;
       color:var(--text3);cursor:pointer;-webkit-tap-highlight-color:transparent;user-select:none"
       ontouchstart="this.style.color='var(--text)'"
       ontouchend="this.style.color='var(--text3)'">Cancel</button>`;
@@ -3871,7 +3876,7 @@ function _renderBdItems(f){
     const row=document.createElement('div');
     row.className='breakdown-item';
     const inp=document.createElement('input');
-    inp.type='number';inp.step='0.01';inp.min='0';
+    inp.type='number';inp.step='0.01';inp.min='0';inp.inputMode='decimal';inp.autocomplete='off';inp.style.fontSize='16px';
     inp.value=v||'';inp.placeholder='0.00';
     inp.oninput=()=>{_bdItems[f][i]=parseFloat(inp.value)||0;_syncBdTotal(f);};
     inp.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();_addBdItem(f);}};
@@ -3885,7 +3890,7 @@ function _renderBdItems(f){
   const row=document.createElement('div');
   row.className='breakdown-item';
   const addInp=document.createElement('input');
-  addInp.type='number';addInp.step='0.01';addInp.min='0';addInp.placeholder='Add amount…';
+  addInp.type='number';addInp.step='0.01';addInp.min='0';addInp.inputMode='decimal';addInp.autocomplete='off';addInp.style.fontSize='16px';addInp.placeholder='Add amount…';
   addInp.oninput=()=>{_pendingBd[f]=addInp.value;}; // track live value
   addInp.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();_addBdItemFromInput(f,addInp);}};
   const addBtn=document.createElement('button');
