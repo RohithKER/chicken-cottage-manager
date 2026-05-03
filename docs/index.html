@@ -922,7 +922,7 @@ body{
         <div class="sg-label">App</div>
         <div class="si">
           <div class="si-icon" style="background:rgba(255,255,255,.08);overflow:hidden;padding:0"><img src="" id="settings-logo" alt="CC" style="width:34px;height:34px;object-fit:cover;border-radius:7px"></div>
-          <div><strong>CC Chelmsford Manager</strong><span>Version 182 • Cloud sync</span></div>
+          <div><strong>CC Chelmsford Manager</strong><span id="app-version-label">Version — • Cloud sync</span></div>
         </div>
       </div>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)">
@@ -1158,6 +1158,11 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
+const APP_VERSION = 188; // ← bump this on every deploy — auto-shows in Settings
+document.addEventListener('DOMContentLoaded',()=>{
+  const el=document.getElementById('app-version-label');
+  if(el)el.textContent=`Version ${APP_VERSION} • Cloud sync`;
+});
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
 // Days with early starters and their start time label
 const EARLY_DEFAULT_TIME = '4pm'; // default early-start time when none set
