@@ -491,12 +491,9 @@ body{
 .early-item{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.04)}
 .early-item:last-child{border-bottom:none}
 .early-item .pill{flex:1;min-width:0}
-.early-time-sel{background:var(--surface2);border:1px solid var(--border2);border-radius:16px;color:var(--text1);font-size:11px;font-weight:700;padding:4px 8px;cursor:pointer;outline:none;-webkit-appearance:none;appearance:none;transition:opacity .15s}
-.early-time-sel:disabled{opacity:.35;cursor:default}
-.early-time-sel:focus{border-color:rgba(255,170,0,.5)}
-.early-btn{border:none;border-radius:20px;font-size:13px;font-weight:700;padding:4px 10px;cursor:pointer;letter-spacing:.3px;transition:background .15s,color .15s;line-height:1}
-.early-btn.off{background:var(--surface2);color:var(--text3)}
-.early-btn.on{background:rgba(255,170,0,.2);color:#ffb347;border:1px solid rgba(255,170,0,.35)}
+.early-time-sel{background:rgba(255,170,0,.18);border:1px solid rgba(255,170,0,.4);border-radius:16px;color:#ffb347;font-size:12px;font-weight:700;padding:5px 10px;cursor:pointer;outline:none;-webkit-appearance:none;appearance:none;transition:background .15s,border-color .15s,color .15s}
+.early-time-sel.off{background:var(--surface2);border-color:var(--border2);color:var(--text3)}
+.early-time-sel:focus{border-color:rgba(255,170,0,.7)}
 /* Time tag on rota pills */
 .early-tag{display:inline-block;font-size:9px;font-weight:700;background:rgba(0,0,0,0.28);color:#fff;border-radius:4px;padding:1px 5px;margin-left:5px;vertical-align:middle;letter-spacing:.2px;white-space:nowrap;line-height:1.4}
 
@@ -2533,28 +2530,30 @@ function _renderEarlySection(day){
   }
   sec.style.display='block';
   list.innerHTML=modalSel.map(n=>{
-    const on=modalEarlyMap.has(n);
-    const t=modalEarlyMap.get(n)||EARLY_DEFAULT_TIME;
-    const opts=EARLY_TIMES.map(v=>`<option value="${v}"${v===t?' selected':''}>${v}</option>`).join('');
+    const t=modalEarlyMap.get(n)||'';
+    const opts=[`<option value=""${!t?' selected':''}>No early</option>`,
+      ...EARLY_TIMES.map(v=>`<option value="${v}"${v===t?' selected':''}>${v}</option>`)
+    ].join('');
     return `<div class="early-item">
       <span class="pill" style="${pillStyle(n,state.type)}">${n}</span>
-      <select class="early-time-sel" id="ets-${n}" onchange="setEarlyTime('${n}',this.value)"${on?'':' disabled'}>${opts}</select>
-      <button class="early-btn ${on?'on':'off'}" onclick="toggleEarlyModal('${n}')">${on?'✓ on':'+'}</button>
+      <select class="early-time-sel${t?'':' off'}" id="ets-${n}" onchange="pickEarlyTime('${n}',this.value)">${opts}</select>
     </div>`;
   }).join('');
 }
 
-function toggleEarlyModal(name){
-  if(modalEarlyMap.has(name)){
-    modalEarlyMap.delete(name);
-  }else{
-    const sel=document.getElementById('ets-'+name);
-    modalEarlyMap.set(name,sel?sel.value:EARLY_DEFAULT_TIME);
+function pickEarlyTime(name,time){
+  if(time){modalEarlyMap.set(name,time);}
+  else{modalEarlyMap.delete(name);}
+  // Update toggle button count without re-rendering the full list (avoids select reset)
+  const toggleBtn=document.getElementById('early-toggle-btn');
+  if(toggleBtn&&earlyExpanded){
+    const cnt=modalEarlyMap.size;
+    toggleBtn.textContent='▲ Hide early shifts';
+    toggleBtn.className='early-toggle-btn'+(cnt>0?' active':'');
   }
-  if(modalCtx)_renderEarlySection(modalCtx.day);
-}
-function setEarlyTime(name,time){
-  if(modalEarlyMap.has(name))modalEarlyMap.set(name,time);
+  // Update select style live
+  const sel=document.getElementById('ets-'+name);
+  if(sel)sel.className='early-time-sel'+(time?'':' off');
 }
 function toggleEarlyExpanded(){
   earlyExpanded=!earlyExpanded;
