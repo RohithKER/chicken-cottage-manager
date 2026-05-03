@@ -909,7 +909,7 @@ body{
         <div class="sg-label">App</div>
         <div class="si">
           <div class="si-icon" style="background:rgba(255,255,255,.08);overflow:hidden;padding:0"><img src="" id="settings-logo" alt="CC" style="width:34px;height:34px;object-fit:cover;border-radius:7px"></div>
-          <div><strong>CC Chelmsford Manager</strong><span>Version 179 • Cloud sync</span></div>
+          <div><strong>CC Chelmsford Manager</strong><span>Version 180 • Cloud sync</span></div>
         </div>
       </div>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)">
@@ -2970,16 +2970,12 @@ async function shareRota(){
     const ROW_H=rowHeights[di];
     _rowY+=ROW_H;
 
-    // row background — matches #191919 base + .rota-tbl tr:nth-child(even) rgba(255,255,255,.022)
-    ctx.fillStyle='#191919';
+    // row background — alternating dark/gray like cards view
+    ctx.fillStyle=di%2===0?'#191919':'#252525';
     ctx.fillRect(PAD,rowY,W-PAD*2,ROW_H);
-    if(di%2!==0){
-      ctx.fillStyle='rgba(255,255,255,0.022)';
-      ctx.fillRect(PAD,rowY,W-PAD*2,ROW_H);
-    }
 
-    // day cell background — matches .rota-tbl td.day-cell: --surface2 #2d2d2d
-    ctx.fillStyle='#2d2d2d';
+    // day cell background — slightly lighter than row, maintains alternation
+    ctx.fillStyle=di%2===0?'#222222':'#2d2d2d';
     ctx.fillRect(PAD,rowY,DAY_W,ROW_H);
 
     // row separator — matches --border rgba(255,255,255,0.07)
