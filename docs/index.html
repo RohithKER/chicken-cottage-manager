@@ -1663,7 +1663,10 @@ let staffBlacklist = new Set(JSON.parse(localStorage.getItem('cc_staff_blacklist
 
 /* ─── Week helpers ───────────────────────────────────── */
 function weekStart(off=0){
-  const d=new Date(); d.setHours(0,0,0,0);
+  // Lag the clock by 12 hours so the week doesn't roll over at midnight
+  // Sunday→Monday. The transition happens at noon Monday instead, giving
+  // the closing team time to finish up before the rota view jumps forward.
+  const d=new Date(Date.now()-12*60*60*1000); d.setHours(0,0,0,0);
   const wd=d.getDay(); d.setDate(d.getDate()+(wd===0?-6:1-wd)+off*7);
   return d;
 }
