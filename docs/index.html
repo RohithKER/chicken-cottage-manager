@@ -1158,7 +1158,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 188; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 189; // ← bump this on every deploy — auto-shows in Settings
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.getElementById('app-version-label');
   if(el)el.textContent=`Version ${APP_VERSION} • Cloud sync`;
@@ -3773,8 +3773,9 @@ function _saveSalesCache(data){
 const DAY_NAMES=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 
 function getSalesWeekDates(offset){
-  // Returns array of 7 Date objects Mon–Sun for the week at offset
-  const now=new Date();
+  // Returns array of 7 Date objects Mon–Sun for the week at offset.
+  // Lags 12h so the week doesn't roll over at midnight Sunday→Monday.
+  const now=new Date(Date.now()-12*60*60*1000);
   const dow=now.getDay(); // 0=Sun
   const mondayDiff=dow===0?-6:1-dow;
   const monday=new Date(now);
