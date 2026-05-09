@@ -797,8 +797,8 @@ body{
   </div>
 
   <div id="type-tabs">
-    <button class="type-tab active" onclick="setType('inside')">Staff</button>
-    <button class="type-tab" onclick="setType('delivery')">Delivery</button>
+    <button class="type-tab active" id="type-tab-staff" onclick="setType('inside')">Staff</button>
+    <button class="type-tab" id="type-tab-delivery" onclick="setType('delivery')">Delivery</button>
     <div style="flex:1"></div>
     <!-- Save cloud icon -->
     <button class="cp-btn" id="save-rota-btn" onclick="saveRotaStaffToCloud()" title="Save to cloud" style="font-size:17px;padding:0 9px">☁</button>
@@ -1158,7 +1158,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 189; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 190; // ← bump this on every deploy — auto-shows in Settings
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.getElementById('app-version-label');
   if(el)el.textContent=`Version ${APP_VERSION} • Cloud sync`;
@@ -1325,7 +1325,7 @@ async function saveBlacklistToCloud(){
 let user = null;
 
 // ─── Permissions ──────────────────────────────────────
-let _perms={is_admin:false,can_edit_rota:false,can_edit_delivery:false,can_edit_staffs:false,can_view_sales:false,can_edit_sales:false,can_edit_settings:false};
+let _perms={is_admin:false,can_edit_rota:false,can_edit_delivery:false,can_edit_staffs:false,can_view_sales:false,can_edit_sales:false,can_edit_settings:false,can_view_staff_rota:true,can_view_driver_rota:true};
 
 const _ADMIN_EMAILS=['rohithkrishna.erumbhapurath@gmail.com'];
 
@@ -1343,7 +1343,10 @@ function _applyPermData(data){
     can_edit_staffs:!!data.can_edit_staffs,
     can_view_sales:!!data.can_view_sales,
     can_edit_sales:!!data.can_edit_sales,
-    can_edit_settings:!!data.can_edit_settings
+    can_edit_settings:!!data.can_edit_settings,
+    // View-rota perms default to true when undefined so existing users don't lose access before the DB column exists
+    can_view_staff_rota:data.can_view_staff_rota!==false,
+    can_view_driver_rota:data.can_view_driver_rota!==false
   };
 }
 /* Cache permissions to localStorage so returning users never block on this */
@@ -1386,7 +1389,9 @@ async function loadPermissions(userId,email){
         can_edit_staffs:isHardcodedAdmin,
         can_view_sales:isHardcodedAdmin,
         can_edit_sales:isHardcodedAdmin,
-        can_edit_settings:isHardcodedAdmin
+        can_edit_settings:isHardcodedAdmin,
+        can_view_staff_rota:true,
+        can_view_driver_rota:true
       };
       const ins=await Promise.race([
         db.from('user_permissions').insert(defaults).select().maybeSingle(),
@@ -1423,7 +1428,8 @@ async function loadPermissions(userId,email){
     _userStatus=isHardcodedAdmin?'approved':'approved';
     if(isHardcodedAdmin){
       _perms={is_admin:true,can_edit_rota:true,can_edit_delivery:true,
-              can_edit_staffs:true,can_view_sales:true,can_edit_sales:true,can_edit_settings:true};
+              can_edit_staffs:true,can_view_sales:true,can_edit_sales:true,can_edit_settings:true,
+              can_view_staff_rota:true,can_view_driver_rota:true};
     }
   }
   _applyPermUI();
@@ -1471,6 +1477,25 @@ function _applyPermUI(){
   if(rotaGroup)rotaGroup.style.display=canSettings?'':'none';
   const restoreRow=document.getElementById('settings-restore-row');
   if(restoreRow)restoreRow.style.display=canSettings?'':'none';
+  // View-Rota gating: hide each type tab, hide the whole rota nav if neither granted,
+  // and switch state.type away from a forbidden type
+  const canStaffRota=_perms.can_view_staff_rota;
+  const canDriverRota=_perms.can_view_driver_rota;
+  const staffTab=document.getElementById('type-tab-staff');
+  if(staffTab)staffTab.style.display=canStaffRota?'':'none';
+  const driverTab=document.getElementById('type-tab-delivery');
+  if(driverTab)driverTab.style.display=canDriverRota?'':'none';
+  const rotaBtn=document.getElementById('nav-rota');
+  if(rotaBtn)rotaBtn.style.display=(canStaffRota||canDriverRota)?'':'none';
+  if(state.type==='inside'&&!canStaffRota&&canDriverRota)setType('delivery');
+  else if(state.type==='delivery'&&!canDriverRota&&canStaffRota)setType('inside');
+  // If user is currently viewing rota but has no view perms, kick them to another visible tab
+  const rotaView=document.getElementById('view-rota');
+  if(rotaView&&rotaView.classList.contains('active')&&!canStaffRota&&!canDriverRota){
+    if(_perms.can_edit_staffs||_perms.is_admin)showView('staff');
+    else if(_perms.can_view_sales||_perms.can_edit_sales)showView('sales');
+    else showView('settings');
+  }
 }
 
 // Watch for pending→approved so the waiting screen auto-redirects
@@ -1563,6 +1588,8 @@ function _buildUserPermRow(u){
     {key:'can_view_sales',label:'View Sales'},
     {key:'can_edit_sales',label:'Edit Sales'},
     {key:'can_edit_settings',label:'Edit Settings'},
+    {key:'can_view_staff_rota',label:'View Staff Rota',defaultTrue:true},
+    {key:'can_view_driver_rota',label:'View Driver Rota',defaultTrue:true},
   ];
 
   fields.forEach(f=>{
@@ -1570,7 +1597,8 @@ function _buildUserPermRow(u){
     row.style.cssText='display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text2)';
     const cb=document.createElement('input');
     cb.type='checkbox';
-    cb.checked=!!u[f.key];
+    // For perms added later (with defaultTrue), undefined columns should render as checked
+    cb.checked=f.defaultTrue?u[f.key]!==false:!!u[f.key];
     cb.style.cssText='width:17px;height:17px;accent-color:var(--accent);cursor:pointer;flex-shrink:0';
     cb.onchange=async function(){
       cb.disabled=true;
@@ -1607,7 +1635,9 @@ function _buildUserPermRow(u){
               can_edit_staffs:false,
               can_view_sales:false,
               can_edit_sales:false,
-              can_edit_settings:false
+              can_edit_settings:false,
+              can_view_staff_rota:false,
+              can_view_driver_rota:false
             }).eq('user_id',u.user_id);
             if(error)throw error;
             toast('User removed ✓');
@@ -2471,6 +2501,9 @@ async function saveNewPin(){
 }
 
 function setType(t){
+  // Block switching to a rota the user can't view
+  if(t==='inside'&&!_perms.can_view_staff_rota)return;
+  if(t==='delivery'&&!_perms.can_view_driver_rota)return;
   state.type=t;
   document.querySelectorAll('.type-tab').forEach((el,i)=>
     el.classList.toggle('active',(i===0&&t==='inside')||(i===1&&t==='delivery')));
@@ -3402,7 +3435,7 @@ async function signOut(){
   // Clear cached permissions so the next user on this device starts fresh
   if(_uid)try{localStorage.removeItem(_PERM_CACHE_KEY+_uid);}catch{}
   user=null;
-  _perms={is_admin:false,can_edit_rota:false,can_edit_delivery:false,can_edit_staffs:false,can_view_sales:false,can_edit_sales:false,can_edit_settings:false};
+  _perms={is_admin:false,can_edit_rota:false,can_edit_delivery:false,can_edit_staffs:false,can_view_sales:false,can_edit_sales:false,can_edit_settings:false,can_view_staff_rota:true,can_view_driver_rota:true};
   state.schedules={};
   _saveSchedCache({});
   showScreen('auth');closeUserMenu();
