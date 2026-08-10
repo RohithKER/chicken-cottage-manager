@@ -1164,7 +1164,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 194; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 195; // ← bump this on every deploy — auto-shows in Settings
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.getElementById('app-version-label');
   if(el)el.textContent=`Version ${APP_VERSION} • Cloud sync`;
@@ -4818,7 +4818,7 @@ window.addEventListener('pageshow', e=>{ if(e.persisted && user) _pwaResume(); }
     <button onclick="closeColorSheet()" style="width:100%;padding:13px;background:var(--accent);border:none;color:#fff;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer">Done</button>
   </div>
 </div>
-<!-- Service Worker registration — shows update banner instead of auto-reloading -->
+<!-- Service Worker registration — shows update banner; Update Now clears all caches for a clean reload -->
 <script>
 var _waitingSW = null;
 
@@ -4827,19 +4827,27 @@ function _showUpdateBanner(){
   if(b) b.style.display = 'flex';
 }
 
-function _applyUpdate(){
-  if(_waitingSW){ _waitingSW.postMessage('SKIP_WAITING'); }
+// Nuclear update: wipe every cache + unregister SW, then hard-reload from network.
+// Works on iOS PWA home screen shortcuts where skipWaiting tricks can stall.
+async function _applyUpdate(){
+  try{
+    if('caches' in window){
+      var keys = await caches.keys();
+      await Promise.all(keys.map(function(k){ return caches.delete(k); }));
+    }
+    if('serviceWorker' in navigator){
+      var regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(function(r){ return r.unregister(); }));
+    }
+  }catch(e){}
+  window.location.reload(true);
 }
 
 if('serviceWorker' in navigator){
-  // Reload the page once the new SW takes control
-  var _reloading = false;
-  navigator.serviceWorker.addEventListener('controllerchange', function(){
-    if(!_reloading){ _reloading = true; window.location.reload(); }
-  });
-
   navigator.serviceWorker.register('./sw.js').then(function(reg){
-    // A SW was already waiting before this page loaded (e.g. tab was left open)
+    // Force a fresh SW fetch on every app open — critical for iOS PWA home screen shortcuts
+    reg.update();
+
     if(reg.waiting){
       _waitingSW = reg.waiting;
       _showUpdateBanner();
@@ -4848,8 +4856,6 @@ if('serviceWorker' in navigator){
     reg.addEventListener('updatefound', function(){
       var newSW = reg.installing;
       newSW.addEventListener('statechange', function(){
-        // installed = downloaded and waiting; only show banner if there's an active SW
-        // (first install has no controller — no need to prompt)
         if(newSW.state === 'installed' && navigator.serviceWorker.controller){
           _waitingSW = newSW;
           _showUpdateBanner();
