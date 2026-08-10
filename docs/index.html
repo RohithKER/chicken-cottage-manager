@@ -1170,7 +1170,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 204; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 205; // ← bump this on every deploy — auto-shows in Settings
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.getElementById('app-version-label');
   if(el)el.textContent=`Version ${APP_VERSION} • Cloud sync`;
@@ -1289,9 +1289,11 @@ let COLS = {
   inside: JSON.parse(localStorage.getItem('cc_cols_inside') || 'null') || [...DEFAULT_COLS.inside],
   delivery: JSON.parse(localStorage.getItem('cc_cols_delivery') || 'null') || [...DEFAULT_COLS.delivery]
 };
-// Guard: if inside COLS are identical to delivery COLS, localStorage is corrupted — reset inside to defaults
-if(JSON.stringify(COLS.inside)===JSON.stringify(COLS.delivery)){
-  console.warn('cc: COLS.inside matches COLS.delivery — resetting inside to defaults');
+// Guard: reset inside COLS if they match delivery COLS exactly OR contain time-format values (e.g. '4:00')
+// The time-format check catches partial corruption where COLS.inside ≠ COLS.delivery but is still wrong
+const _hasTimeCol=arr=>arr.some(c=>/^\d{1,2}:\d{2}$/.test(c));
+if(JSON.stringify(COLS.inside)===JSON.stringify(COLS.delivery)||_hasTimeCol(COLS.inside)){
+  console.warn('cc: COLS.inside is corrupted — resetting inside to defaults');
   COLS.inside=[...DEFAULT_COLS.inside];
   localStorage.removeItem('cc_cols_inside');
 }
@@ -2217,6 +2219,12 @@ function setShift(type,off,day,col,names){
 
 /* ─── Render ─────────────────────────────────────────── */
 function renderRota(){
+  // Runtime guard: catches COLS corruption that slips past the startup check (e.g. set mid-session)
+  if(_hasTimeCol(COLS.inside)){
+    console.warn('cc: renderRota — COLS.inside still corrupted, resetting');
+    COLS.inside=[...DEFAULT_COLS.inside];
+    localStorage.removeItem('cc_cols_inside');
+  }
   if(viewMode==='table') renderTable();
   else renderCards();
 }

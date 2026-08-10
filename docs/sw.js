@@ -1,6 +1,6 @@
-/* CC Manager Service Worker — v204 */
+/* CC Manager Service Worker — v205 */
 
-const CACHE = 'cc-v204';
+const CACHE = 'cc-v205';
 const CDN_SUPABASE = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
 
 self.addEventListener('install', event => {
@@ -9,8 +9,9 @@ self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE).then(cache =>
       Promise.all([
-        cache.add('./').catch(() => {}),
-        cache.add('./index.html').catch(() => {}),
+        // Force fresh fetch (bypass HTTP cache) so the new SW always caches the latest HTML
+        fetch('./', { cache: 'no-cache' }).then(r => { if(r && r.ok) return cache.put('./', r); }).catch(() => {}),
+        fetch('./index.html', { cache: 'no-cache' }).then(r => { if(r && r.ok) return cache.put('./index.html', r); }).catch(() => {}),
         cache.add('./manifest.json').catch(() => {}),
         cache.add('./favicon.png').catch(() => {}),
         cache.add('./icon-192.png').catch(() => {}),
