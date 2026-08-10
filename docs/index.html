@@ -1029,7 +1029,8 @@ body{
       <div class="ss-section">
         <div class="ss-section-hdr">Delivery Platforms</div>
         <div class="ss-row"><label>Just Eat</label><input type="number" autocomplete="off" id="sd-je" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
-        <div class="ss-row"><label>CC App</label><input type="number" autocomplete="off" id="sd-cc" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
+        <div class="ss-row"><div class="ss-row-lbl"><label>CC App</label><button class="breakdown-toggle" id="ca-toggle" onclick="toggleBreakdown('ca')"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="ca-badge">Add breakdown</span></button></div><input type="number" autocomplete="off" id="sd-cc" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
+        <div id="ca-panel" style="display:none" class="breakdown-panel"><div id="ca-items"></div><button class="breakdown-collapse" onclick="toggleBreakdown('ca')">▲ Collapse</button></div>
         <div class="ss-row"><div class="ss-row-lbl"><label>Uber Eats</label><button class="breakdown-toggle" id="ue-toggle" onclick="toggleBreakdown('ue')"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="ue-badge">Add breakdown</span></button></div><input type="number" autocomplete="off" id="sd-ue" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
         <div id="ue-panel" style="display:none" class="breakdown-panel"><div id="ue-items"></div><button class="breakdown-collapse" onclick="toggleBreakdown('ue')">▲ Collapse</button></div>
         <div class="ss-row"><div class="ss-row-lbl"><label>Deliveroo</label><button class="breakdown-toggle" id="dr-toggle" onclick="toggleBreakdown('dr')"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="dr-badge">Add breakdown</span></button></div><input type="number" autocomplete="off" id="sd-dr" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
@@ -1165,7 +1166,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 197; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 198; // ← bump this on every deploy — auto-shows in Settings
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.getElementById('app-version-label');
   if(el)el.textContent=`Version ${APP_VERSION} • Cloud sync`;
@@ -3967,9 +3968,9 @@ function changeSalesWeek(dir){
 }
 
 // ── Order Breakdown (Uber Eats / Deliveroo) ──────────────────────────────────
-let _bdItems={ue:[],dr:[],cd:[]};
+let _bdItems={ue:[],dr:[],cd:[],ca:[]};
 let _bdFocusNew=false; // flag: focus newly added item row instead of "Add amount"
-let _pendingBd={ue:'',dr:'',cd:''}; // tracks live value in "Add amount" input before confirmed
+let _pendingBd={ue:'',dr:'',cd:'',ca:''}; // tracks live value in "Add amount" input before confirmed
 let _driverPayments=[]; // [{driver:'Name',amount:0,paid:false},...]
 function _updateToggleBtn(f){
   const btn=document.getElementById(f+'-toggle');
@@ -4041,15 +4042,15 @@ function _addBdItemFromInput(f,inp){
 function _syncBdTotal(f){
   const items=_bdItems[f];
   const sum=items.reduce((a,b)=>a+(b||0),0);
-  const fieldId=f==='ue'?'sd-ue':f==='cd'?'sd-card':'sd-dr';
+  const fieldId=f==='ue'?'sd-ue':f==='cd'?'sd-card':f==='ca'?'sd-cc':'sd-dr';
   const el=document.getElementById(fieldId);
   // Always update — even when items is empty so stale values are cleared
   if(el){el.value=sum>0?sum.toFixed(2):'';calcDaySales();}
   _updateToggleBtn(f);
 }
 function _resetBreakdown(){
-  _bdItems={ue:[],dr:[],cd:[]};
-  ['ue','dr','cd'].forEach(f=>{
+  _bdItems={ue:[],dr:[],cd:[],ca:[]};
+  ['ue','dr','cd','ca'].forEach(f=>{
     const panel=document.getElementById(f+'-panel');
     if(panel)panel.style.display='none';
     _updateToggleBtn(f);
@@ -4168,6 +4169,7 @@ function openDayEntry(dateStr){
   _bdItems.ue=(Array.isArray(r.uber_eats_items)?r.uber_eats_items:[]).map(Number);
   _bdItems.dr=(Array.isArray(r.deliveroo_items)?r.deliveroo_items:[]).map(Number);
   _bdItems.cd=(Array.isArray(r.card_items)?r.card_items:[]).map(Number);
+  _bdItems.ca=(Array.isArray(r.cc_app_items)?r.cc_app_items:[]).map(Number);
   if(_bdItems.ue.length)_syncBdTotal('ue');
   if(_bdItems.dr.length)_syncBdTotal('dr');
   calcDaySales();
@@ -4231,7 +4233,7 @@ function calcDaySales(){
 
 function _flushPendingBdInputs(){
   // Capture any value typed in "Add amount" but not yet confirmed with Enter/+
-  ['ue','dr','cd'].forEach(f=>{
+  ['ue','dr','cd','ca'].forEach(f=>{
     const v=parseFloat(_pendingBd[f])||0;
     if(v){_bdItems[f].push(v);_syncBdTotal(f);}
     _pendingBd[f]='';
@@ -4251,6 +4253,7 @@ async function saveDaySales(){
     uber_eats_items:_bdItems.ue,
     deliveroo_items:_bdItems.dr,
     card_items:_bdItems.cd,
+    cc_app_items:_bdItems.ca,
     notes:(document.getElementById('sd-notes')||{}).value||'',
     driver_payments:_driverPayments,
     unlocked_until:_unlockUntilISO() // 6h grace — visible to all accounts after save
