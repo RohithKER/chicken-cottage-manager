@@ -1175,7 +1175,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 207; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 208; // ← bump this on every deploy — auto-shows in Settings
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.getElementById('app-version-label');
   if(el)el.textContent=`Version ${APP_VERSION} • Cloud sync`;
@@ -3829,6 +3829,19 @@ async function _startSession(u){
       ]);
     }catch(e){console.warn('loadFromCloud error:',e);}
 
+    // ── Post-cloud COLS corruption heal (v208) ──────────────────────────────
+    // loadColsFromCloud() may have re-applied a corrupted DB value, or the DB
+    // was empty so the local corrupted value was never overwritten. Either way,
+    // time-format values in COLS.inside are always wrong — reset and write the
+    // correct value back to the DB so all devices self-heal via Realtime.
+    if(_hasTimeCol(COLS.inside)){
+      console.warn('cc: _startSession — COLS.inside corrupted after cloud load, healing');
+      COLS.inside=[...DEFAULT_COLS.inside];
+      localStorage.setItem('cc_cols_inside',JSON.stringify(DEFAULT_COLS.inside));
+      // Fire-and-forget: writes correct value to app_settings → Realtime propagates to all devices
+      saveColsToCloud('inside',[...DEFAULT_COLS.inside]).catch(()=>{});
+    }
+
     document.getElementById('week-label').textContent=weekLabel(state.weekOffset);
     renderRota();
     showScreen('main');
@@ -4932,7 +4945,7 @@ if('serviceWorker' in navigator){
 
   // The ?v= suffix changes the registration URL, forcing iOS to bypass HTTP cache and fetch
   // a fresh sw.js even when the browser would otherwise serve a cached copy.
-  navigator.serviceWorker.register('./sw.js?v=207').then(function(reg){
+  navigator.serviceWorker.register('./sw.js?v=208').then(function(reg){
     // Force a fresh SW fetch on every app open — critical for iOS PWA home screen shortcuts
     reg.update();
 
