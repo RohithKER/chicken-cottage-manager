@@ -1,6 +1,6 @@
-/* CC Manager Service Worker — v199 */
+/* CC Manager Service Worker — v200 */
 
-const CACHE = 'cc-v199';
+const CACHE = 'cc-v200';
 const CDN_SUPABASE = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
 
 self.addEventListener('install', event => {
