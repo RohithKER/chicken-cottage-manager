@@ -446,8 +446,9 @@ body{
   backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
   z-index:50;display:none;align-items:flex-end;justify-content:center;
   opacity:0;transition:opacity .22s;
+  pointer-events:none; /* never block clicks unless .open — prevents invisible overlay intercepting taps */
 }
-#overlay.open{display:flex;opacity:1}
+#overlay.open{display:flex;opacity:1;pointer-events:auto}
 #sheet{
   width:100%;max-width:480px;background:var(--surface);
   border-radius:22px 22px 0 0;border-top:1px solid var(--border2);
@@ -1175,7 +1176,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 211; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 212; // ← bump this on every deploy — auto-shows in Settings
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.getElementById('app-version-label');
   if(el)el.textContent=`Version ${APP_VERSION} • Cloud sync`;
@@ -2706,6 +2707,7 @@ function toggleUniquePerDay(){
 function closeModal(){
   const ov=document.getElementById('overlay');
   ov.classList.remove('open');
+  ov.style.display=''; // clear inline style so CSS display:none takes effect immediately
   _modalClosedAt=Date.now();
   setTimeout(()=>{ov.style.display='none';modalCtx=null;},220);
 }
