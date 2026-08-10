@@ -148,7 +148,7 @@ body{
   font-size:15px;cursor:pointer;flex-shrink:0;transition:background .1s;
 }
 .icon-btn:active{background:var(--border2)}
-#sync-btn{font-size:18px;transition:color .2s}
+#sync-btn{transition:color .2s;display:flex;align-items:center;justify-content:center}
 .refresh-icon{display:inline-block}
 .refresh-icon.syncing{animation:spin-sync .7s linear infinite}
 @keyframes spin-sync{to{transform:rotate(360deg)}}
@@ -433,9 +433,7 @@ body{
   transition:background .2s;
 }
 .nav-btn.active .nav-btn-inner{background:rgba(91,156,245,0.15)}
-.nav-icon{font-size:22px;line-height:1;display:block}
-/* 📅 calendar renders visually larger than other emoji — scale it down to match */
-#nav-rota .nav-icon{font-size:18px}
+.nav-icon{display:flex;align-items:center;justify-content:center;width:24px;height:24px}
 .nav-btn.active{color:var(--accent)}
 .nav-btn.active::after{
   content:'';position:absolute;top:0;left:30%;right:30%;
@@ -798,8 +796,8 @@ body{
       <div id="week-label">This week</div>
       <button onclick="changeWeek(1)">›</button>
     </div>
-    <div class="icon-btn" id="sync-btn" onclick="refreshFromCloud()" title="Refresh data from cloud"><span class="refresh-icon">↻</span></div>
-    <div class="icon-btn" onclick="toggleUserMenu()">👤</div>
+    <div class="icon-btn" id="sync-btn" onclick="refreshFromCloud()" title="Refresh data from cloud"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></div>
+    <div class="icon-btn" onclick="toggleUserMenu()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
   </div>
 
   <div id="type-tabs">
@@ -807,7 +805,7 @@ body{
     <button class="type-tab" id="type-tab-delivery" onclick="setType('delivery')">Delivery</button>
     <div style="flex:1"></div>
     <!-- Save cloud icon -->
-    <button class="cp-btn" id="save-rota-btn" onclick="saveRotaStaffToCloud()" title="Save to cloud" style="font-size:17px;padding:0 9px">☁</button>
+    <button class="cp-btn" id="save-rota-btn" onclick="saveRotaStaffToCloud()" title="Save to cloud" style="padding:0 9px;display:flex;align-items:center;justify-content:center"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg></button>
     <!-- Overflow menu -->
     <div style="position:relative">
       <button class="cp-btn" id="rota-more-btn" onclick="toggleRotaMenu()" title="More" style="font-size:16px;padding:0 9px;letter-spacing:2px">···</button>
@@ -960,7 +958,7 @@ body{
       </div>
       <!-- Sales save row -->
       <div style="padding:8px 10px 10px">
-        <button class="save-cloud-btn" id="save-sales-btn" onclick="saveSalesWeekToCloud()" style="width:100%">☁ Save Sales</button>
+        <button class="save-cloud-btn" id="save-sales-btn" onclick="saveSalesWeekToCloud()" style="width:100%"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg> Save Sales</button>
       </div>
 
       <!-- Weekly Table -->
@@ -975,16 +973,16 @@ body{
 
   <div id="bottom-nav">
     <button class="nav-btn active" onclick="showView('rota')" id="nav-rota">
-      <div class="nav-btn-inner"><span class="nav-icon">📅</span></div><span>Rota</span>
+      <div class="nav-btn-inner"><span class="nav-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span></div><span>Rota</span>
     </button>
     <button class="nav-btn" onclick="showView('staff')" id="nav-staff">
-      <div class="nav-btn-inner"><span class="nav-icon">👥</span></div><span>Staff</span>
+      <div class="nav-btn-inner"><span class="nav-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span></div><span>Staff</span>
     </button>
     <button class="nav-btn" onclick="showView('sales')" id="nav-sales">
-      <div class="nav-btn-inner"><span class="nav-icon">💷</span></div><span>Sales</span>
+      <div class="nav-btn-inner"><span class="nav-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="2" y1="20" x2="22" y2="20"/></svg></span></div><span>Sales</span>
     </button>
     <button class="nav-btn" onclick="showView('settings')" id="nav-settings">
-      <div class="nav-btn-inner"><span class="nav-icon">⚙️</span></div><span>Settings</span>
+      <div class="nav-btn-inner"><span class="nav-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span></div><span>Settings</span>
     </button>
   </div>
 
@@ -1166,7 +1164,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 198; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 199; // ← bump this on every deploy — auto-shows in Settings
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.getElementById('app-version-label');
   if(el)el.textContent=`Version ${APP_VERSION} • Cloud sync`;
