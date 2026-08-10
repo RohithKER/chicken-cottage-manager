@@ -1170,7 +1170,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 202; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 203; // ← bump this on every deploy — auto-shows in Settings
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.getElementById('app-version-label');
   if(el)el.textContent=`Version ${APP_VERSION} • Cloud sync`;
@@ -2834,13 +2834,11 @@ function _doRenameStaff(oldName, newName){
   saveColorsToCloud();
   renderStaff();renderRota();
   toast(`Renamed to ${newName}`+(updatedShifts?` · ${updatedShifts} shift${updatedShifts!==1?'s':''} updated`:''));
-  // cloud: add new, remove old staff record
-  // Compute the correct type — person may be in both lists after rename
+  // cloud: add new first, then remove old — sequential so realtime never sees the person missing
   const _rInside=state.staff.inside.includes(newName);
   const _rDelivery=state.staff.delivery.includes(newName);
   const _rType=_rInside&&_rDelivery?'both':_rInside?'inside':'delivery';
-  saveStaffToCloud(newName,_rType).catch(()=>{});
-  deleteStaffFromCloud(oldName).catch(()=>{});
+  saveStaffToCloud(newName,_rType).catch(()=>{}).then(()=>deleteStaffFromCloud(oldName).catch(()=>{}));
 }
 
 /* ─── Column Editor ──────────────────────────────────── */
@@ -3653,6 +3651,7 @@ function setupRealtime(){
       if(data&&data.length>0){
         state.staff.inside=data.filter(s=>s.type==='inside'||s.type==='both').map(s=>s.name);
         state.staff.delivery=data.filter(s=>s.type==='delivery'||s.type==='both').map(s=>s.name);
+        renderStaff();
         renderRota();
       }
     })
