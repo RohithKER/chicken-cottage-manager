@@ -1170,7 +1170,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 201; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 202; // ← bump this on every deploy — auto-shows in Settings
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.getElementById('app-version-label');
   if(el)el.textContent=`Version ${APP_VERSION} • Cloud sync`;
@@ -4182,6 +4182,8 @@ function openDayEntry(dateStr){
   _bdItems.ca=(Array.isArray(r.cc_app_items)?r.cc_app_items:[]).map(Number);
   if(_bdItems.ue.length)_syncBdTotal('ue');
   if(_bdItems.dr.length)_syncBdTotal('dr');
+  if(_bdItems.cd.length)_syncBdTotal('cd');
+  if(_bdItems.ca.length)_syncBdTotal('ca');
   calcDaySales();
 
   // Show/hide edit controls based on permission
@@ -4203,6 +4205,8 @@ function openDayEntry(dateStr){
 }
 
 function closeDayEntry(){
+  // Clear any pending typed-but-unconfirmed breakdown inputs so they can't leak into another day
+  ['ue','dr','cd','ca'].forEach(k=>_pendingBd[k]='');
   const ov=document.getElementById('sales-overlay');
   ov.classList.remove('open');
   setTimeout(()=>{ov.style.display='none';},260);
@@ -4222,12 +4226,7 @@ function clearDayEntry(){
     if(salesOpenDate)localStorage.removeItem(_NOTES_KEY+salesOpenDate);
     _driverPayments=[];
     _renderDriverPayments(true);
-    _bdItems={ue:[],dr:[]};
-    ['ue','dr'].forEach(f=>{
-      const panel=document.getElementById(f+'-panel');
-      if(panel)panel.style.display='none';
-      _updateToggleBtn(f);
-    });
+    _resetBreakdown();
     calcDaySales();
   });
 }
