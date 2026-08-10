@@ -1170,7 +1170,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 203; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 204; // ← bump this on every deploy — auto-shows in Settings
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.getElementById('app-version-label');
   if(el)el.textContent=`Version ${APP_VERSION} • Cloud sync`;
@@ -1289,6 +1289,12 @@ let COLS = {
   inside: JSON.parse(localStorage.getItem('cc_cols_inside') || 'null') || [...DEFAULT_COLS.inside],
   delivery: JSON.parse(localStorage.getItem('cc_cols_delivery') || 'null') || [...DEFAULT_COLS.delivery]
 };
+// Guard: if inside COLS are identical to delivery COLS, localStorage is corrupted — reset inside to defaults
+if(JSON.stringify(COLS.inside)===JSON.stringify(COLS.delivery)){
+  console.warn('cc: COLS.inside matches COLS.delivery — resetting inside to defaults');
+  COLS.inside=[...DEFAULT_COLS.inside];
+  localStorage.removeItem('cc_cols_inside');
+}
 async function loadColsFromCloud(){
   const {data}=await db.from('app_settings').select('key,value').in('key',['cols_inside','cols_delivery','staff_colors','staff_blacklist','sales_pin']);
   if(!data)return;
@@ -1348,6 +1354,9 @@ const _PERM_CACHE_KEY='cc_perm_v1_';
 /* Apply a permissions object (from DB row or defaults) to _perms */
 function _applyPermData(data){
   if(!data)return;
+  // Hardcoded admins always get full rota view access regardless of DB value,
+  // preventing accidental lockout via the permissions panel.
+  const isHardcoded=_ADMIN_EMAILS.includes(data.email||'');
   _perms={
     is_admin:!!data.is_admin,
     can_edit_rota:!!data.can_edit_rota,
@@ -1357,8 +1366,9 @@ function _applyPermData(data){
     can_edit_sales:!!data.can_edit_sales,
     can_edit_settings:!!data.can_edit_settings,
     // View-rota perms default to true when undefined so existing users don't lose access before the DB column exists
-    can_view_staff_rota:data.can_view_staff_rota!==false,
-    can_view_driver_rota:data.can_view_driver_rota!==false
+    // Hardcoded admins always get true regardless of DB value
+    can_view_staff_rota:isHardcoded||(data.can_view_staff_rota!==false),
+    can_view_driver_rota:isHardcoded||(data.can_view_driver_rota!==false)
   };
 }
 /* Cache permissions to localStorage so returning users never block on this */
@@ -2517,8 +2527,8 @@ async function saveNewPin(){
 
 function setType(t){
   // Block switching to a rota the user can't view
-  if(t==='inside'&&!_perms.can_view_staff_rota)return;
-  if(t==='delivery'&&!_perms.can_view_driver_rota)return;
+  if(t==='inside'&&!_perms.can_view_staff_rota){toast('⛔ No permission to view staff rota');return;}
+  if(t==='delivery'&&!_perms.can_view_driver_rota){toast('⛔ No permission to view driver rota');return;}
   state.type=t;
   document.querySelectorAll('.type-tab').forEach((el,i)=>
     el.classList.toggle('active',(i===0&&t==='inside')||(i===1&&t==='delivery')));
@@ -3630,14 +3640,17 @@ function setupRealtime(){
       if(payload.eventType==='INSERT'||payload.eventType==='UPDATE'){
         const r=payload.new;
         const k=`${r.schedule_type}|${r.week_key}|${r.day}|${r.shift_col}`;
-        if(r.staff_names&&r.staff_names.length>0) state.schedules[k]=r.staff_names;
-        else delete state.schedules[k];
+        // Skip if we have a pending local save for this key — local wins to avoid overwriting in-flight saves
+        if(!_pendingShiftSet.has(k)){
+          if(r.staff_names&&r.staff_names.length>0) state.schedules[k]=r.staff_names;
+          else delete state.schedules[k];
+        }
         renderRota();
       }else if(payload.eventType==='DELETE'){
         const r=payload.old;
         if(r){
           const k=`${r.schedule_type}|${r.week_key}|${r.day}|${r.shift_col}`;
-          delete state.schedules[k];
+          if(!_pendingShiftSet.has(k)) delete state.schedules[k];
           renderRota();
         }
       }
