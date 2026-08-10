@@ -207,7 +207,7 @@ body{
 #view-sales.active{display:flex;flex-direction:column;padding:0;height:100%;position:relative;overflow:hidden}
 
 /* ─── Day Cards ──────────────────────────────────── */
-#cards-wrap{padding:12px}
+.rota-cards-wrap{padding:12px}
 /* Unified table container — wraps all day-cards into one bordered card */
 .day-cards-container{
   border:1px solid var(--border);
@@ -262,7 +262,7 @@ body{
 .sync-dot.saved{background:var(--green)}
 
 /* ─── Table View ─────────────────────────────────── */
-#table-wrap{
+.rota-table-wrap{
   overflow-x:auto;-webkit-overflow-scrolling:touch;
   padding:12px;
 }
@@ -837,10 +837,16 @@ body{
   <div id="content">
 
     <div id="view-rota" class="view active">
-      <!-- Cards view -->
-      <div id="cards-wrap"></div>
-      <!-- Table view -->
-      <div id="table-wrap" style="display:none"></div>
+      <!-- Staff rota — shown when type=inside -->
+      <div id="rota-inside">
+        <div id="inside-cards-wrap" class="rota-cards-wrap"></div>
+        <div id="inside-table-wrap" class="rota-table-wrap" style="display:none"></div>
+      </div>
+      <!-- Delivery rota — shown when type=delivery -->
+      <div id="rota-delivery" style="display:none">
+        <div id="delivery-cards-wrap" class="rota-cards-wrap"></div>
+        <div id="delivery-table-wrap" class="rota-table-wrap" style="display:none"></div>
+      </div>
     </div>
 
     <div id="view-staff" class="view" style="padding:12px">
@@ -1176,7 +1182,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 212; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 213; // ← bump this on every deploy — auto-shows in Settings
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.getElementById('app-version-label');
   if(el)el.textContent=`Version ${APP_VERSION} • Cloud sync`;
@@ -2016,7 +2022,7 @@ function _updateSaveIndicator(){
 async function saveShiftToCloud(type,wk,day,col,names){
   if(!user)return;
   const _key=`${type}|${wk}|${day}|${col}`;
-  setSyncDot(day,col,'saving');
+  setSyncDot(type,day,col,'saving');
   _pendingSaves++;
   _updateSaveIndicator();
   // Mark as pending BEFORE the async upsert so that loadSchedules() / _pwaResume()
@@ -2037,15 +2043,15 @@ async function saveShiftToCloud(type,wk,day,col,names){
     _failedSaves.delete(_key);
     _pendingShiftSet.delete(_key);
     _savePendingShifts();
-    setSyncDot(day,col,'saved');
+    setSyncDot(type,day,col,'saved');
     logActivity(`${day} ${col} saved to cloud ✓`, 'success');
-    setTimeout(()=>setSyncDot(day,col,''),1500);
+    setTimeout(()=>setSyncDot(type,day,col,''),1500);
   }catch(e){
     // Queue for retry — persist so data survives a force-close
     _failedSaves.set(_key,{type,wk,day,col,names});
     _pendingShiftSet.add(_key);
     _savePendingShifts();
-    setSyncDot(day,col,'');
+    setSyncDot(type,day,col,'');
     if(e.message==='timeout'){
       logActivity(`${day} ${col} — saved locally (cloud timeout, will retry on ↻)`, 'saving');
     }else{
@@ -2058,9 +2064,9 @@ async function saveShiftToCloud(type,wk,day,col,names){
   }
 }
 
-function setSyncDot(day,col,status){
-  // Works for both card and table views
-  const ids=[`dot-${day}-${col}`,`tdot-${day}-${col}`];
+function setSyncDot(type,day,col,status){
+  // Works for both card and table views — type prefix avoids ID collision between staff/delivery
+  const ids=[`dot-${type}-${day}-${col}`,`tdot-${type}-${day}-${col}`];
   ids.forEach(id=>{
     const el=document.getElementById(id);
     if(el)el.className=el.className.replace(/saving|saved/,'').trim()+(status?' '+status:'');
@@ -2250,37 +2256,38 @@ function renderRota(){
     COLS.inside=[...DEFAULT_COLS.inside];
     localStorage.removeItem('cc_cols_inside');
   }
-  if(viewMode==='table') renderTable();
-  else renderCards();
+  // Render both types into their own containers — tab switching is instant (just show/hide)
+  if(viewMode==='table'){renderTable('inside');renderTable('delivery');}
+  else{renderCards('inside');renderCards('delivery');}
 }
 
-function renderCards(){
-  const cols=COLS[state.type];
+function renderCards(type){
+  const cols=COLS[type];
   let html='';
   DAYS.forEach((day,di)=>{
     html+=`<div class="day-card">
       <div class="day-header"><div class="day-dot"></div><b class="day-name">${day}</b><span class="day-date">${dayDate(di,state.weekOffset)} ${dayMonth(di,state.weekOffset)}</span></div>`;
     cols.forEach(col=>{
-      const staff=getShift(state.type,state.weekOffset,day,col);
+      const staff=getShift(type,state.weekOffset,day,col);
       const earlyMap=getEarlyMap(state.weekOffset,day);
       const pills=staff.length?staff.map(n=>{
         const et=earlyMap.get(n);
         const tag=et?`<span class="early-tag">${et}</span>`:'';
-        return `<span class="pill" style="${pillStyle(n,state.type)}">${n}${tag}</span>`;
+        return `<span class="pill" style="${pillStyle(n,type)}">${n}${tag}</span>`;
       }).join(''):`<span class="empty-label">Tap to assign</span>`;
       html+=`<div class="shift-row${col==='OFF'?' off-row':''}" onclick="openModal('${day}','${col}')">
         <span class="shift-label">${col}</span>
         <div class="pills-wrap">${pills}</div>
-        <div class="sync-dot" id="dot-${day}-${col}"></div>
+        <div class="sync-dot" id="dot-${type}-${day}-${col}"></div>
       </div>`;
     });
     html+='</div>';
   });
-  document.getElementById('cards-wrap').innerHTML=`<div class="day-cards-container">${html}</div>`;
+  document.getElementById(`${type==='inside'?'inside':'delivery'}-cards-wrap`).innerHTML=`<div class="day-cards-container">${html}</div>`;
 }
 
-function renderTable(){
-  const cols=COLS[state.type];
+function renderTable(type){
+  const cols=COLS[type];
   let html=`<table class="rota-tbl"><thead><tr>
     <th>Day</th>
     ${cols.map(c=>`<th${c==='OFF'?' class="off-th"':''}>${c}</th>`).join('')}
@@ -2292,24 +2299,24 @@ function renderTable(){
         <div class="td-date">${dayDate(di,state.weekOffset)} ${dayMonth(di,state.weekOffset)}</div>
       </td>`;
     cols.forEach(col=>{
-      const staff=getShift(state.type,state.weekOffset,day,col);
+      const staff=getShift(type,state.weekOffset,day,col);
       const earlyMap=getEarlyMap(state.weekOffset,day);
       const pills=staff.length
         ?staff.map(n=>{
             const et=earlyMap.get(n);
             const tag=et?`<span class="early-tag">${et}</span>`:'';
-            return`<span class="pill" style="${pillStyle(n,state.type)}">${n}${tag}</span>`;
+            return`<span class="pill" style="${pillStyle(n,type)}">${n}${tag}</span>`;
           }).join('')
         :`<span class="td-empty">—</span>`;
       html+=`<td class="shift-cell${col==='OFF'?' off-cell':''}" onclick="openModal('${day}','${col}')">
         <div class="td-pills">${pills}</div>
-        <span class="tbl-sync" id="tdot-${day}-${col}"></span>
+        <span class="tbl-sync" id="tdot-${type}-${day}-${col}"></span>
       </td>`;
     });
     html+=`</tr>`;
   });
   html+=`</tbody></table>`;
-  document.getElementById('table-wrap').innerHTML=html;
+  document.getElementById(`${type==='inside'?'inside':'delivery'}-table-wrap`).innerHTML=html;
 }
 
 function renderStaff(){
@@ -2337,8 +2344,10 @@ function setViewMode(mode){
   localStorage.setItem('cc_view',mode);
   document.getElementById('vt-cards').classList.toggle('active',mode==='cards');
   document.getElementById('vt-table').classList.toggle('active',mode==='table');
-  document.getElementById('cards-wrap').style.display=mode==='cards'?'block':'none';
-  document.getElementById('table-wrap').style.display=mode==='table'?'block':'none';
+  ['inside','delivery'].forEach(t=>{
+    document.getElementById(`${t}-cards-wrap`).style.display=mode==='cards'?'block':'none';
+    document.getElementById(`${t}-table-wrap`).style.display=mode==='table'?'block':'none';
+  });
   renderRota();
 }
 
@@ -2565,7 +2574,9 @@ function setType(t){
   state.type=t;
   document.querySelectorAll('.type-tab').forEach((el,i)=>
     el.classList.toggle('active',(i===0&&t==='inside')||(i===1&&t==='delivery')));
-  renderRota(); // data already cached — instant switch, no network call
+  // Both rotas are pre-rendered — just toggle visibility, no renderRota() needed
+  document.getElementById('rota-inside').style.display=t==='inside'?'':'none';
+  document.getElementById('rota-delivery').style.display=t==='delivery'?'':'none';
 }
 
 function changeWeek(d){
