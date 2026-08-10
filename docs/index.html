@@ -1164,7 +1164,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 195; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 196; // ← bump this on every deploy — auto-shows in Settings
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.getElementById('app-version-label');
   if(el)el.textContent=`Version ${APP_VERSION} • Cloud sync`;
@@ -4827,9 +4827,14 @@ function _showUpdateBanner(){
   if(b) b.style.display = 'flex';
 }
 
-// Nuclear update: wipe every cache + unregister SW, then hard-reload from network.
-// Works on iOS PWA home screen shortcuts where skipWaiting tricks can stall.
+// Nuclear update: sync everything to cloud first, then wipe cache + reload from network.
 async function _applyUpdate(){
+  var btn = document.querySelector('#update-banner button');
+  if(btn){ btn.textContent = 'Saving…'; btn.disabled = true; }
+  // 1. Push all local data to Supabase before wiping anything
+  try{ await syncAll(); }catch(e){}
+  if(btn) btn.textContent = 'Updating…';
+  // 2. Wipe all caches and unregister SW so reload fetches fresh from network
   try{
     if('caches' in window){
       var keys = await caches.keys();

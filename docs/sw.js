@@ -1,10 +1,10 @@
-/* CC Manager Service Worker — v195
+/* CC Manager Service Worker — v196
    Caches the HTML page, manifest, icons and the Supabase CDN script so that
    window.location.reload() serves everything instantly from cache
    with zero network dependency. The fresh Supabase client then
    makes brand-new TCP connections which work fine.             */
 
-const CACHE = 'cc-v195';
+const CACHE = 'cc-v196';
 const CDN_SUPABASE = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
 
 self.addEventListener('install', event => {
@@ -17,15 +17,13 @@ self.addEventListener('install', event => {
         cache.add('./favicon.png').catch(() => {}),
         cache.add('./icon-192.png').catch(() => {}),
         cache.add('./icon-512.png').catch(() => {}),
-        // Pre-cache the Supabase CDN script (no-cors = opaque response, still cacheable)
         fetch(CDN_SUPABASE, { mode: 'no-cors' })
           .then(r => cache.put(CDN_SUPABASE, r))
           .catch(() => {})
       ])
     )
   );
-  // Do NOT call skipWaiting here — from v195 onwards all updates go through the
-  // in-app "Update Now" banner which does a full cache clear + reload instead.
+  // Do NOT skipWaiting — updates go through the in-app banner which syncs to cloud first.
 });
 
 self.addEventListener('activate', event => {
@@ -38,7 +36,7 @@ self.addEventListener('activate', event => {
   );
 });
 
-// Legacy: kept in case any v194 client sends SKIP_WAITING
+// Legacy: kept for any client that sends SKIP_WAITING
 self.addEventListener('message', event => {
   if(event.data === 'SKIP_WAITING') self.skipWaiting();
 });
@@ -51,14 +49,12 @@ self.addEventListener('fetch', event => {
     f => url.pathname.endsWith(f)
   );
 
-  // Only handle the app page, static assets and CDN scripts — let Supabase API calls through
   if (!isPage && !isJsDelivr && !isAsset) return;
 
   event.respondWith(
     caches.open(CACHE).then(cache =>
       cache.match(event.request).then(cached => {
         if (cached) {
-          // Serve from cache instantly; update page in background
           if (isPage) {
             fetch(event.request)
               .then(r => { if (r && r.ok) cache.put(event.request, r.clone()); })
@@ -66,7 +62,6 @@ self.addEventListener('fetch', event => {
           }
           return cached;
         }
-        // Not in cache yet — fetch from network and cache
         return fetch(event.request, isJsDelivr ? { mode: 'no-cors' } : undefined)
           .then(response => {
             if (response) {
