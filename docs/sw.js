@@ -1,10 +1,10 @@
-/* CC Manager Service Worker — v192
+/* CC Manager Service Worker — v194
    Caches the HTML page, manifest, icons and the Supabase CDN script so that
    window.location.reload() serves everything instantly from cache
    with zero network dependency. The fresh Supabase client then
    makes brand-new TCP connections which work fine.             */
 
-const CACHE = 'cc-v193';
+const CACHE = 'cc-v194';
 const CDN_SUPABASE = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
 
 self.addEventListener('install', event => {
@@ -24,7 +24,9 @@ self.addEventListener('install', event => {
       ])
     )
   );
-  // Do NOT skipWaiting here — let the app show an update prompt first
+  // skipWaiting here so v190/v192 users auto-upgrade to v194 immediately.
+  // From v194 onwards, future updates go through the in-app banner instead.
+  self.skipWaiting();
 });
 
 self.addEventListener('activate', event => {
