@@ -1442,9 +1442,13 @@ async function _refreshPermsBackground(userId,email,isHardcodedAdmin){
       // Row deleted or admin removed this user — clear their cache and sign them out
       try{localStorage.removeItem(_PERM_CACHE_KEY+userId);}catch{}
       if(!isHardcodedAdmin){
-        toast('⛔ Your access has been removed. Contact an admin to rejoin.');
-        await db.auth.signOut();
-        showScreen('auth');
+        // Reset to pending so they can rejoin via approval
+        await db.from('user_permissions').update({status:'pending'}).eq('user_id',userId);
+        _userStatus='pending';
+        const el=document.getElementById('pending-email-display');
+        if(el)el.textContent=email;
+        showScreen('pending');
+        _setupPendingWatcher(userId,email);
       }
       return;
     }
@@ -3430,9 +3434,9 @@ async function doGoogleAuth(){
 
 async function signOut(){
   const _uid=user?.id;
-  await db.auth.signOut();
-  // Clear cached permissions so the next user on this device starts fresh
-  if(_uid)try{localStorage.removeItem(_PERM_CACHE_KEY+_uid);}catch{}
+  // Local-only: only clears this device's session — other devices stay logged in
+  await db.auth.signOut({scope:'local'});
+  // Keep permission cache (keyed to user ID) so re-login is instant with no pending flash
   user=null;
   _perms={is_admin:false,can_edit_rota:false,can_edit_delivery:false,can_edit_staffs:false,can_view_sales:false,can_edit_sales:false,can_edit_settings:false,can_view_staff_rota:true,can_view_driver_rota:true};
   state.schedules={};
