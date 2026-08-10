@@ -4,7 +4,7 @@
    with zero network dependency. The fresh Supabase client then
    makes brand-new TCP connections which work fine.             */
 
-const CACHE = 'cc-v192';
+const CACHE = 'cc-v193';
 const CDN_SUPABASE = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
 
 self.addEventListener('install', event => {
@@ -24,7 +24,7 @@ self.addEventListener('install', event => {
       ])
     )
   );
-  self.skipWaiting();
+  // Do NOT skipWaiting here — let the app show an update prompt first
 });
 
 self.addEventListener('activate', event => {
@@ -35,6 +35,11 @@ self.addEventListener('activate', event => {
       ))
       .then(() => self.clients.claim())
   );
+});
+
+// When the app sends SKIP_WAITING, activate immediately so page can reload
+self.addEventListener('message', event => {
+  if(event.data === 'SKIP_WAITING') self.skipWaiting();
 });
 
 self.addEventListener('fetch', event => {

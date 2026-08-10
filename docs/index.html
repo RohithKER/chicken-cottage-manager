@@ -731,6 +731,12 @@ body{
 <body>
 <div id="app">
 
+<!-- Update banner — shown when a new service worker version is waiting -->
+<div id="update-banner" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:9999;background:#1c1c2e;border-top:2px solid #7c5cbf;padding:14px 18px;flex-direction:row;align-items:center;justify-content:space-between;gap:12px">
+  <div style="font-size:14px;color:#e0e0e0;line-height:1.4">🔄 New update available</div>
+  <button onclick="_applyUpdate()" style="background:#7c5cbf;color:#fff;border:none;border-radius:10px;padding:9px 18px;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap">Update Now</button>
+</div>
+
 <!-- Loading -->
 <div id="loading-screen">
   <img id="loading-logo" src="./favicon.png" style="width:72px;height:72px;border-radius:18px;box-shadow:0 4px 24px rgba(0,0,0,.5);opacity:0;transition:opacity .3s" onload="this.style.opacity=1" onerror="this.style.display='none'">
@@ -4812,23 +4818,44 @@ window.addEventListener('pageshow', e=>{ if(e.persisted && user) _pwaResume(); }
     <button onclick="closeColorSheet()" style="width:100%;padding:13px;background:var(--accent);border:none;color:#fff;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer">Done</button>
   </div>
 </div>
-<!-- Service Worker registration — required for update detection on iOS -->
+<!-- Service Worker registration — shows update banner instead of auto-reloading -->
 <script>
+var _waitingSW = null;
+
+function _showUpdateBanner(){
+  var b = document.getElementById('update-banner');
+  if(b) b.style.display = 'flex';
+}
+
+function _applyUpdate(){
+  if(_waitingSW){ _waitingSW.postMessage('SKIP_WAITING'); }
+}
+
 if('serviceWorker' in navigator){
+  // Reload the page once the new SW takes control
+  var _reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', function(){
+    if(!_reloading){ _reloading = true; window.location.reload(); }
+  });
+
   navigator.serviceWorker.register('./sw.js').then(function(reg){
-    // When a new SW is found, wait for it to activate then reload
+    // A SW was already waiting before this page loaded (e.g. tab was left open)
+    if(reg.waiting){
+      _waitingSW = reg.waiting;
+      _showUpdateBanner();
+    }
+
     reg.addEventListener('updatefound', function(){
       var newSW = reg.installing;
       newSW.addEventListener('statechange', function(){
-        if(newSW.state === 'activated'){
-          window.location.reload();
+        // installed = downloaded and waiting; only show banner if there's an active SW
+        // (first install has no controller — no need to prompt)
+        if(newSW.state === 'installed' && navigator.serviceWorker.controller){
+          _waitingSW = newSW;
+          _showUpdateBanner();
         }
       });
     });
-  });
-  // If controller changes (new SW claimed this page), reload immediately
-  navigator.serviceWorker.addEventListener('controllerchange', function(){
-    window.location.reload();
   });
 }
 </script>
