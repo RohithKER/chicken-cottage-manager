@@ -370,8 +370,9 @@ body{
   backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
   z-index:55;display:none;align-items:flex-end;justify-content:center;
   opacity:0;transition:opacity .22s;
+  pointer-events:none;
 }
-#col-sheet-overlay.open{display:flex;opacity:1}
+#col-sheet-overlay.open{display:flex;opacity:1;pointer-events:auto}
 #col-sheet{
   width:100%;max-width:480px;background:var(--surface);
   border-radius:22px 22px 0 0;border-top:1px solid var(--border2);
@@ -631,8 +632,9 @@ body{
   backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
   z-index:50;display:none;align-items:flex-end;justify-content:center;
   opacity:0;transition:opacity .22s;
+  pointer-events:none;
 }
-#sales-overlay.open{display:flex;opacity:1}
+#sales-overlay.open{display:flex;opacity:1;pointer-events:auto}
 #sales-sheet{
   width:100%;max-width:480px;background:var(--surface);
   border-radius:22px 22px 0 0;border-top:1px solid var(--border2);
@@ -1182,7 +1184,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 213; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 214; // ← bump this on every deploy — auto-shows in Settings
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.getElementById('app-version-label');
   if(el)el.textContent=`Version ${APP_VERSION} • Cloud sync`;
@@ -1733,7 +1735,7 @@ let state = {
     }catch{return{};}
   })()
 };
-let viewMode = localStorage.getItem('cc_view') || 'table';
+let viewMode = localStorage.getItem('cc_view') || 'cards';
 let modalCtx = null;
 let modalSel = [];
 let modalEarlyMap = new Map(); // early starters {name→time} being edited in current modal
@@ -2718,9 +2720,10 @@ function toggleUniquePerDay(){
 function closeModal(){
   const ov=document.getElementById('overlay');
   ov.classList.remove('open');
-  ov.style.display=''; // clear inline style so CSS display:none takes effect immediately
+  // pointer-events:none is set by CSS when .open is removed — no click-through during fade
+  // Don't clear ov.style.display here: let the sheet slide down (0.28s) before hiding
   _modalClosedAt=Date.now();
-  setTimeout(()=>{ov.style.display='none';modalCtx=null;},220);
+  setTimeout(()=>{ov.style.display='none';modalCtx=null;},280);
 }
 function handleOverlay(e){if(e.target===document.getElementById('overlay'))closeModal();}
 
