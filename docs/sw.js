@@ -1,6 +1,6 @@
-/* CC Manager Service Worker — v205 */
+/* CC Manager Service Worker — v206 */
 
-const CACHE = 'cc-v205';
+const CACHE = 'cc-v206';
 const CDN_SUPABASE = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
 
 self.addEventListener('install', event => {
@@ -31,6 +31,11 @@ self.addEventListener('activate', event => {
         keys.filter(k => k !== CACHE).map(k => caches.delete(k))
       ))
       .then(() => self.clients.claim())
+      .then(async () => {
+        // Tell all open pages to reload so they get the fresh HTML immediately
+        const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+        clients.forEach(client => client.postMessage({ type: 'SW_UPDATED', version: 206 }));
+      })
   );
 });
 
@@ -40,33 +45,35 @@ self.addEventListener('message', event => {
 
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
-  const isPage    = event.request.mode === 'navigate';
+  const isPage     = event.request.mode === 'navigate';
   const isJsDelivr = url.hostname === 'cdn.jsdelivr.net';
-  const isAsset   = ['favicon.png','icon-192.png','icon-512.png','manifest.json'].some(
+  const isAsset    = ['favicon.png','icon-192.png','icon-512.png','manifest.json'].some(
     f => url.pathname.endsWith(f)
   );
 
   if (!isPage && !isJsDelivr && !isAsset) return;
 
   event.respondWith(
-    caches.open(CACHE).then(cache =>
-      cache.match(event.request).then(cached => {
-        if (cached) {
-          if (isPage) {
-            fetch(event.request)
-              .then(r => { if (r && r.ok) cache.put(event.request, r.clone()); })
-              .catch(() => {});
-          }
-          return cached;
-        }
+    caches.open(CACHE).then(cache => {
+      if (isPage) {
+        // Network-first for HTML: always serve the latest code from the server.
+        // Falls back to cache only when completely offline.
+        return fetch(event.request, { cache: 'no-cache' })
+          .then(r => {
+            if (r && r.ok) cache.put(event.request, r.clone()).catch(() => {});
+            return r;
+          })
+          .catch(() => cache.match(event.request));
+      }
+      // Cache-first for static assets and CDN libraries
+      return cache.match(event.request).then(cached => {
+        if (cached) return cached;
         return fetch(event.request, isJsDelivr ? { mode: 'no-cors' } : undefined)
           .then(response => {
-            if (response) {
-              cache.put(event.request, response.clone()).catch(() => {});
-            }
+            if (response) cache.put(event.request, response.clone()).catch(() => {});
             return response;
           });
-      })
-    )
+      });
+    })
   );
 });

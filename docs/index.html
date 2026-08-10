@@ -1170,7 +1170,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 205; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 206; // ← bump this on every deploy — auto-shows in Settings
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.getElementById('app-version-label');
   if(el)el.textContent=`Version ${APP_VERSION} • Cloud sync`;
@@ -4884,6 +4884,25 @@ async function _applyUpdate(){
 }
 
 if('serviceWorker' in navigator){
+  // Auto-reload when a new SW activates and sends SW_UPDATED — ensures fresh HTML is served
+  // without the user having to manually reload. Saves any unsaved data first.
+  navigator.serviceWorker.addEventListener('message', function(event){
+    if(event.data && event.data.type === 'SW_UPDATED'){
+      console.log('cc: SW v' + event.data.version + ' activated — reloading for fresh code');
+      // Give the app 800ms to finish any in-progress saves, then reload
+      setTimeout(function(){
+        // Delete cached HTML so the reload fetches fresh from network
+        caches.keys().then(function(keys){
+          return Promise.all(keys.map(function(k){
+            return caches.open(k).then(function(c){
+              return Promise.all([c.delete('./'), c.delete('./index.html')]);
+            });
+          }));
+        }).then(function(){ location.reload(); }).catch(function(){ location.reload(); });
+      }, 800);
+    }
+  });
+
   navigator.serviceWorker.register('./sw.js').then(function(reg){
     // Force a fresh SW fetch on every app open — critical for iOS PWA home screen shortcuts
     reg.update();
