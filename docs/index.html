@@ -1040,7 +1040,8 @@ body{
       <div class="ss-section">
         <div class="ss-section-hdr">Payments</div>
         <div class="ss-row"><label>Cash</label><input type="number" autocomplete="off" id="sd-cash" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
-        <div class="ss-row"><label>Card</label><input type="number" autocomplete="off" id="sd-card" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
+        <div class="ss-row"><div class="ss-row-lbl"><label>Card</label><button class="breakdown-toggle" id="cd-toggle" onclick="toggleBreakdown('cd')"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="cd-badge">Add breakdown</span></button></div><input type="number" autocomplete="off" id="sd-card" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
+        <div id="cd-panel" style="display:none" class="breakdown-panel"><div id="cd-items"></div><button class="breakdown-collapse" onclick="toggleBreakdown('cd')">▲ Collapse</button></div>
         <div class="ss-total-row"><label>Day Total</label><div class="ss-total-val" id="sd-day-total" style="color:var(--green)">£0.00</div></div>
       </div>
       <!-- Driver Payments section -->
@@ -1164,7 +1165,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 196; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 197; // ← bump this on every deploy — auto-shows in Settings
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.getElementById('app-version-label');
   if(el)el.textContent=`Version ${APP_VERSION} • Cloud sync`;
@@ -3966,9 +3967,9 @@ function changeSalesWeek(dir){
 }
 
 // ── Order Breakdown (Uber Eats / Deliveroo) ──────────────────────────────────
-let _bdItems={ue:[],dr:[]};
+let _bdItems={ue:[],dr:[],cd:[]};
 let _bdFocusNew=false; // flag: focus newly added item row instead of "Add amount"
-let _pendingBd={ue:'',dr:''}; // tracks live value in "Add amount" input before confirmed
+let _pendingBd={ue:'',dr:'',cd:''}; // tracks live value in "Add amount" input before confirmed
 let _driverPayments=[]; // [{driver:'Name',amount:0,paid:false},...]
 function _updateToggleBtn(f){
   const btn=document.getElementById(f+'-toggle');
@@ -4040,15 +4041,15 @@ function _addBdItemFromInput(f,inp){
 function _syncBdTotal(f){
   const items=_bdItems[f];
   const sum=items.reduce((a,b)=>a+(b||0),0);
-  const fieldId=f==='ue'?'sd-ue':'sd-dr';
+  const fieldId=f==='ue'?'sd-ue':f==='cd'?'sd-card':'sd-dr';
   const el=document.getElementById(fieldId);
   // Always update — even when items is empty so stale values are cleared
   if(el){el.value=sum>0?sum.toFixed(2):'';calcDaySales();}
   _updateToggleBtn(f);
 }
 function _resetBreakdown(){
-  _bdItems={ue:[],dr:[]};
-  ['ue','dr'].forEach(f=>{
+  _bdItems={ue:[],dr:[],cd:[]};
+  ['ue','dr','cd'].forEach(f=>{
     const panel=document.getElementById(f+'-panel');
     if(panel)panel.style.display='none';
     _updateToggleBtn(f);
@@ -4166,6 +4167,7 @@ function openDayEntry(dateStr){
   _resetBreakdown();
   _bdItems.ue=(Array.isArray(r.uber_eats_items)?r.uber_eats_items:[]).map(Number);
   _bdItems.dr=(Array.isArray(r.deliveroo_items)?r.deliveroo_items:[]).map(Number);
+  _bdItems.cd=(Array.isArray(r.card_items)?r.card_items:[]).map(Number);
   if(_bdItems.ue.length)_syncBdTotal('ue');
   if(_bdItems.dr.length)_syncBdTotal('dr');
   calcDaySales();
@@ -4229,7 +4231,7 @@ function calcDaySales(){
 
 function _flushPendingBdInputs(){
   // Capture any value typed in "Add amount" but not yet confirmed with Enter/+
-  ['ue','dr'].forEach(f=>{
+  ['ue','dr','cd'].forEach(f=>{
     const v=parseFloat(_pendingBd[f])||0;
     if(v){_bdItems[f].push(v);_syncBdTotal(f);}
     _pendingBd[f]='';
@@ -4248,6 +4250,7 @@ async function saveDaySales(){
     card:getSdVal('sd-card'),
     uber_eats_items:_bdItems.ue,
     deliveroo_items:_bdItems.dr,
+    card_items:_bdItems.cd,
     notes:(document.getElementById('sd-notes')||{}).value||'',
     driver_payments:_driverPayments,
     unlocked_until:_unlockUntilISO() // 6h grace — visible to all accounts after save
