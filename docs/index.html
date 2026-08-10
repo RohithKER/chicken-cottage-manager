@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1401,13 +1401,12 @@ async function loadPermissions(userId,email){
     }
     _userStatus=data?.status||'pending';
     if(_userStatus==='removed'){
-      // Admin removed this user — clear cache, sign them out
+      // Removed user wants to rejoin — reset to pending so admin can re-approve
       try{localStorage.removeItem(_PERM_CACHE_KEY+userId);}catch{}
       if(!isHardcodedAdmin){
-        toast('⛔ Your access has been removed. Contact an admin to rejoin.');
-        await db.auth.signOut();
-        showScreen('auth');
-        return;
+        await db.from('user_permissions').update({status:'pending'}).eq('user_id',userId);
+        _userStatus='pending';
+        if(data)data.status='pending';
       }
     }
     if(_userStatus==='approved'){
