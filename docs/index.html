@@ -1175,7 +1175,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 208; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 209; // ← bump this on every deploy — auto-shows in Settings
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.getElementById('app-version-label');
   if(el)el.textContent=`Version ${APP_VERSION} • Cloud sync`;
@@ -1335,8 +1335,13 @@ async function loadColsFromCloud(){
     } else {
       const type=row.key.replace('cols_','');
       if(row.value&&row.value.length){
-        COLS[type]=row.value;
-        localStorage.setItem(`cc_cols_${type}`,JSON.stringify(row.value));
+        // Guard: never load delivery time values (e.g. '4:00') into inside columns
+        if(type==='inside'&&_hasTimeCol(row.value)){
+          console.warn('cc: loadColsFromCloud — cols_inside has time values in DB, ignoring (DB trigger should have blocked this)');
+        } else {
+          COLS[type]=row.value;
+          localStorage.setItem(`cc_cols_${type}`,JSON.stringify(row.value));
+        }
       }
     }
   });
@@ -3717,6 +3722,11 @@ function setupRealtime(){
       }
       const type=row.key.replace('cols_','');
       if((type==='inside'||type==='delivery')&&row.value&&row.value.length){
+        // Guard: never apply delivery time values to inside columns via Realtime
+        if(type==='inside'&&_hasTimeCol(row.value)){
+          console.warn('cc: cc-settings Realtime — cols_inside received time values, ignoring');
+          return;
+        }
         COLS[type]=row.value;
         localStorage.setItem(`cc_cols_${type}`,JSON.stringify(row.value));
         renderRota();
@@ -4945,7 +4955,7 @@ if('serviceWorker' in navigator){
 
   // The ?v= suffix changes the registration URL, forcing iOS to bypass HTTP cache and fetch
   // a fresh sw.js even when the browser would otherwise serve a cached copy.
-  navigator.serviceWorker.register('./sw.js?v=208').then(function(reg){
+  navigator.serviceWorker.register('./sw.js').then(function(reg){
     // Force a fresh SW fetch on every app open — critical for iOS PWA home screen shortcuts
     reg.update();
 
