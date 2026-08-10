@@ -1175,7 +1175,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 209; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 210; // ← bump this on every deploy — auto-shows in Settings
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.getElementById('app-version-label');
   if(el)el.textContent=`Version ${APP_VERSION} • Cloud sync`;
@@ -1185,7 +1185,7 @@ const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sun
 const EARLY_DEFAULT_TIME = '4pm'; // default early-start time when none set
 const DEFAULT_COLS = {
   inside: ['MORNING','NIGHT','OFF'],
-  delivery: ['DAY','4:00','5:00']
+  delivery: ['4:00','5:00']
 };
 const DEFAULT_STAFF = {
   inside:['Kado','Ercan','Rohith','Albert','Anu','Abzar','Aibal','Abuzar','Abdul'],
