@@ -1175,7 +1175,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 210; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 211; // ← bump this on every deploy — auto-shows in Settings
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.getElementById('app-version-label');
   if(el)el.textContent=`Version ${APP_VERSION} • Cloud sync`;
@@ -2018,6 +2018,10 @@ async function saveShiftToCloud(type,wk,day,col,names){
   setSyncDot(day,col,'saving');
   _pendingSaves++;
   _updateSaveIndicator();
+  // Mark as pending BEFORE the async upsert so that loadSchedules() / _pwaResume()
+  // can never overwrite local state with stale DB data while the save is in-flight.
+  _pendingShiftSet.add(_key);
+  _savePendingShifts();
   try{
     const _t=new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),15000));
     // Destructure to catch Supabase-level errors (RLS, constraint, etc.)
