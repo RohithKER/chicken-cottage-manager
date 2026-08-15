@@ -1184,7 +1184,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 214; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 215; // ← bump this on every deploy — auto-shows in Settings
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.getElementById('app-version-label');
   if(el)el.textContent=`Version ${APP_VERSION} • Cloud sync`;
@@ -4950,26 +4950,33 @@ async function _applyUpdate(){
       await Promise.all(regs.map(function(r){ return r.unregister(); }));
     }
   }catch(e){}
+  // Flag this as a controlled update so the post-reload SW_UPDATED message
+  // doesn't falsely re-show the banner (the freshly installed SW always fires
+  // SW_UPDATED once it activates, even though there's nothing new to update).
+  try{ sessionStorage.setItem('cc_sw_just_applied','1'); }catch(e){}
   window.location.reload(true);
 }
 
 if('serviceWorker' in navigator){
-  // Auto-reload when a new SW activates and sends SW_UPDATED — ensures fresh HTML is served
-  // without the user having to manually reload. Saves any unsaved data first.
+  // When a new SW activates it sends SW_UPDATED. We show the banner and let
+  // the user choose when to apply — no auto-reload. Auto-reload was causing
+  // an infinite refresh loop on older iPhones because the freshly activated
+  // SW immediately sends SW_UPDATED to the reloaded page, triggering another
+  // reload, and so on forever.
   navigator.serviceWorker.addEventListener('message', function(event){
     if(event.data && event.data.type === 'SW_UPDATED'){
-      console.log('cc: SW v' + event.data.version + ' activated — reloading for fresh code');
-      // Give the app 800ms to finish any in-progress saves, then reload
-      setTimeout(function(){
-        // Delete cached HTML so the reload fetches fresh from network
-        caches.keys().then(function(keys){
-          return Promise.all(keys.map(function(k){
-            return caches.open(k).then(function(c){
-              return Promise.all([c.delete('./'), c.delete('./index.html')]);
-            });
-          }));
-        }).then(function(){ location.reload(); }).catch(function(){ location.reload(); });
-      }, 800);
+      // After _applyUpdate() reloads the page the brand-new SW fires SW_UPDATED
+      // too — suppress that one so the banner doesn't re-appear immediately
+      // after the user just manually updated.
+      try{
+        if(sessionStorage.getItem('cc_sw_just_applied')){
+          sessionStorage.removeItem('cc_sw_just_applied');
+          console.log('cc: SW v' + event.data.version + ' confirmed active after manual update');
+          return;
+        }
+      }catch(e){}
+      console.log('cc: SW v' + event.data.version + ' ready — showing update banner');
+      _showUpdateBanner();
     }
   });
 
