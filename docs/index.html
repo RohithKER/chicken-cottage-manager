@@ -1184,7 +1184,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 215; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 216; // ← bump this on every deploy — auto-shows in Settings
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.getElementById('app-version-label');
   if(el)el.textContent=`Version ${APP_VERSION} • Cloud sync`;
@@ -3662,9 +3662,9 @@ async function _retryPendingOnLoad(){
   const total=shiftCount+salesCount;
   toast(`⚠ ${total} unsaved change${total!==1?'s':''} found — syncing to cloud…`);
   // Retry pending shifts
+  const pendingShiftSnapshot=[..._pendingShiftSet]; // snapshot before any async work
   if(shiftCount>0){
-    const pending=[..._pendingShiftSet];
-    for(const k of pending){
+    for(const k of pendingShiftSnapshot){
       const [type,wk,day,col]=k.split('|');
       const names=state.schedules[k]||[];
       await saveShiftToCloud(type,wk,day,col,names);
@@ -3686,6 +3686,17 @@ async function _retryPendingOnLoad(){
   const remaining=_pendingShiftSet.size+_pendingSaleSet.size;
   if(remaining===0)toast('✅ All unsaved changes synced to cloud');
   else toast(`⚠ ${remaining} change${remaining!==1?'s':''} still pending — tap ↻ to retry`);
+
+  // IMPORTANT: Remove any keys from _pendingShiftSet that we just attempted to retry
+  // (whether they succeeded or failed). Stale keys from previous sessions permanently
+  // block Realtime updates for those cells — a failed retry that isn't cleared means
+  // the cell will never receive live updates from other devices until a full page reload.
+  // New edits in this session will add fresh keys as needed.
+  pendingShiftSnapshot.forEach(k=>{
+    _pendingShiftSet.delete(k);
+  });
+  _savePendingShifts();
+  console.log('cc: Cleared',pendingShiftSnapshot.length,'stale pending key(s) from previous session — Realtime unblocked');
 }
 
 /* ─── Realtime Sync ──────────────────────────────────── */
@@ -3695,6 +3706,7 @@ function setupRealtime(){
   _realtimeSetup=true;
 
   // Schedule changes — update local cache and re-render instantly
+  let _schedChanWasDown=false;
   db.channel('cc-schedules')
     .on('postgres_changes',{event:'*',schema:'public',table:'schedules'},payload=>{
       if(payload.eventType==='INSERT'||payload.eventType==='UPDATE'){
@@ -3715,7 +3727,21 @@ function setupRealtime(){
         }
       }
     })
-    .subscribe();
+    .subscribe((status)=>{
+      // Detect channel drops and refresh data on reconnect to catch any missed events.
+      // Supabase Realtime does NOT replay missed events — only a fresh DB fetch recovers them.
+      if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'){
+        _schedChanWasDown=true;
+        console.warn('cc: cc-schedules channel',status,'— will refresh on reconnect');
+      }else if(status==='SUBSCRIBED'&&_schedChanWasDown){
+        _schedChanWasDown=false;
+        console.log('cc: cc-schedules reconnected — fetching fresh schedules to catch missed events');
+        if(user&&!_hbBusy){
+          Promise.race([loadSchedules(),new Promise(r=>setTimeout(r,5000))])
+            .then(()=>renderRota()).catch(()=>{});
+        }
+      }
+    });
 
   // Staff changes — reload staff list and re-render
   db.channel('cc-staff')
@@ -4823,6 +4849,22 @@ setInterval(()=>{
   _hbLast   = now;
   if(gap > 1500 && user) _pwaResume();
 }, 1000);
+
+// visibilitychange: backup for cases where the heartbeat gap is < 1.5 s
+// (brief background, iOS throttling, Android) but the Realtime WS still dropped.
+// Does a lightweight schedule refresh — not the full client rebuild that _pwaResume does.
+let _lastVisRefresh = 0;
+document.addEventListener('visibilitychange', function(){
+  if(document.visibilityState !== 'visible') return;
+  if(!user || _hbBusy) return; // _pwaResume is already running a full reload
+  const now = Date.now();
+  if(now - _lastVisRefresh < 15000) return; // debounce — don't hammer DB on rapid switches
+  _lastVisRefresh = now;
+  // Fetch fresh schedules to catch any Realtime events missed while backgrounded
+  Promise.race([loadSchedules(), new Promise(r=>setTimeout(r,5000))])
+    .then(()=>{ renderRota(); renderStaff(); })
+    .catch(()=>{});
+});
 
 // iOS bfcache restore
 window.addEventListener('pageshow', e=>{ if(e.persisted && user) _pwaResume(); });
