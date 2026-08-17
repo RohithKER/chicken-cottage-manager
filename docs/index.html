@@ -1184,7 +1184,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 218; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 219; // ← bump this on every deploy — auto-shows in Settings
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.getElementById('app-version-label');
   if(el)el.textContent=`Version ${APP_VERSION} • Cloud sync`;
@@ -3702,7 +3702,18 @@ async function _retryPendingOnLoad(){
 /* ─── Realtime Sync ──────────────────────────────────── */
 let _realtimeSetup=false;
 let _lastRealtimeEvent=0; // timestamp of last received Realtime event (any channel)
+let _realtimeChannels=[]; // tracks active channel objects so we can remove them cleanly
 function _touchRealtimeTs(){ _lastRealtimeEvent=Date.now(); }
+
+async function _teardownRealtime(){
+  // Unsubscribe and remove all tracked channels before rebuilding
+  const chs=[..._realtimeChannels];
+  _realtimeChannels=[];
+  for(const ch of chs){
+    try{ await db.removeChannel(ch); }catch(e){}
+  }
+  _realtimeSetup=false;
+}
 
 function setupRealtime(){
   if(_realtimeSetup)return;
@@ -3710,7 +3721,7 @@ function setupRealtime(){
 
   // Schedule changes — update local cache and re-render instantly
   let _schedChanWasDown=false;
-  db.channel('cc-schedules')
+  const _schedCh=db.channel('cc-schedules')
     .on('postgres_changes',{event:'*',schema:'public',table:'schedules'},payload=>{
       _touchRealtimeTs();
       if(payload.eventType==='INSERT'||payload.eventType==='UPDATE'){
@@ -3749,9 +3760,10 @@ function setupRealtime(){
         }
       }
     });
+  _realtimeChannels.push(_schedCh);
 
   // Staff changes — reload staff list and re-render
-  db.channel('cc-staff')
+  const _staffCh=db.channel('cc-staff')
     .on('postgres_changes',{event:'*',schema:'public',table:'staff'},async()=>{
       _touchRealtimeTs();
       const{data}=await db.from('staff').select('*');
@@ -3763,9 +3775,10 @@ function setupRealtime(){
       }
     })
     .subscribe();
+  _realtimeChannels.push(_staffCh);
 
   // Settings changes — sync column config and sales PIN in real time
-  db.channel('cc-settings')
+  const _settingsCh=db.channel('cc-settings')
     .on('postgres_changes',{event:'*',schema:'public',table:'app_settings'},payload=>{
       _touchRealtimeTs();
       const row=payload.new;
@@ -3788,9 +3801,10 @@ function setupRealtime(){
       }
     })
     .subscribe();
+  _realtimeChannels.push(_settingsCh);
 
   // Sales changes — update sales table live (just like rota)
-  db.channel('cc-sales')
+  const _salesCh=db.channel('cc-sales')
     .on('postgres_changes',{event:'*',schema:'public',table:'daily_sales'},payload=>{
       const row=payload.new;
       if(!row||!row.sale_date)return;
@@ -3821,10 +3835,11 @@ function setupRealtime(){
       logActivity(`Sales ${row.sale_date} updated live ✓`,'success');
     })
     .subscribe();
+  _realtimeChannels.push(_salesCh);
 
   // Permissions changes — reload instantly when admin changes your permissions
   if(user){
-    db.channel('cc-my-perms')
+    const _permsCh=db.channel('cc-my-perms')
       .on('postgres_changes',{event:'UPDATE',schema:'public',table:'user_permissions',filter:`user_id=eq.${user.id}`},async(payload)=>{
         // Skip if this is the pending→approved transition (handled by _setupPendingWatcher)
         if(_userStatus==='pending')return;
@@ -3838,10 +3853,11 @@ function setupRealtime(){
         toast('🔑 Your permissions have been updated');
       })
       .subscribe();
+    _realtimeChannels.push(_permsCh);
   }
 
   // Early shift changes — update tags live across all devices
-  db.channel('cc-early')
+  const _earlyCh=db.channel('cc-early')
     .on('postgres_changes',{event:'*',schema:'public',table:'shift_early'},payload=>{
       const r=payload.new||payload.old;
       if(!r||!r.week_key||!r.day)return;
@@ -3857,14 +3873,16 @@ function setupRealtime(){
       renderRota();
     })
     .subscribe();
+  _realtimeChannels.push(_earlyCh);
 
   // Admin: auto-refresh pending list when a new user signs in
   if(_perms.is_admin){
-    db.channel('cc-new-signups')
+    const _signupCh=db.channel('cc-new-signups')
       .on('postgres_changes',{event:'INSERT',schema:'public',table:'user_permissions'},()=>{
         loadPendingUsers();
       })
       .subscribe();
+    _realtimeChannels.push(_signupCh);
   }
 }
 
@@ -4895,14 +4913,18 @@ setInterval(function(){
   _lastPeriodicSync = now;
 
   // Zombie-channel detector: if we've been subscribed for > 2 minutes with zero Realtime
-  // events, the WebSocket is silently dead. Tear down and rebuild the subscriptions.
+  // events, the WebSocket is silently dead. Tear down cleanly and rebuild.
   const timeSinceEvent = now - _lastRealtimeEvent;
   const timeSinceLogin = now - (_sessionStartedAt || now);
   if(_realtimeSetup && timeSinceLogin > 30000 && timeSinceEvent > 120000){
     console.warn('cc: No Realtime events in 2 min — zombie channel detected, rebuilding subscriptions');
-    _realtimeSetup = false;
-    _lastRealtimeEvent = now; // reset so we don't immediately re-trigger
-    setupRealtime();
+    _lastRealtimeEvent = now; // reset before teardown so we don't re-trigger during async removal
+    _teardownRealtime().then(()=>{
+      if(user) setupRealtime();
+    }).catch(()=>{
+      _realtimeSetup = false;
+      if(user) setupRealtime();
+    });
   }
 
   Promise.race([loadSchedules(), new Promise(r=>setTimeout(r,5000))])
