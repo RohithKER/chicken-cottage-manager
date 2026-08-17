@@ -1184,7 +1184,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 220; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 221; // ← bump this on every deploy — auto-shows in Settings
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.getElementById('app-version-label');
   if(el)el.textContent=`Version ${APP_VERSION} • Cloud sync`;
@@ -1368,6 +1368,20 @@ async function saveBlacklistToCloud(){
   if(!user)return;
   try{await db.from('app_settings').upsert({key:'staff_blacklist',value:[...staffBlacklist],updated_at:new Date().toISOString()},{onConflict:'key'});}
   catch(e){console.warn('Blacklist sync failed:',e);}
+}
+// Remove from staffBlacklist any name that is currently an active staff member.
+// Called after staff list loads / changes to prevent blacklist hiding valid staff.
+function _reconcileBlacklist(){
+  if(!staffBlacklist.size)return;
+  const allStaff=new Set([...( state.staff.inside||[]),...(state.staff.delivery||[])]);
+  let changed=false;
+  [...staffBlacklist].forEach(n=>{
+    if(allStaff.has(n)){staffBlacklist.delete(n);changed=true;}
+  });
+  if(changed){
+    localStorage.setItem('cc_staff_blacklist',JSON.stringify([...staffBlacklist]));
+    saveBlacklistToCloud().catch(()=>{});
+  }
 }
 
 /* ─── State ──────────────────────────────────────────── */
@@ -1785,6 +1799,7 @@ async function loadFromCloud(){
     if(staffData&&staffData.length>0){
       state.staff.inside=staffData.filter(s=>s.type==='inside'||s.type==='both').map(s=>s.name);
       state.staff.delivery=staffData.filter(s=>s.type==='delivery'||s.type==='both').map(s=>s.name);
+      _reconcileBlacklist();
     }else{await Promise.race([seedDefaultStaff(),_t(5000)]).catch(()=>{});}
     await Promise.race([loadSchedules(),_t(5000)]);
     await Promise.race([loadEarlyShift(),_t(5000)]);
@@ -1816,6 +1831,7 @@ async function syncAll(){
     if(staffData&&staffData.length>0){
       state.staff.inside=staffData.filter(s=>s.type==='inside'||s.type==='both').map(s=>s.name);
       state.staff.delivery=staffData.filter(s=>s.type==='delivery'||s.type==='both').map(s=>s.name);
+      _reconcileBlacklist();
     }
     // 3. Push ALL local schedule changes to Supabase FIRST so nothing is lost
     const pushRows=Object.entries(state.schedules).map(([key,names])=>{
@@ -2240,8 +2256,14 @@ async function deleteStaffFromCloud(name){
 /* ─── Local state helpers ────────────────────────────── */
 function getShift(type,off,day,col){
   const raw=state.schedules[`${type}|${weekKey(off)}|${day}|${col}`]||[];
-  const filtered=staffBlacklist.size?raw.filter(n=>!staffBlacklist.has(n)):raw;
-  return [...filtered].sort((a,b)=>a.localeCompare(b));
+  if(staffBlacklist.size){
+    // Active staff are ALWAYS shown even if they somehow appear in the blacklist.
+    // Blacklisting only hides names that have been fully removed from all staff lists.
+    const activeStaff=new Set(state.staff[type]||[]);
+    const filtered=raw.filter(n=>activeStaff.has(n)||!staffBlacklist.has(n));
+    return [...filtered].sort((a,b)=>a.localeCompare(b));
+  }
+  return [...raw].sort((a,b)=>a.localeCompare(b));
 }
 function setShift(type,off,day,col,names){
   const k=`${type}|${weekKey(off)}|${day}|${col}`;
@@ -3770,6 +3792,8 @@ function setupRealtime(){
       if(data&&data.length>0){
         state.staff.inside=data.filter(s=>s.type==='inside'||s.type==='both').map(s=>s.name);
         state.staff.delivery=data.filter(s=>s.type==='delivery'||s.type==='both').map(s=>s.name);
+        // Reconcile: if a name is back in the staff list, remove them from the blacklist
+        _reconcileBlacklist();
         renderStaff();
         renderRota();
       }
@@ -3777,7 +3801,7 @@ function setupRealtime(){
     .subscribe();
   _realtimeChannels.push(_staffCh);
 
-  // Settings changes — sync column config and sales PIN in real time
+  // Settings changes — sync column config, sales PIN, and staff blacklist in real time
   const _settingsCh=db.channel('cc-settings')
     .on('postgres_changes',{event:'*',schema:'public',table:'app_settings'},payload=>{
       _touchRealtimeTs();
@@ -3786,6 +3810,17 @@ function setupRealtime(){
       if(row.key==='sales_pin'){
         _salesPin=(row.value&&typeof row.value==='string'&&row.value.length>=4)?row.value:null;
         _updatePinStatusLabel();
+        return;
+      }
+      if(row.key==='staff_blacklist'){
+        if(Array.isArray(row.value)){
+          staffBlacklist.clear();
+          row.value.forEach(n=>staffBlacklist.add(n));
+          // Always reconcile: never blacklist someone who is currently active staff
+          _reconcileBlacklist();
+          localStorage.setItem('cc_staff_blacklist',JSON.stringify([...staffBlacklist]));
+          renderRota();
+        }
         return;
       }
       const type=row.key.replace('cols_','');
