@@ -1184,7 +1184,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 217; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 218; // ← bump this on every deploy — auto-shows in Settings
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.getElementById('app-version-label');
   if(el)el.textContent=`Version ${APP_VERSION} • Cloud sync`;
@@ -3701,6 +3701,9 @@ async function _retryPendingOnLoad(){
 
 /* ─── Realtime Sync ──────────────────────────────────── */
 let _realtimeSetup=false;
+let _lastRealtimeEvent=0; // timestamp of last received Realtime event (any channel)
+function _touchRealtimeTs(){ _lastRealtimeEvent=Date.now(); }
+
 function setupRealtime(){
   if(_realtimeSetup)return;
   _realtimeSetup=true;
@@ -3709,6 +3712,7 @@ function setupRealtime(){
   let _schedChanWasDown=false;
   db.channel('cc-schedules')
     .on('postgres_changes',{event:'*',schema:'public',table:'schedules'},payload=>{
+      _touchRealtimeTs();
       if(payload.eventType==='INSERT'||payload.eventType==='UPDATE'){
         const r=payload.new;
         const k=`${r.schedule_type}|${r.week_key}|${r.day}|${r.shift_col}`;
@@ -3733,12 +3737,15 @@ function setupRealtime(){
       if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'){
         _schedChanWasDown=true;
         console.warn('cc: cc-schedules channel',status,'— will refresh on reconnect');
-      }else if(status==='SUBSCRIBED'&&_schedChanWasDown){
-        _schedChanWasDown=false;
-        console.log('cc: cc-schedules reconnected — fetching fresh schedules to catch missed events');
-        if(user&&!_hbBusy){
-          Promise.race([loadSchedules(),new Promise(r=>setTimeout(r,5000))])
-            .then(()=>renderRota()).catch(()=>{});
+      }else if(status==='SUBSCRIBED'){
+        _touchRealtimeTs(); // subscription itself counts as an event — resets the zombie timer
+        if(_schedChanWasDown){
+          _schedChanWasDown=false;
+          console.log('cc: cc-schedules reconnected — fetching fresh schedules to catch missed events');
+          if(user&&!_hbBusy){
+            Promise.race([loadSchedules(),new Promise(r=>setTimeout(r,5000))])
+              .then(()=>renderRota()).catch(()=>{});
+          }
         }
       }
     });
@@ -3746,6 +3753,7 @@ function setupRealtime(){
   // Staff changes — reload staff list and re-render
   db.channel('cc-staff')
     .on('postgres_changes',{event:'*',schema:'public',table:'staff'},async()=>{
+      _touchRealtimeTs();
       const{data}=await db.from('staff').select('*');
       if(data&&data.length>0){
         state.staff.inside=data.filter(s=>s.type==='inside'||s.type==='both').map(s=>s.name);
@@ -3759,6 +3767,7 @@ function setupRealtime(){
   // Settings changes — sync column config and sales PIN in real time
   db.channel('cc-settings')
     .on('postgres_changes',{event:'*',schema:'public',table:'app_settings'},payload=>{
+      _touchRealtimeTs();
       const row=payload.new;
       if(!row||!row.key)return;
       if(row.key==='sales_pin'){
@@ -3861,6 +3870,7 @@ function setupRealtime(){
 
 /* ─── Init ───────────────────────────────────────────── */
 let _sessionStarting=false; // guard against concurrent _startSession calls (e.g. token refresh)
+let _sessionStartedAt=0;   // timestamp when the current session fully loaded (used by zombie-channel detector)
 async function _startSession(u){
   if(_sessionStarting)return;
   _sessionStarting=true;
@@ -3902,6 +3912,8 @@ async function _startSession(u){
     renderRota();
     showScreen('main');
     setupRealtime();
+    _sessionStartedAt=Date.now();
+    _lastRealtimeEvent=Date.now(); // give channels 2 min grace before zombie check fires
     _retryPendingOnLoad();
   }finally{
     _sessionStarting=false;
@@ -4869,7 +4881,7 @@ document.addEventListener('visibilitychange', function(){
 // iOS bfcache restore
 window.addEventListener('pageshow', e=>{ if(e.persisted && user) _pwaResume(); });
 
-// Periodic soft-sync (every 60s) — catches Realtime events silently missed while the
+// Periodic soft-sync (every 15s) — catches Realtime events silently missed while the
 // app stays in the foreground but the WebSocket drops without triggering a status event.
 // Only runs when idle (no pending saves, not busy with a heartbeat reload).
 let _lastPeriodicSync = 0;
@@ -4879,12 +4891,24 @@ setInterval(function(){
   if(_hbBusy) return;
   if(_pendingSaves > 0) return; // skip while saves are in flight
   const now = Date.now();
-  if(now - _lastPeriodicSync < 58000) return; // safety guard against drift
+  if(now - _lastPeriodicSync < 13000) return; // safety guard against drift
   _lastPeriodicSync = now;
+
+  // Zombie-channel detector: if we've been subscribed for > 2 minutes with zero Realtime
+  // events, the WebSocket is silently dead. Tear down and rebuild the subscriptions.
+  const timeSinceEvent = now - _lastRealtimeEvent;
+  const timeSinceLogin = now - (_sessionStartedAt || now);
+  if(_realtimeSetup && timeSinceLogin > 30000 && timeSinceEvent > 120000){
+    console.warn('cc: No Realtime events in 2 min — zombie channel detected, rebuilding subscriptions');
+    _realtimeSetup = false;
+    _lastRealtimeEvent = now; // reset so we don't immediately re-trigger
+    setupRealtime();
+  }
+
   Promise.race([loadSchedules(), new Promise(r=>setTimeout(r,5000))])
     .then(()=>renderRota())
     .catch(()=>{});
-}, 60000);
+}, 15000);
 </script>
 <!-- Thermal Receipt (hidden, shown only during print) -->
 <div id="print-receipt">
