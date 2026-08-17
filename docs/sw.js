@@ -1,4 +1,4 @@
-/* CC Manager Service Worker — v220 */
+/* CC Manager Service Worker — v220 — build 2 */
 
 const CACHE = 'cc-v220';
 const CDN_SUPABASE = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
