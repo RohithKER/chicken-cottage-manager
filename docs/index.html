@@ -1184,7 +1184,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 216; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 217; // ← bump this on every deploy — auto-shows in Settings
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.getElementById('app-version-label');
   if(el)el.textContent=`Version ${APP_VERSION} • Cloud sync`;
@@ -4868,6 +4868,23 @@ document.addEventListener('visibilitychange', function(){
 
 // iOS bfcache restore
 window.addEventListener('pageshow', e=>{ if(e.persisted && user) _pwaResume(); });
+
+// Periodic soft-sync (every 60s) — catches Realtime events silently missed while the
+// app stays in the foreground but the WebSocket drops without triggering a status event.
+// Only runs when idle (no pending saves, not busy with a heartbeat reload).
+let _lastPeriodicSync = 0;
+setInterval(function(){
+  if(!user) return;
+  if(document.visibilityState !== 'visible') return;
+  if(_hbBusy) return;
+  if(_pendingSaves > 0) return; // skip while saves are in flight
+  const now = Date.now();
+  if(now - _lastPeriodicSync < 58000) return; // safety guard against drift
+  _lastPeriodicSync = now;
+  Promise.race([loadSchedules(), new Promise(r=>setTimeout(r,5000))])
+    .then(()=>renderRota())
+    .catch(()=>{});
+}, 60000);
 </script>
 <!-- Thermal Receipt (hidden, shown only during print) -->
 <div id="print-receipt">
