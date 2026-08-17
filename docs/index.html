@@ -1184,7 +1184,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 221; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 222; // ← bump this on every deploy — auto-shows in Settings
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.getElementById('app-version-label');
   if(el)el.textContent=`Version ${APP_VERSION} • Cloud sync`;
@@ -2011,6 +2011,7 @@ async function loadSchedules(){
 /* ─── Pending-save tracking ──────────────────────────── */
 let _pendingSaves=0;
 const _failedSaves=new Map(); // key->'type|wk|day|col' → save args (in-memory, current session)
+const _localSaveTs={}; // key → Date.now() of last successful cloud save, for Realtime bounce-back protection
 
 // Persistent pending queue — survives force-close. Shifts here are in local cache
 // but not yet confirmed by cloud. On next load, local wins and we auto-retry.
@@ -2061,6 +2062,9 @@ async function saveShiftToCloud(type,wk,day,col,names){
     _failedSaves.delete(_key);
     _pendingShiftSet.delete(_key);
     _savePendingShifts();
+    // Stamp the save time so the Realtime handler won't clear a cell we just saved
+    // (prevents late-arriving bounce-backs with empty staff_names from wiping local state)
+    _localSaveTs[_key] = Date.now();
     setSyncDot(type,day,col,'saved');
     logActivity(`${day} ${col} saved to cloud ✓`, 'success');
     setTimeout(()=>setSyncDot(type,day,col,''),1500);
@@ -3751,8 +3755,14 @@ function setupRealtime(){
         const k=`${r.schedule_type}|${r.week_key}|${r.day}|${r.shift_col}`;
         // Skip if we have a pending local save for this key — local wins to avoid overwriting in-flight saves
         if(!_pendingShiftSet.has(k)){
-          if(r.staff_names&&r.staff_names.length>0) state.schedules[k]=r.staff_names;
-          else delete state.schedules[k];
+          if(r.staff_names&&r.staff_names.length>0){
+            state.schedules[k]=r.staff_names;
+          } else {
+            // Only clear if local save was more than 5 s ago — prevents a delayed bounce-back
+            // with empty staff_names from wiping a cell we just successfully saved.
+            const msSinceLocalSave = Date.now() - (_localSaveTs[k] || 0);
+            if(msSinceLocalSave > 5000) delete state.schedules[k];
+          }
         }
         renderRota();
       }else if(payload.eventType==='DELETE'){
