@@ -1184,7 +1184,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 222; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 223; // ← bump this on every deploy — auto-shows in Settings
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.getElementById('app-version-label');
   if(el)el.textContent=`Version ${APP_VERSION} • Cloud sync`;
@@ -1332,7 +1332,10 @@ async function loadColsFromCloud(){
         applyStaffColors();
       }
     } else if(row.key==='staff_blacklist'){
-      if(Array.isArray(row.value)&&row.value.length){
+      if(Array.isArray(row.value)){
+        // REPLACE — don't add. Cloud is the source of truth. Clearing first prevents
+        // stale localStorage entries (e.g. a re-added staff member) from surviving.
+        staffBlacklist.clear();
         row.value.forEach(n=>staffBlacklist.add(n));
         localStorage.setItem('cc_staff_blacklist',JSON.stringify([...staffBlacklist]));
       }
@@ -4908,6 +4911,7 @@ async function _pwaResume(){
     if(staffData && staffData.length > 0){
       state.staff.inside   = staffData.filter(s=>s.type==='inside'  ||s.type==='both').map(s=>s.name);
       state.staff.delivery = staffData.filter(s=>s.type==='delivery'||s.type==='both').map(s=>s.name);
+      _reconcileBlacklist(); // remove any active staff members from the blacklist on resume
     }
     await Promise.race([loadSchedules(),  _t(6000)]);
     await Promise.race([loadEarlyShift(), _t(6000)]);
