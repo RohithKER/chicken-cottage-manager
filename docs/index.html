@@ -1184,7 +1184,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 223; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 224; // ← bump this on every deploy — auto-shows in Settings
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.getElementById('app-version-label');
   if(el)el.textContent=`Version ${APP_VERSION} • Cloud sync`;
@@ -1997,7 +1997,8 @@ async function loadSchedules(){
   const cached=_loadSchedCache();
   Object.assign(state.schedules,cached);
   // Shared data — no user_id filter — load all types at once for instant switching
-  const {data}=await db.from('schedules').select('*').in('week_key',wks);
+  const {data,error:_schedErr}=await db.from('schedules').select('*').in('week_key',wks);
+  if(_schedErr) logActivity('loadSchedules error: '+_schedErr.message,'error');
   if(data){
     // Merge remote into local — but LOCAL WINS for any shift in the pending queue
     // (those are shifts saved locally but not yet confirmed by cloud)
@@ -4942,7 +4943,7 @@ document.addEventListener('visibilitychange', function(){
   if(document.visibilityState !== 'visible') return;
   if(!user || _hbBusy) return; // _pwaResume is already running a full reload
   const now = Date.now();
-  if(now - _lastVisRefresh < 15000) return; // debounce — don't hammer DB on rapid switches
+  if(now - _lastVisRefresh < 5000) return; // debounce — don't hammer DB on rapid switches
   _lastVisRefresh = now;
   // Fetch fresh schedules to catch any Realtime events missed while backgrounded
   Promise.race([loadSchedules(), new Promise(r=>setTimeout(r,5000))])
@@ -4953,25 +4954,27 @@ document.addEventListener('visibilitychange', function(){
 // iOS bfcache restore
 window.addEventListener('pageshow', e=>{ if(e.persisted && user) _pwaResume(); });
 
-// Periodic soft-sync (every 15s) — catches Realtime events silently missed while the
+// Periodic soft-sync (every 8s) — catches Realtime events silently missed while the
 // app stays in the foreground but the WebSocket drops without triggering a status event.
-// Only runs when idle (no pending saves, not busy with a heartbeat reload).
+// Runs as long as user is logged in, visible, and no saves are actively in-flight.
+// (Note: _hbBusy is intentionally NOT a skip condition — the poll is a lightweight
+//  DB read and can safely overlap with a PWA resume that is rebuilding Realtime.)
 let _lastPeriodicSync = 0;
 setInterval(function(){
   if(!user) return;
   if(document.visibilityState !== 'visible') return;
-  if(_hbBusy) return;
-  if(_pendingSaves > 0) return; // skip while saves are in flight
+  if(_pendingSaves > 0) return; // skip while saves are actively in flight
   const now = Date.now();
-  if(now - _lastPeriodicSync < 13000) return; // safety guard against drift
+  if(now - _lastPeriodicSync < 6500) return; // safety guard against drift
   _lastPeriodicSync = now;
 
-  // Zombie-channel detector: if we've been subscribed for > 2 minutes with zero Realtime
-  // events, the WebSocket is silently dead. Tear down cleanly and rebuild.
+  // Zombie-channel detector: if we've been subscribed for > 30s with zero Realtime
+  // events, the WebSocket may be silently dead. Tear down cleanly and rebuild.
+  // (45s threshold catches dead connections much faster than the old 2-minute window.)
   const timeSinceEvent = now - _lastRealtimeEvent;
   const timeSinceLogin = now - (_sessionStartedAt || now);
-  if(_realtimeSetup && timeSinceLogin > 30000 && timeSinceEvent > 120000){
-    console.warn('cc: No Realtime events in 2 min — zombie channel detected, rebuilding subscriptions');
+  if(_realtimeSetup && timeSinceLogin > 30000 && timeSinceEvent > 45000){
+    console.warn('cc: No Realtime events in 45s — zombie channel detected, rebuilding subscriptions');
     _lastRealtimeEvent = now; // reset before teardown so we don't re-trigger during async removal
     _teardownRealtime().then(()=>{
       if(user) setupRealtime();
@@ -4984,7 +4987,7 @@ setInterval(function(){
   Promise.race([loadSchedules(), new Promise(r=>setTimeout(r,5000))])
     .then(()=>renderRota())
     .catch(()=>{});
-}, 15000);
+}, 8000);
 </script>
 <!-- Thermal Receipt (hidden, shown only during print) -->
 <div id="print-receipt">
@@ -5117,25 +5120,24 @@ async function _applyUpdate(){
 }
 
 if('serviceWorker' in navigator){
-  // When a new SW activates it sends SW_UPDATED. We show the banner and let
-  // the user choose when to apply — no auto-reload. Auto-reload was causing
-  // an infinite refresh loop on older iPhones because the freshly activated
-  // SW immediately sends SW_UPDATED to the reloaded page, triggering another
-  // reload, and so on forever.
+  // When a new SW activates it sends SW_UPDATED. Auto-reload so iOS PWA home-screen
+  // shortcuts never run stale code. The cc_sw_just_applied flag prevents an infinite
+  // loop: _applyUpdate sets the flag before reloading; the freshly activated SW fires
+  // SW_UPDATED again on the new page, we see the flag, suppress, and stop there.
   navigator.serviceWorker.addEventListener('message', function(event){
     if(event.data && event.data.type === 'SW_UPDATED'){
-      // After _applyUpdate() reloads the page the brand-new SW fires SW_UPDATED
-      // too — suppress that one so the banner doesn't re-appear immediately
-      // after the user just manually updated.
+      // Suppress the SW_UPDATED that fires right after _applyUpdate's own reload
       try{
         if(sessionStorage.getItem('cc_sw_just_applied')){
           sessionStorage.removeItem('cc_sw_just_applied');
-          console.log('cc: SW v' + event.data.version + ' confirmed active after manual update');
+          console.log('cc: SW v' + event.data.version + ' confirmed active after update — skipping re-reload');
           return;
         }
       }catch(e){}
-      console.log('cc: SW v' + event.data.version + ' ready — showing update banner');
-      _showUpdateBanner();
+      console.log('cc: SW v' + event.data.version + ' ready — auto-applying update');
+      // Short delay so any in-progress render completes, then _applyUpdate syncs
+      // all local data to cloud and reloads with the fresh build.
+      setTimeout(function(){ _applyUpdate(); }, 1500);
     }
   });
 
