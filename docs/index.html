@@ -1184,7 +1184,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 219; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 220; // ← bump this on every deploy — auto-shows in Settings
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.getElementById('app-version-label');
   if(el)el.textContent=`Version ${APP_VERSION} • Cloud sync`;
@@ -4845,9 +4845,14 @@ async function _pwaResume(){
       if(event==='SIGNED_OUT'){user=null;showScreen('auth');}
     });
 
-    // 4. Re-setup realtime on the fresh client
-    _realtimeSetup = false;
-    setupRealtime();
+    // 4. Re-setup realtime on the fresh client — tear down old channels first so
+    //    _realtimeChannels doesn't accumulate dead objects from the previous db instance.
+    await _teardownRealtime();
+    if(user) setupRealtime();
+    // Give the new channels a 2-minute grace period before the zombie detector fires —
+    // the SUBSCRIBED callback will also call _touchRealtimeTs(), but resetting here
+    // prevents a race where the periodic poll fires before SUBSCRIBED arrives.
+    _lastRealtimeEvent = Date.now();
 
     // 4. Reload data — all calls now go through fresh HTTP connections
     const _t = ms => new Promise(r=>setTimeout(r,ms));
