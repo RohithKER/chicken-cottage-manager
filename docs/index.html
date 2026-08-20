@@ -1184,10 +1184,14 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 225; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 226; // ← bump this on every deploy — auto-shows in Settings
+// Detect an installed iOS/Android Home Screen PWA — Realtime/network behave very
+// differently here vs a normal browser tab (see the v226 fix in the reconnect logic
+// below), so several recovery paths branch on this.
+const IS_STANDALONE = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.getElementById('app-version-label');
-  if(el)el.textContent=`Version ${APP_VERSION} • Cloud sync`;
+  if(el)el.textContent=`Version ${APP_VERSION}${IS_STANDALONE?' • PWA':''} • Cloud sync`;
 });
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
 // Days with early starters and their start time label
@@ -4897,8 +4901,8 @@ applyStaffColors();
 
 init();
 
-/* ─── PWA Foreground Reconnect v133 ───────────────────────
-   Root cause: iOS suspends the PWA's WKWebView. When resumed,
+/* ─── PWA Foreground Reconnect v133, hardened v226 for iOS standalone ────
+   Root cause (v133): iOS suspends the PWA's WKWebView. When resumed,
    the browser's HTTP connection pool still holds stale TCP
    connections to Supabase. The Supabase JS client reuses those
    dead connections → every fetch hangs for 60–120 s (TCP timeout).
@@ -4910,39 +4914,75 @@ init();
    detects the JS freeze gap (iOS suspended → resumed), recreate
    the Supabase client entirely. The new client has a clean HTTP
    pool with no stale connections. No page reload needed.
-──────────────────────────────────────────────────────────── */
+
+   v226 — bug found specifically on installed iOS Home Screen PWAs (browser-tab
+   use was never affected): this recovery path had a client-swap ordering bug.
+   _pwaResume() reassigned `db` to the NEW client BEFORE calling
+   _teardownRealtime(), so teardown removed channels through the wrong client
+   and the OLD client's Realtime socket — with its own internal reconnect/
+   heartbeat timers — was simply abandoned, never disconnected. A Home Screen
+   PWA gets suspended/resumed far more often per shift than a browser tab ever
+   backgrounds this way, so every one of those cycles leaked one more zombie
+   socket. Over a shift these accumulate and degrade the connection to the
+   point where even the in-app "Update" button doesn't help — reload() only
+   resets JS state, it can't undo whatever the pile-up of abandoned background
+   sockets already did to the WKWebView's shared network layer. Only killing
+   the process (removing + re-adding the Home Screen icon) truly cleared it.
+
+   Fix: always tear down + explicitly disconnect the OLD client's realtime
+   socket BEFORE swapping to a new one, and route every recovery path through
+   this same full-strength reconnect (not just a channel resubscribe) —
+   heartbeat gap, zombie-channel detector, focus/visibilitychange, AND a
+   standalone-only unconditional safety-net timer that doesn't depend on any
+   of those signals firing at all (iOS standalone visibility/focus events are
+   not fully trustworthy). */
 let _hbLast = Date.now();
 let _hbBusy  = false;
+let _lastHardReconnect = 0;
 
-async function _pwaResume(){
+// Full-strength recovery: disconnect + discard the current Supabase client's
+// Realtime socket, create a fresh client, re-verify the session, and rebuild
+// everything. Every recovery path below calls this instead of the weaker
+// "just resubscribe channels on the same client" fix, which doesn't help when
+// the client's own socket/HTTP pool is the wedged part (the v133 failure mode).
+async function _hardReconnect(reason){
   if(_hbBusy || !user) return;
   _hbBusy = true;
+  _lastHardReconnect = Date.now();
+  console.log('cc: hard reconnect —', reason);
   try{
-    // 1. Recreate the Supabase client — fresh HTTP pool, no stale TCP connections.
-    //    This is identical to what force-close from recents does.
-    //    The new client reads the existing session from localStorage automatically.
+    // 1. Tear down channels + fully disconnect the realtime socket on the
+    //    CURRENT client while `db` still points to it. Must happen BEFORE
+    //    swapping `db` — otherwise teardown silently targets the wrong
+    //    client and the old socket (and its timers) leaks forever.
+    const _oldDb = db;
+    await _teardownRealtime();
+    try{ _oldDb.realtime.disconnect(1000, 'hard-reconnect'); }catch(e){}
+
+    // 2. Recreate the Supabase client — fresh HTTP pool, no stale TCP
+    //    connections, no inherited Realtime socket. Identical to what
+    //    force-closing the app from recents does. Reads the existing
+    //    session from localStorage automatically.
     db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    // 2. Verify we still have a valid session on the new client
+    // 3. Verify we still have a valid session on the new client
     const {data:{session}} = await db.auth.getSession();
     if(!session){ user=null; showScreen('auth'); return; }
     user = session.user;
 
-    // 3. Re-register auth state listener on the new client (old one was on old db instance)
+    // 4. Re-register auth state listener on the new client (old one was on old db instance)
     db.auth.onAuthStateChange((event,sess)=>{
       if(event==='SIGNED_OUT'){user=null;showScreen('auth');}
     });
 
-    // 4. Re-setup realtime on the fresh client — tear down old channels first so
-    //    _realtimeChannels doesn't accumulate dead objects from the previous db instance.
-    await _teardownRealtime();
+    // 5. Set up realtime fresh on the new client.
     if(user) setupRealtime();
-    // Give the new channels a 2-minute grace period before the zombie detector fires —
+    // Give the new channels a grace period before the zombie detector fires —
     // the SUBSCRIBED callback will also call _touchRealtimeTs(), but resetting here
     // prevents a race where the periodic poll fires before SUBSCRIBED arrives.
     _lastRealtimeEvent = Date.now();
 
-    // 4. Reload data — all calls now go through fresh HTTP connections
+    // 6. Reload data — all calls now go through fresh HTTP connections
     const _t = ms => new Promise(r=>setTimeout(r,ms));
     const {data:staffData} = await Promise.race([
       db.from('staff').select('*'),
@@ -4959,11 +4999,14 @@ async function _pwaResume(){
     await Promise.race([loadSalesWeek(),  _t(6000)]);
     renderRota(); renderStaff(); applyStaffColors();
   }catch(e){
-    console.warn('PWA resume error:', e);
+    console.warn('cc: hard reconnect error:', e);
   }finally{
     _hbBusy = false;
   }
 }
+
+// Kept for readability at existing call sites — a "PWA resume" is just a hard reconnect.
+function _pwaResume(reason){ return _hardReconnect(reason || 'heartbeat-gap'); }
 
 // Heartbeat: ticks every 1 s while JS is running.
 // iOS freezes JS when suspending → gap > 1.5 s on resume.
@@ -4971,71 +5014,87 @@ setInterval(()=>{
   const now = Date.now();
   const gap = now - _hbLast;
   _hbLast   = now;
-  if(gap > 1500 && user) _pwaResume();
+  if(gap > 1500 && user) _pwaResume('heartbeat-gap');
 }, 1000);
 
-// visibilitychange: fires when app returns to foreground (tab switch, lock screen, app switcher).
-// iOS PWA is the critical case — the OS silently kills the Supabase Realtime WebSocket even
-// during a brief background. We therefore rebuild Realtime completely on every foreground
-// event, not just load data. This guarantees a live connection whenever the user is looking.
+// visibilitychange / focus: fire when app returns to foreground (tab switch, lock
+// screen, app switcher). iOS standalone PWAs are the critical case — the OS can
+// silently kill the Supabase Realtime WebSocket (and leave the HTTP pool stale)
+// even during a brief background, and visibilitychange itself is not fully
+// trustworthy in standalone mode — so `focus` is wired to the same debounced
+// handler as a second, independent trigger.
 let _lastVisRefresh = 0;
-document.addEventListener('visibilitychange', function(){
+function _onForegroundSignal(){
   if(document.visibilityState !== 'visible') return;
   if(!user) return;
-  if(_hbBusy) return; // _pwaResume is already doing a full rebuild — don't race it
+  if(_hbBusy) return; // a hard reconnect is already running — don't race it
   const now = Date.now();
-  if(now - _lastVisRefresh < 5000) return; // debounce — don't rebuild on rapid switches
+  if(now - _lastVisRefresh < 5000) return; // debounce — don't rebuild on rapid switches/duplicate events
   _lastVisRefresh = now;
-  // Tear down old (potentially dead) channels and rebuild with fresh subscriptions,
-  // then immediately fetch the latest schedules to catch any missed DB changes.
-  _teardownRealtime()
-    .then(()=>{
-      if(user && !_hbBusy) setupRealtime();
-      return Promise.race([loadSchedules(), new Promise(r=>setTimeout(r,5000))]);
-    })
-    .then(()=>{ renderRota(); renderStaff(); })
-    .catch(()=>{
-      // If teardown failed, still try to pull fresh data
-      Promise.race([loadSchedules(), new Promise(r=>setTimeout(r,5000))])
-        .then(()=>{ renderRota(); renderStaff(); }).catch(()=>{});
-    });
-});
+  _hardReconnect('foreground-signal');
+}
+document.addEventListener('visibilitychange', _onForegroundSignal);
+window.addEventListener('focus', _onForegroundSignal);
 
 // iOS bfcache restore
-window.addEventListener('pageshow', e=>{ if(e.persisted && user) _pwaResume(); });
+window.addEventListener('pageshow', e=>{ if(e.persisted && user) _pwaResume('bfcache-restore'); });
 
 // Periodic soft-sync (every 8s) — catches Realtime events silently missed while the
 // app stays in the foreground but the WebSocket drops without triggering a status event.
 // Runs as long as user is logged in, visible, and no saves are actively in-flight.
-// (Note: _hbBusy is intentionally NOT a skip condition — the poll is a lightweight
-//  DB read and can safely overlap with a PWA resume that is rebuilding Realtime.)
+// (Note: _hbBusy is intentionally NOT a skip condition for the plain data poll below —
+//  it's a lightweight DB read and can safely overlap with a hard reconnect in progress.
+//  It IS checked before triggering a *new* hard reconnect, to avoid piling them up.)
 let _lastPeriodicSync = 0;
+let _pollTimeouts = 0; // consecutive loadSchedules() timeouts — signals a stale HTTP pool, not just a dead channel
 setInterval(function(){
   if(!user) return;
   if(document.visibilityState !== 'visible') return;
+
+  // Standalone-only unconditional safety net: force a full hard reconnect on a fixed
+  // cadence regardless of whether any event-driven signal above fired. iOS standalone
+  // PWAs can silently degrade (stale sockets/HTTP pool) without ever producing a
+  // heartbeat-freeze gap, a zombie-channel silence, or a visibilitychange/focus event —
+  // this bounds worst-case staleness to ~90s even when every other detector misses it.
+  if(IS_STANDALONE && !_hbBusy){
+    const sinceHard = Date.now() - (_lastHardReconnect || _sessionStartedAt || Date.now());
+    if(sinceHard > 90000){ _hardReconnect('standalone-safety-net'); return; }
+  }
+
   if(_pendingSaves > 0) return; // skip while saves are actively in flight
   const now = Date.now();
   if(now - _lastPeriodicSync < 6500) return; // safety guard against drift
   _lastPeriodicSync = now;
 
   // Zombie-channel detector: if we've been subscribed for > 30s with zero Realtime
-  // events, the WebSocket may be silently dead. Tear down cleanly and rebuild.
+  // events, the WebSocket may be silently dead. Escalate straight to a full hard
+  // reconnect (fresh client + fresh socket) rather than resubscribing channels on the
+  // same client — if the client's own socket/HTTP pool is the wedged part (the v133/
+  // v226 failure mode), resubscribing on it doesn't help.
   // (20s threshold catches dead iOS PWA connections quickly.)
   const timeSinceEvent = now - _lastRealtimeEvent;
   const timeSinceLogin = now - (_sessionStartedAt || now);
-  if(_realtimeSetup && timeSinceLogin > 30000 && timeSinceEvent > 20000){
-    console.warn('cc: No Realtime events in 20s — zombie channel detected, rebuilding subscriptions');
-    _lastRealtimeEvent = now; // reset before teardown so we don't re-trigger during async removal
-    _teardownRealtime().then(()=>{
-      if(user) setupRealtime();
-    }).catch(()=>{
-      _realtimeSetup = false;
-      if(user) setupRealtime();
-    });
+  if(_realtimeSetup && timeSinceLogin > 30000 && timeSinceEvent > 20000 && !_hbBusy){
+    console.warn('cc: No Realtime events in 20s — zombie channel detected, hard-reconnecting');
+    _lastRealtimeEvent = now; // reset before reconnect so we don't re-trigger mid-flight
+    _hardReconnect('zombie-channel');
+    return;
   }
 
-  Promise.race([loadSchedules(), new Promise(r=>setTimeout(r,5000))])
-    .then(()=>renderRota())
+  Promise.race([loadSchedules(), new Promise(r=>setTimeout(r,5000)).then(()=>'__timeout__')])
+    .then((r)=>{
+      if(r==='__timeout__'){
+        _pollTimeouts++;
+        // Two consecutive silent timeouts on a plain data fetch (not the Realtime
+        // channel) means the client's HTTP pool itself is likely stale — the same
+        // failure mode _hardReconnect exists to fix. Escalate instead of quietly
+        // polling forever against a dead connection.
+        if(_pollTimeouts >= 2 && !_hbBusy){ _pollTimeouts = 0; _hardReconnect('poll-timeout'); return; }
+      }else{
+        _pollTimeouts = 0;
+      }
+      renderRota();
+    })
     .catch(()=>{});
 }, 8000);
 </script>
@@ -5148,11 +5207,20 @@ function _showUpdateBanner(){
 async function _applyUpdate(){
   var btn = document.querySelector('#update-banner button');
   if(btn){ btn.textContent = 'Saving…'; btn.disabled = true; }
-  // 1. Push all local data to Supabase before wiping anything
-  try{ await syncAll(); }catch(e){}
+  // 1. Push all local data to Supabase before wiping anything. Bounded to 8s —
+  // syncAll() has its own internal per-step timeouts but they run sequentially and
+  // can add up to ~40s worst case. If the connection is what's actually broken (the
+  // exact scenario this button exists to recover from), "Update" shouldn't hang that
+  // long before it ever reaches the reload below.
+  try{ await Promise.race([syncAll(), new Promise(r=>setTimeout(r,8000))]); }catch(e){}
   if(btn) btn.textContent = 'Updating…';
   // 2. Wipe all caches and unregister SW so reload fetches fresh from network
   try{
+    // Belt-and-suspenders: explicitly disconnect the realtime socket too. A full
+    // reload should already tear this down, but on iOS standalone PWAs a plain
+    // reload has been observed to not fully clear a wedged connection — see the
+    // v226 hard-reconnect fix above for the actual root cause this addresses.
+    try{ db.realtime.disconnect(1000,'apply-update'); }catch(e){}
     if('caches' in window){
       var keys = await caches.keys();
       await Promise.all(keys.map(function(k){ return caches.delete(k); }));
