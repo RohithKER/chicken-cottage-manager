@@ -1184,7 +1184,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 229; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 230; // ← bump this on every deploy — auto-shows in Settings
 // Detect an installed iOS/Android Home Screen PWA — Realtime/network behave very
 // differently here vs a normal browser tab (see the v226 fix in the reconnect logic
 // below), so several recovery paths branch on this.
@@ -1939,7 +1939,12 @@ function _saveEarlyCache(obj){try{localStorage.setItem(_EARLY_CACHE_KEY,JSON.str
 function _earlyKey(wk,day){return`${wk}|${day}`;}
 function getEarlyMap(off,day){
   const k=_earlyKey(weekKey(off),day);
-  return state.earlyShift[k]||new Map();
+  const v=state.earlyShift[k];
+  // v230 defensive guard: every render reads this via .get(name), so it must always be a real
+  // Map. The known way this went wrong (a Realtime handler building a Set instead) is fixed at
+  // its source above, but this choke point guarantees a throw here can never happen again even
+  // if some other future path puts the wrong shape in state.earlyShift.
+  return (v instanceof Map)?v:new Map();
 }
 function getEarlySet(off,day){return new Set(getEarlyMap(off,day).keys());}
 function getEarlyTime(off,day,name){return getEarlyMap(off,day).get(name)||null;}
@@ -3980,6 +3985,20 @@ function setupRealtime(){
   }
 
   // Early shift changes — update tags live across all devices
+  // v230 — the actual cause of "Rota render error: earlyMap.get is not a function", firing on
+  // EVERY save: saveShift() unconditionally calls saveEarlyToCloud() for every shift save (even
+  // when early-shift assignments didn't change), which writes to the shift_early table — and
+  // Supabase echoes that write straight back to this same channel, including to the device that
+  // made it. This handler then rebuilt state.earlyShift[k] as `new Set(r.staff_names||[])` — a
+  // Set, not a Map, and it silently dropped r.staff_times entirely. Every other place that
+  // builds this data (loadEarlyShift(), _setEarlyMap()) uses a Map of name→time, and every
+  // render reads it with earlyMap.get(name) — which a Set doesn't have (WebKit's "not a
+  // function", not "cannot read property of undefined", because the Set itself is a real
+  // object, just the wrong kind). So the very first save after a fresh load corrupted this key,
+  // and every render from then on threw immediately, for BOTH inside and delivery (the v228 fix
+  // isolated the two renders from EACH OTHER, but couldn't help when both throw the same error)
+  // — until a refresh/reconnect rebuilt state.earlyShift from scratch via the correct Map path.
+  // Fix: build it the same way loadEarlyShift() does — a real Map, times included.
   const _earlyCh=db.channel('cc-early')
     .on('postgres_changes',{event:'*',schema:'public',table:'shift_early'},payload=>{
       const r=payload.new||payload.old;
@@ -3988,10 +4007,14 @@ function setupRealtime(){
       if(payload.eventType==='DELETE'){
         delete state.earlyShift[k];
       }else{
-        state.earlyShift[k]=new Set(r.staff_names||[]);
+        const names=r.staff_names||[];
+        const times=r.staff_times||{};
+        const m=new Map();
+        names.forEach(n=>m.set(n,times[n]||EARLY_DEFAULT_TIME));
+        state.earlyShift[k]=m;
       }
       const toCache={};
-      Object.entries(state.earlyShift).forEach(([ck,s])=>{toCache[ck]=[...s];});
+      Object.entries(state.earlyShift).forEach(([ck,m])=>{toCache[ck]=Object.fromEntries(m);});
       _saveEarlyCache(toCache);
       renderRota();
     })
