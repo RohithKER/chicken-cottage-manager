@@ -1184,7 +1184,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 228; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 229; // ← bump this on every deploy — auto-shows in Settings
 // Detect an installed iOS/Android Home Screen PWA — Realtime/network behave very
 // differently here vs a normal browser tab (see the v226 fix in the reconnect logic
 // below), so several recovery paths branch on this.
@@ -4012,8 +4012,20 @@ function setupRealtime(){
 /* ─── Init ───────────────────────────────────────────── */
 let _sessionStarting=false; // guard against concurrent _startSession calls (e.g. token refresh)
 let _sessionStartedAt=0;   // timestamp when the current session fully loaded (used by zombie-channel detector)
+// v229 — "Early shifts loaded" (and everything else _startSession/loadFromCloud touches) was
+// being logged TWICE back-to-back on every single app launch. Root cause: init() called
+// _startSession() directly from its own getSession() check, THEN immediately registered an
+// onAuthStateChange listener that ALSO calls _startSession() on a 'SIGNED_IN' event — and
+// Supabase fires that listener once with the current session state right away. _sessionStarting
+// only blocks CONCURRENT/overlapping calls, not this back-to-back sequential double-fire, so the
+// entire loadPermissions → loadFromCloud → loadEarlyShift chain ran twice every time. Guard by
+// user id so a redundant "start session for the user we already fully loaded" is a cheap no-op
+// instead of a full duplicate reload. Reset to null on sign-out so a genuine future sign-in
+// still does a full load.
+let _sessionStartedForUser=null;
 async function _startSession(u){
   if(_sessionStarting)return;
+  if(_sessionStartedForUser===u.id){ showScreen('main'); return; }
   _sessionStarting=true;
   try{
     user=u;
@@ -4056,6 +4068,7 @@ async function _startSession(u){
     _sessionStartedAt=Date.now();
     _lastRealtimeEvent=Date.now(); // give channels grace before zombie check fires
     _retryPendingOnLoad();
+    _sessionStartedForUser=u.id; // fully loaded — a redundant _startSession(u) call is now a no-op
     // Check if a newer version has been published — forces stale PWA builds to update.
     // Fire-and-forget: if we ARE on the latest version, publish it so older clients auto-reload.
     _checkAndPublishVersion().catch(()=>{});
@@ -4077,6 +4090,7 @@ async function init(){
       await _startSession(session.user);
     }else if(event==='SIGNED_OUT'){
       _userStatus='';
+      _sessionStartedForUser=null; // allow a genuine future sign-in to do a full load again
       showScreen('auth');
     }
   });
@@ -4973,6 +4987,18 @@ init();
 let _hbLast = Date.now();
 let _hbBusy  = false;
 let _lastHardReconnect = 0;
+// v229 — a full hard reconnect got re-triggered every ~2s in a sustained back-to-back loop on
+// at least one device (visible as "Early shifts loaded" — one of the steps a hard reconnect
+// runs — repeating every couple of seconds in the Activity Log for about 12s straight). Likely
+// cause: if the browser throttles/coalesces the 1s heartbeat interval to fire every ~2s (a real
+// thing on backgrounded/power-saving mobile tabs), EVERY tick sees gap>1500ms and re-triggers
+// _hardReconnect the instant the previous one finishes — a self-sustaining loop, and each of
+// those full client-recreate cycles is itself real work (new WS connection, several fetches),
+// so a runaway loop like this is wasted battery/network at best and could contribute to the
+// exact connection exhaustion this whole reconnect logic exists to prevent. Circuit-breaker:
+// refuse to start another hard reconnect within _HARD_RECONNECT_MIN_GAP_MS of the last one
+// finishing, regardless of which trigger (heartbeat/zombie/focus/safety-net/poll-timeout) fired.
+const _HARD_RECONNECT_MIN_GAP_MS = 15000;
 
 // Full-strength recovery: disconnect + discard the current Supabase client's
 // Realtime socket, create a fresh client, re-verify the session, and rebuild
@@ -4981,6 +5007,10 @@ let _lastHardReconnect = 0;
 // the client's own socket/HTTP pool is the wedged part (the v133 failure mode).
 async function _hardReconnect(reason){
   if(_hbBusy || !user) return;
+  if(_lastHardReconnect && (Date.now()-_lastHardReconnect) < _HARD_RECONNECT_MIN_GAP_MS){
+    console.log(`cc: hard reconnect (${reason}) skipped — ${Date.now()-_lastHardReconnect}ms since the last one`);
+    return;
+  }
   _hbBusy = true;
   _lastHardReconnect = Date.now();
   console.log('cc: hard reconnect —', reason);
@@ -5006,7 +5036,7 @@ async function _hardReconnect(reason){
 
     // 4. Re-register auth state listener on the new client (old one was on old db instance)
     db.auth.onAuthStateChange((event,sess)=>{
-      if(event==='SIGNED_OUT'){user=null;showScreen('auth');}
+      if(event==='SIGNED_OUT'){user=null;_sessionStartedForUser=null;showScreen('auth');}
     });
 
     // 5. Set up realtime fresh on the new client.
