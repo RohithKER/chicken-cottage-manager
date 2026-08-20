@@ -1184,7 +1184,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 227; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 228; // ← bump this on every deploy — auto-shows in Settings
 // Detect an installed iOS/Android Home Screen PWA — Realtime/network behave very
 // differently here vs a normal browser tab (see the v226 fix in the reconnect logic
 // below), so several recovery paths branch on this.
@@ -2305,9 +2305,27 @@ function renderRota(){
     COLS.inside=[...DEFAULT_COLS.inside];
     localStorage.removeItem('cc_cols_inside');
   }
+  // v228 — "I edit Delivery, it saves to Supabase fine, but the screen never updates until
+  // refresh" bug: renderTable('inside');renderTable('delivery'); (or the renderCards
+  // equivalent) ran as ONE unguarded sequential statement. If anything threw partway through
+  // rendering 'inside' — bad staff-colour data, a corrupted early-shift entry, literally
+  // anything — the 'delivery' call right after it was NEVER REACHED, so its grid silently
+  // kept showing whatever HTML it last had. The edit itself (state.schedules + the Supabase
+  // write) was always correct; the on-screen grid just never got the chance to redraw. A
+  // refresh "fixed" it because a fresh load rebuilds state from scratch, sidestepping
+  // whatever in-memory condition triggered the throw — until it happened again. Isolating
+  // each type's render means a failure in one can never silently block the other, and any
+  // real error now surfaces in the console + Activity Log instead of vanishing.
+  const _renderType=(fn,type)=>{
+    try{ fn(type); }
+    catch(e){
+      console.error(`cc: renderRota — rendering '${type}' failed:`,e);
+      try{ logActivity(`Rota render error (${type}): ${e&&e.message||e}`,'error'); }catch(_){}
+    }
+  };
   // Render both types into their own containers — tab switching is instant (just show/hide)
-  if(viewMode==='table'){renderTable('inside');renderTable('delivery');}
-  else{renderCards('inside');renderCards('delivery');}
+  if(viewMode==='table'){ _renderType(renderTable,'inside'); _renderType(renderTable,'delivery'); }
+  else{ _renderType(renderCards,'inside'); _renderType(renderCards,'delivery'); }
 }
 
 function renderCards(type){
