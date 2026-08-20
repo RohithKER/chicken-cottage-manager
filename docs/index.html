@@ -1184,7 +1184,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 226; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 227; // ← bump this on every deploy — auto-shows in Settings
 // Detect an installed iOS/Android Home Screen PWA — Realtime/network behave very
 // differently here vs a normal browser tab (see the v226 fix in the reconnect logic
 // below), so several recovery paths branch on this.
@@ -2005,12 +2005,13 @@ async function loadSchedules(){
   if(_schedErr) logActivity('loadSchedules error: '+_schedErr.message,'error');
   if(data){
     // Merge remote into local — but LOCAL WINS for any shift in the pending queue
-    // (those are shifts saved locally but not yet confirmed by cloud)
+    // (those are shifts saved locally but not yet confirmed by cloud) AND for any
+    // shift confirmed-saved in the last _LOCAL_WINS_MS (v227 — see comment below).
     data.forEach(row=>{
       const k=`${row.schedule_type}|${row.week_key}|${row.day}|${row.shift_col}`;
-      if(!_pendingShiftSet.has(k)){
-        state.schedules[k]=row.staff_names||[];
-      }
+      if(_pendingShiftSet.has(k)) return; // unconfirmed local save in flight — local wins
+      if(Date.now()-(_localSaveTs[k]||0) < _LOCAL_WINS_MS) return; // just-confirmed edit — local wins
+      state.schedules[k]=row.staff_names||[];
     });
     _saveSchedCache(state.schedules);
   }
@@ -2020,6 +2021,18 @@ async function loadSchedules(){
 let _pendingSaves=0;
 const _failedSaves=new Map(); // key->'type|wk|day|col' → save args (in-memory, current session)
 const _localSaveTs={}; // key → Date.now() of last successful cloud save, for Realtime bounce-back protection
+// v227 — "editing it doesn't update live on my own screen, only a refresh/reopen shows it" bug:
+// setShift()/saveShift() already update state.schedules + call renderRota() synchronously and
+// optimistically on save, completely independent of Realtime — that part was already correct.
+// The actual bug: any fetch that was ALREADY in flight before the edit (the 8s periodic poll,
+// a hard-reconnect data reload, syncAll, another loadSchedules() call, etc.) resolves AFTER the
+// edit lands and blindly overwrites state.schedules[k] with the pre-edit snapshot it captured
+// before your save started — reverting the screen right after it briefly showed the correct
+// value. A plain page refresh/minimize-reopen "fixes" it only because the fetch it triggers is
+// issued AFTER the edit, so there's no stale in-flight snapshot left to race against. Guard:
+// treat a just-confirmed local save as authoritative for a grace window, so a stale in-flight
+// read can never clobber it.
+const _LOCAL_WINS_MS = 10000;
 
 // Persistent pending queue — survives force-close. Shifts here are in local cache
 // but not yet confirmed by cloud. On next load, local wins and we auto-retry.
@@ -3788,14 +3801,17 @@ function setupRealtime(){
       if(payload.eventType==='INSERT'||payload.eventType==='UPDATE'){
         const r=payload.new;
         const k=`${r.schedule_type}|${r.week_key}|${r.day}|${r.shift_col}`;
-        // Skip if we have a pending local save for this key — local wins to avoid overwriting in-flight saves
+        const msSinceLocalSave = Date.now() - (_localSaveTs[k] || 0);
         if(!_pendingShiftSet.has(k)){
           if(r.staff_names&&r.staff_names.length>0){
-            state.schedules[k]=r.staff_names;
+            // Skip (v227) if we confirmed a local save for this key within the last
+            // _LOCAL_WINS_MS — an out-of-order/replayed Realtime event (e.g. right after a
+            // v226 hard-reconnect rebuilds the channel) shouldn't be able to stomp a
+            // just-made edit either, same as the in-flight-fetch race fixed in loadSchedules().
+            if(msSinceLocalSave >= _LOCAL_WINS_MS) state.schedules[k]=r.staff_names;
           } else {
             // Only clear if local save was more than 5 s ago — prevents a delayed bounce-back
             // with empty staff_names from wiping a cell we just successfully saved.
-            const msSinceLocalSave = Date.now() - (_localSaveTs[k] || 0);
             if(msSinceLocalSave > 5000) delete state.schedules[k];
           }
         }
