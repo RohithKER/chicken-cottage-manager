@@ -1234,12 +1234,20 @@ body{
 
 <!-- Admin Permissions Panel -->
 <div id="perms-overlay" style="display:none;position:fixed;inset:0;z-index:9700;background:rgba(0,0,0,.75);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);align-items:flex-end;justify-content:center">
-  <div id="perms-sheet" style="width:100%;max-width:480px;background:var(--surface);border-radius:20px 20px 0 0;border-top:1px solid var(--border2);padding:16px 16px calc(env(safe-area-inset-bottom,0px)+20px);max-height:90dvh;display:flex;flex-direction:column;gap:0">
-    <div style="display:flex;align-items:center;justify-content:space-between;padding-bottom:12px;margin-bottom:14px;border-bottom:1px solid var(--border);flex-shrink:0">
-      <div style="font-size:16px;font-weight:700;color:var(--text)">⚙️ Manage Permissions</div>
+  <!-- v256 — header restructured to match the .sh-hdr/.ss-hdr pattern used by every
+       other modal in the app (shift-assign sheet, day-entry sheet): the SHEET itself
+       owns no top/side padding, and the header row owns its own padding:14px 16px 12px
+       + border-bottom instead. Previously the whole sheet had a flat 16px padding with
+       the header just borrowing it, so the title sat right at the sheet's top edge
+       with no dedicated breathing room of its own — and the gear emoji ran straight
+       into the text with nothing but a single, easy-to-miss space character between
+       them. Icon and label are now explicit flex children with a real 8px gap. -->
+  <div id="perms-sheet" style="width:100%;max-width:480px;background:var(--surface);border-radius:20px 20px 0 0;border-top:1px solid var(--border2);padding:0 0 calc(env(safe-area-inset-bottom,0px)+20px);max-height:90dvh;display:flex;flex-direction:column;gap:0">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 12px;border-bottom:1px solid var(--border);flex-shrink:0">
+      <div style="font-size:16px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px"><span>⚙️</span><span>Manage Permissions</span></div>
       <div onclick="closePermsPanel()" style="cursor:pointer;font-size:20px;color:var(--text3);padding:4px 8px">×</div>
     </div>
-    <div id="perms-list" style="overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1;min-height:0;display:flex;flex-direction:column;gap:12px;padding-bottom:8px">
+    <div id="perms-list" style="overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1;min-height:0;display:flex;flex-direction:column;gap:12px;padding:14px 16px 8px">
       <div style="color:var(--text3);font-size:13px;text-align:center;padding:20px">Loading users…</div>
     </div>
   </div>
@@ -1302,7 +1310,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 255; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 256; // ← bump this on every deploy — auto-shows in Settings
 // Detect an installed iOS/Android Home Screen PWA — Realtime/network behave very
 // differently here vs a normal browser tab (see the v226 fix in the reconnect logic
 // below), so several recovery paths branch on this.
