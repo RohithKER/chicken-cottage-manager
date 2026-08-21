@@ -871,8 +871,6 @@ body{
     <button class="type-tab active" id="type-tab-staff" onclick="setType('inside')">Staff</button>
     <button class="type-tab" id="type-tab-delivery" onclick="setType('delivery')">Delivery</button>
     <div style="flex:1"></div>
-    <!-- Save cloud icon -->
-    <button class="cp-btn" id="save-rota-btn" onclick="saveRotaStaffToCloud()" title="Save to cloud" style="padding:0 9px;display:flex;align-items:center;justify-content:center"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg></button>
     <!-- Overflow menu -->
     <div style="position:relative">
       <button class="cp-btn" id="rota-more-btn" onclick="toggleRotaMenu()" title="More" style="font-size:16px;padding:0 9px;letter-spacing:2px">···</button>
@@ -880,6 +878,7 @@ body{
         <div class="rm-item" onclick="shareRota();closeRotaMenu()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg> Share Rota</div>
         <div class="rm-item" onclick="openLog();closeRotaMenu()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> Activity Log</div>
         <div style="height:1px;background:var(--border);margin:4px 0"></div>
+        <div class="rm-item" onclick="saveRotaStaffToCloud();closeRotaMenu()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg> Save to Cloud</div>
         <div class="rm-item" onclick="confirmSyncAll();closeRotaMenu()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> Full Sync (push + pull)</div>
         <div style="height:1px;background:var(--border);margin:4px 0"></div>
         <div class="rm-item" onclick="copyWeek();closeRotaMenu()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy Week</div>
@@ -1237,7 +1236,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 241; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 242; // ← bump this on every deploy — auto-shows in Settings
 // Detect an installed iOS/Android Home Screen PWA — Realtime/network behave very
 // differently here vs a normal browser tab (see the v226 fix in the reconnect logic
 // below), so several recovery paths branch on this.
