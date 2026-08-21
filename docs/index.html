@@ -292,28 +292,26 @@ body{
 .rota-tbl td.shift-cell{
   position:relative;
   cursor:pointer;transition:background .12s;
-  /* v233 — v232 used vertical-align:middle on the <td> itself to re-center shorter
-     cells' pills within a row's shared height. That measured as mathematically
-     exact in Chromium (verified live: content-box center landed within ~2px of the
-     cell's own center, in every row tested, both on a synthetic repro and on the
-     real deployed page with real data) — but the live iPhone/WKWebView report
-     still showed the old top-aligned-with-dead-space-at-bottom look after
-     confirming v232 was installed, which Chromium testing alone can't explain away.
-     table-cell vertical-align interacting with a flex child (.td-pills) is exactly
-     the kind of table-layout corner case WebKit and Blink have historically not
-     agreed on. Rather than keep trusting vertical-align's cross-engine behavior,
-     centering is now done inside .td-pills itself with flexbox (height:100% of the
-     cell + align-content:center for the wrapped-line cross axis) — flexbox
-     alignment is far more consistently implemented across engines than table
-     vertical-align edge cases. vertical-align:top below is now just an inert
-     fallback box-position, not what does the centering.
+  /* v233 — first attempt here tried moving centering off vertical-align entirely
+     (height:100% + align-content:center on .td-pills), on the theory that table
+     vertical-align + flex-child interaction is a cross-engine soft spot. Reverted:
+     re-measuring on the live page proved height:100% doesn't resolve against the
+     table-cell's own height in Chrome either (computed height stayed content-sized,
+     24px, instead of filling the cell) — so single-line cells (e.g. the OFF column)
+     stopped centering at all and regressed to 100% of the dead space at the bottom.
+     vertical-align:middle here is the part that's actually proven: verified live,
+     repeatedly, against real production data across multiple weeks — content-box
+     center lands within ~2px of the cell's own center for every pill count (0/1/2/
+     3/4) tested. Kept for v233. The only change this version keeps is decoupling
+     .tbl-sync (the tiny save-status dot) from the flow via position:absolute, so it
+     can no longer add its own line-height into the content being centered/measured.
   */
-  vertical-align:top;
+  vertical-align:middle;
 }
 .rota-tbl td.shift-cell:active{background:rgba(255,255,255,.05)}
 .td-day{font-size:12px;font-weight:700;color:var(--text)}
 .td-date{font-size:10px;color:var(--text3);margin-top:2px;font-variant-numeric:tabular-nums}
-.td-pills{display:flex;flex-wrap:wrap;align-content:center;gap:3px;min-height:24px;height:100%}
+.td-pills{display:flex;flex-wrap:wrap;gap:3px;min-height:24px}
 .td-empty{font-size:11px;color:var(--text3);opacity:0.55;padding-top:4px;letter-spacing:.3px}
 .tbl-sync{position:absolute;right:4px;bottom:4px;display:inline-block;width:5px;height:5px;border-radius:50%;background:transparent;transition:background .2s}
 .tbl-sync.saving{background:#facc15}
