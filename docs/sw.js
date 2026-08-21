@@ -1,6 +1,6 @@
-/* CC Manager Service Worker — v235 */
+/* CC Manager Service Worker — v236 */
 
-const CACHE = 'cc-v235';
+const CACHE = 'cc-v236';
 const CDN_SUPABASE = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
 
 self.addEventListener('install', event => {
@@ -34,7 +34,7 @@ self.addEventListener('activate', event => {
       .then(async () => {
         // Tell all open pages to reload so they get the fresh HTML immediately
         const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-        clients.forEach(client => client.postMessage({ type: 'SW_UPDATED', version: 235 }));
+        clients.forEach(client => client.postMessage({ type: 'SW_UPDATED', version: 236 }));
       })
   );
 });

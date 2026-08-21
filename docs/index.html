@@ -1211,7 +1211,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 235; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 236; // ← bump this on every deploy — auto-shows in Settings
 // Detect an installed iOS/Android Home Screen PWA — Realtime/network behave very
 // differently here vs a normal browser tab (see the v226 fix in the reconnect logic
 // below), so several recovery paths branch on this.
@@ -1219,6 +1219,37 @@ const IS_STANDALONE = (window.matchMedia && window.matchMedia('(display-mode: st
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.getElementById('app-version-label');
   if(el)el.textContent=`Version ${APP_VERSION}${IS_STANDALONE?' • PWA':''} • Cloud sync`;
+});
+// v236 — temporary on-device diagnostic for the standalone-only bottom-gap bug.
+// Three CSS-only theories (v232/v234/v235) have each shipped clean and each
+// produced zero visible change on the actual device, and a grep for any
+// standalone-conditional CSS/JS (media queries, .is-standalone-style classes,
+// a JS-computed --vh) came back empty — there is no code path in this file that
+// behaves differently in standalone mode other than IS_STANDALONE itself, which
+// only touches a text label and the Realtime reconnect logic, nothing visual.
+// That means the difference is happening inside WebKit's own handling of
+// env(safe-area-inset-bottom) / position:fixed between tab and standalone
+// contexts, which can't be found by reading this file, and can't be reproduced
+// in Chrome at all. Rather than ship a fourth blind CSS guess, this logs the
+// actual numbers WebKit is using on the real device, appended right onto the
+// Settings version line where it's already visible — screenshot Settings and
+// send it back so the next attempt is aimed at real data instead of another
+// theory.
+window.addEventListener('load',()=>{
+  try{
+    const probe=document.createElement('div');
+    probe.style.cssText='position:fixed;bottom:0;left:-9999px;padding-bottom:env(safe-area-inset-bottom,0px);pointer-events:none;';
+    document.body.appendChild(probe);
+    const safeBottomPx=getComputedStyle(probe).paddingBottom;
+    probe.remove();
+    const nav=document.getElementById('bottom-nav');
+    const navRect=nav?nav.getBoundingClientRect():null;
+    const vvH=window.visualViewport?Math.round(window.visualViewport.height):'n/a';
+    const diag=`safe-bottom:${safeBottomPx} innerH:${window.innerHeight} vvH:${vvH} navBottom:${navRect?Math.round(navRect.bottom):'n/a'} gap:${navRect?Math.round(window.innerHeight-navRect.bottom):'n/a'}`;
+    const el=document.getElementById('app-version-label');
+    if(el)el.textContent+=` — ${diag}`;
+    console.log('cc: diag —',diag);
+  }catch(e){ console.error('cc: diag failed',e); }
 });
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
 // Days with early starters and their start time label
