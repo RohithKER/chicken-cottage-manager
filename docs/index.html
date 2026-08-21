@@ -900,6 +900,37 @@ body{
    rather than inventing a new one, since it's an inline full-bleed panel,
    not a floating overlay. */
 #sales-pin-overlay.cc-fade{animation:ccFadeIn .18s ease-out}
+
+/* ─── Round B tap-feedback pass (v258) ───────────────────────
+   Adds :active press feedback to interactive elements that previously had
+   none (instant snap, no visual acknowledgement of the tap). Matches the
+   existing conventions already used elsewhere in this file: a background
+   tint for row/tab-style controls (e.g. .week-nav button:active,
+   .rm-item:active), a scale-down for small round icon buttons (e.g.
+   .cp-btn:active, .cp-swatch:active). */
+.type-tab:active{background:var(--surface2)}
+.vt-btn:active{background:var(--surface2)}
+.nav-btn:active .nav-btn-inner{background:var(--surface2)}
+.staff-color-dot[onclick]{transition:transform .12s}
+.staff-color-dot[onclick]:active{transform:scale(.9)}
+.pill[onclick]{transition:transform .1s}
+.pill[onclick]:active{transform:scale(.94)}
+.breakdown-add{transition:transform .12s}
+.breakdown-add:active{transform:scale(.9)}
+.breakdown-rm{transition:transform .12s,background .12s}
+.breakdown-rm:active{transform:scale(.9);background:rgba(220,60,60,.24)}
+.breakdown-collapse:active{background:var(--surface2)}
+.early-toggle-btn:active{color:var(--text2)}
+#add-driver-btn{transition:opacity .12s}
+#add-driver-btn:active{opacity:.8}
+.dp-toggle-btn{transition:opacity .12s}
+.dp-toggle-btn:active{opacity:.75}
+.dp-remove-btn{transition:background .12s}
+.dp-remove-btn:active{background:rgba(255,107,122,.15)}
+.perm-check-row{transition:opacity .12s}
+.perm-check-row:active{opacity:.6}
+.btn-retry{transition:opacity .12s}
+.btn-retry:active{opacity:.8}
 </style>
 </head>
 <body>
@@ -1369,7 +1400,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 257; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 258; // ← bump this on every deploy — auto-shows in Settings
 // Detect an installed iOS/Android Home Screen PWA — Realtime/network behave very
 // differently here vs a normal browser tab (see the v226 fix in the reconnect logic
 // below), so several recovery paths branch on this.
@@ -1897,7 +1928,7 @@ async function _loadPermsData(){
     const el=document.getElementById('perms-list');
     if(el)el.innerHTML=`<div style="text-align:center;padding:20px">
       <div style="color:var(--red);font-size:13px;margin-bottom:12px">Error: ${e.message}</div>
-      <button onclick="_loadPermsData()" style="background:var(--accent);color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:13px;cursor:pointer">↺ Retry</button>
+      <button class="btn-retry" onclick="_loadPermsData()" style="background:var(--accent);color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:13px;cursor:pointer">↺ Retry</button>
     </div>`;
     console.error('_loadPermsData:',e);
   }
@@ -1956,6 +1987,7 @@ function _buildUserPermRow(u){
 
   fields.forEach(f=>{
     const row=document.createElement('label');
+    row.className='perm-check-row';
     row.style.cssText='display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text2)';
     const cb=document.createElement('input');
     cb.type='checkbox';
@@ -4664,7 +4696,7 @@ function _salesErr(el,msg){
   el.innerHTML=`<div style="text-align:center;padding:40px 16px">
     <div style="font-size:13px;color:var(--red);margin-bottom:6px">Failed to load sales</div>
     <div style="font-size:11px;color:var(--text3);margin-bottom:16px;max-width:240px;margin-left:auto;margin-right:auto">${msg||''}</div>
-    <button onclick="loadSalesWeek()" style="padding:9px 20px;border-radius:8px;border:1px solid var(--border2);background:var(--surface2);color:var(--text2);font-size:13px;cursor:pointer">↺ Retry</button>
+    <button class="btn-retry" onclick="loadSalesWeek()" style="padding:9px 20px;border-radius:8px;border:1px solid var(--border2);background:var(--surface2);color:var(--text2);font-size:13px;cursor:pointer">↺ Retry</button>
   </div>`;
 }
 
@@ -4969,12 +5001,14 @@ function _renderDriverPayments(canEdit=true){
 
       // Paid toggle
       const toggle=document.createElement('button');
+      toggle.className='dp-toggle-btn';
       toggle.style.cssText=`flex:0 0 auto;padding:8px 10px;border-radius:8px;border:none;background:${p.paid?'var(--green)':'#555'};color:#fff;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap`;
       toggle.textContent=p.paid?'Paid':'Unpaid';
       toggle.onclick=()=>{_driverPayments[i].paid=!_driverPayments[i].paid;_renderDriverPayments(true);_rebuildReceiptPreview();};
 
       // Remove button
       const rem=document.createElement('button');
+      rem.className='dp-remove-btn';
       rem.style.cssText='flex:0 0 auto;width:30px;height:30px;border-radius:7px;border:1px solid rgba(255,107,122,.35);background:transparent;color:var(--red);font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0';
       rem.textContent='✕';
       rem.onclick=()=>{_driverPayments.splice(i,1);_renderDriverPayments(true);_rebuildReceiptPreview();};
