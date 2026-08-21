@@ -1279,7 +1279,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 247; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 248; // ← bump this on every deploy — auto-shows in Settings
 // Detect an installed iOS/Android Home Screen PWA — Realtime/network behave very
 // differently here vs a normal browser tab (see the v226 fix in the reconnect logic
 // below), so several recovery paths branch on this.
@@ -1549,16 +1549,24 @@ async function loadPermissions(userId,email){
       _tout
     ]);
     if(!data){
-      // First login — create row
+      // First login — create row. Security fix: this MUST always be the safe
+      // pending/no-permissions shape — the DB's perms_insert policy now only
+      // accepts exactly this shape (status='pending', every capability flag
+      // false) regardless of what the client sends, so a self-insert can never
+      // grant elevated access any more. isHardcodedAdmin used to auto-approve
+      // here client-side, but that was never actually enforced server-side —
+      // anyone could've sent is_admin:true themselves. Real admin grants now
+      // only ever happen through an admin's own approve/update action in the
+      // Manage Permissions panel (perms_update, gated to cc_is_admin()).
       const defaults={
-        user_id:userId,email,status:isHardcodedAdmin?'approved':'pending',
-        is_admin:isHardcodedAdmin,
-        can_edit_rota:isHardcodedAdmin,
-        can_edit_delivery:isHardcodedAdmin,
-        can_edit_staffs:isHardcodedAdmin,
-        can_view_sales:isHardcodedAdmin,
-        can_edit_sales:isHardcodedAdmin,
-        can_edit_settings:isHardcodedAdmin,
+        user_id:userId,email,status:'pending',
+        is_admin:false,
+        can_edit_rota:false,
+        can_edit_delivery:false,
+        can_edit_staffs:false,
+        can_view_sales:false,
+        can_edit_sales:false,
+        can_edit_settings:false,
         can_view_staff_rota:true,
         can_view_driver_rota:true
       };

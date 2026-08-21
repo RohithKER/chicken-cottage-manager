@@ -1,6 +1,6 @@
-/* CC Manager Service Worker — v247 */
+/* CC Manager Service Worker — v248 */
 
-const CACHE = 'cc-v247';
+const CACHE = 'cc-v248';
 const CDN_SUPABASE = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
 
 self.addEventListener('install', event => {
@@ -53,7 +53,7 @@ self.addEventListener('activate', event => {
         // auto-reloads on this message — it only shows the Update/Don't Update
         // popup and waits for the user (see the SW_UPDATED handler there).
         const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-        clients.forEach(client => client.postMessage({ type: 'SW_UPDATED', version: 247 }));
+        clients.forEach(client => client.postMessage({ type: 'SW_UPDATED', version: 248 }));
       })
   );
 });
