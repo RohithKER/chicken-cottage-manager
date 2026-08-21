@@ -1279,7 +1279,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 249; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 250; // ← bump this on every deploy — auto-shows in Settings
 // Detect an installed iOS/Android Home Screen PWA — Realtime/network behave very
 // differently here vs a normal browser tab (see the v226 fix in the reconnect logic
 // below), so several recovery paths branch on this.
@@ -1496,6 +1496,19 @@ let user = null;
 // ─── Permissions ──────────────────────────────────────
 let _perms={is_admin:false,can_edit_rota:false,can_edit_delivery:false,can_edit_staffs:false,can_view_sales:false,can_edit_sales:false,can_edit_settings:false,can_view_staff_rota:true,can_view_driver_rota:true};
 
+// v249 security review (fix 6, low priority): this email is visible to anyone who
+// views the page source — there's no way to truly hide a value from a static
+// client-side file, since anything shipped to the browser is, by definition,
+// public. That's fine here: after fix 1 (locking down user_permissions'
+// self-INSERT policy), this constant no longer grants any real privilege —
+// is_admin is only ever set server-side by cc_is_admin()-gated admin actions now,
+// so listing this email here can't be used to self-escalate. It's purely a
+// client-side UX convenience for the three spots below: preventing the site
+// owner's own account from ever being locked out of the rota view, from being
+// treated as "removed" if their row is ever fat-fingered, or from an optimistic
+// timeout fallback assuming lower access than they actually have. Every one of
+// those is a soft UX nicety, not a security boundary — the DB is the only real
+// gate now.
 const _ADMIN_EMAILS=['rohithkrishna.erumbhapurath@gmail.com'];
 
 // Returns 'pending' | 'approved' — call after loadPermissions resolves
@@ -1613,9 +1626,16 @@ async function loadPermissions(userId,email){
     }
   }catch(e){
     console.warn('loadPermissions:',e);
-    // Network timed out — fall back: hardcoded admins are approved, others get approved
-    // tentatively (they were approved if they have a session). Don't lock them out.
-    _userStatus=isHardcodedAdmin?'approved':'approved';
+    // Network timed out — fall back: everyone gets approved tentatively (they were
+    // approved if they have a session), so a slow network doesn't lock a returning
+    // user out. This is purely a local, optimistic UI state — RLS on every table
+    // still gates real reads/writes by each user's actual DB status and permission
+    // flags regardless of what's set here, so this fallback can't grant any real
+    // access it shouldn't. v249 cleanup: this used to be a
+    // `isHardcodedAdmin?'approved':'approved'` ternary — both branches were
+    // identical, so it never actually distinguished anything; simplified to a
+    // plain assignment with no behavior change.
+    _userStatus='approved';
     if(isHardcodedAdmin){
       _perms={is_admin:true,can_edit_rota:true,can_edit_delivery:true,
               can_edit_staffs:true,can_view_sales:true,can_edit_sales:true,can_edit_settings:true,
