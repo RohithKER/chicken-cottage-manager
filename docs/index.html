@@ -433,9 +433,8 @@ body{
   position:fixed;bottom:0;left:50%;transform:translateX(-50%);
   width:100%;max-width:480px;
   display:flex;
-  background:rgba(22,22,22,0.97);border-top:1px solid var(--border);
+  background:#191919;border-top:1px solid var(--border);
   z-index:20;
-  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
   /* v234 — previously padding-bottom:var(--safe-bottom) lived here. That correctly
      extended the bar's own background down to the true bottom edge on notched/
      home-indicator iPhones, but the tap targets (icon+label inside .nav-btn) kept
@@ -447,6 +446,30 @@ body{
      staying pinned above a growing gap. Requires viewport-fit=cover on the
      <meta name="viewport"> tag to get a non-zero env(safe-area-inset-bottom) at
      all — already present in this file (checked), so no change needed there.
+
+     v238 — a real on-device photo (not just numbers) finally showed what the
+     Chrome-simulated test couldn't: a genuine, visible color seam between the
+     icon row and the strip below it, which really is pure black, not this bar's
+     own color. Re-checked manifest.json: background_color and theme_color are
+     already #191919, and the <meta name="theme-color"> tag matches too — so
+     there's no mismatch in the fields the manifest/meta spec actually exposes.
+     What WAS still slightly off: this rule's own background was a translucent
+     rgba(22,22,22,0.97) over a backdrop-filter blur — technically a hair darker
+     than the app's real #191919 background once blended, and reliant on
+     whatever's scrolled behind it. Changed to a flat, opaque #191919 (byte-
+     identical to manifest/theme-color/body) and dropped the now-pointless
+     backdrop-filter (nothing shows through an opaque background anyway) so
+     there is exactly one dark color used everywhere, top to bottom, with no
+     blending step that could ever drift from it.
+
+     Flagging honestly: if the black strip in the photo is coming from native
+     iOS chrom (the window's own background behind the WebView, outside the
+     page's DOM/CSS/manifest entirely — plausible, since nothing paint-side in
+     this page has explained it despite two rounds of direct, on-device-matching
+     tests), this change won't touch it, and manifest_color changes are also
+     part of the install-time-cached category like the icon itself — may need
+     another remove-and-re-add to even take effect, on top of possibly not
+     being the real mechanism at all.
   */
 }
 .nav-btn{
@@ -1211,7 +1234,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 237; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 238; // ← bump this on every deploy — auto-shows in Settings
 // Detect an installed iOS/Android Home Screen PWA — Realtime/network behave very
 // differently here vs a normal browser tab (see the v226 fix in the reconnect logic
 // below), so several recovery paths branch on this.
