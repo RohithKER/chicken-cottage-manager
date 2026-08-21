@@ -588,8 +588,15 @@ body{
   border-radius:var(--r);padding:8px;
   z-index:40;display:none;min-width:200px;
   box-shadow:0 8px 32px rgba(0,0,0,.4);
+  /* v257 — same fade+scale dropdown technique as #rota-menu: display is toggled
+     by JS (toggleUserMenu/closeUserMenu, mirroring toggleRotaMenu/closeRotaMenu
+     exactly), CSS only ever animates opacity/transform so open AND close both
+     transition smoothly instead of instant-snapping. */
+  opacity:0;transform:scale(.94) translateY(-6px);transform-origin:top right;
+  transition:opacity .16s ease,transform .16s cubic-bezier(.22,.68,0,1);
+  pointer-events:none;
 }
-#user-menu.open{display:block}
+#user-menu.open{opacity:1;transform:scale(1) translateY(0);pointer-events:auto}
 .um-email{font-size:12px;color:var(--text3);padding:6px 8px 10px;border-bottom:1px solid var(--border)}
 .um-item{
   display:flex;align-items:center;gap:8px;
@@ -841,6 +848,58 @@ body{
 #perms-overlay.open{opacity:1;pointer-events:auto}
 #perms-sheet{transform:translateY(40px) scale(.96);transition:transform .22s cubic-bezier(.22,.68,0,1)}
 #perms-overlay.open #perms-sheet{transform:translateY(0) scale(1)}
+
+/* ─── Round A animation pass (v257) ──────────────────────────
+   Brings every remaining "dead" (instant-snap) overlay in line with the
+   fade+scale / fade+slide+scale techniques already established above for
+   #sales-overlay/#sales-sheet and #perms-overlay/#perms-sheet. Same JS
+   choreography throughout: style.display='flex' then (rAF) add .open to
+   open; remove .open then setTimeout(display='none') to close — so this
+   CSS only ever touches opacity/transform/pointer-events, never display. */
+
+/* Centered dialogs — fade + scale-in, 200ms (matches #confirm-overlay,
+   which already used this exact technique before this pass). */
+#update-modal-overlay,#confirm-overlay,#sync-confirm-overlay,#input-dialog-overlay,#generic-confirm-overlay{
+  opacity:0;transition:opacity .2s;pointer-events:none;
+}
+#update-modal-overlay.open,#confirm-overlay.open,#sync-confirm-overlay.open,#input-dialog-overlay.open,#generic-confirm-overlay.open{
+  opacity:1;pointer-events:auto;
+}
+#update-modal-card,#confirm-card,#sync-confirm-card,#input-dialog-card,#generic-confirm-card{
+  transform:scale(.94);transition:transform .2s cubic-bezier(.22,.68,0,1);
+}
+#update-modal-overlay.open #update-modal-card{transform:scale(1)}
+#confirm-overlay.open #confirm-card{transform:scale(1)}
+#sync-confirm-overlay.open #sync-confirm-card{transform:scale(1)}
+#input-dialog-overlay.open #input-dialog-card{transform:scale(1)}
+#generic-confirm-overlay.open #generic-confirm-card{transform:scale(1)}
+
+/* Bottom sheets — fade + slide-up + scale-in, 220ms (matches #sales-sheet
+   and #perms-sheet). */
+#change-pin-overlay,#receipt-overlay,#color-sheet-overlay{
+  opacity:0;transition:opacity .22s;pointer-events:none;
+}
+#change-pin-overlay.open,#receipt-overlay.open,#color-sheet-overlay.open{
+  opacity:1;pointer-events:auto;
+}
+#change-pin-sheet,#receipt-sheet,#color-sheet{
+  transform:translateY(40px) scale(.98);transition:transform .22s cubic-bezier(.22,.68,0,1);
+}
+#change-pin-overlay.open #change-pin-sheet{transform:translateY(0) scale(1)}
+#receipt-overlay.open #receipt-sheet{transform:translateY(0) scale(1)}
+#color-sheet-overlay.open #color-sheet{transform:translateY(0) scale(1)}
+
+/* Activity Log — same bottom-sheet treatment, layered onto its existing base rules. */
+#log-overlay{opacity:0;transition:opacity .22s;pointer-events:none}
+#log-overlay.open{opacity:1;pointer-events:auto}
+#log-panel{transform:translateY(40px) scale(.98);transition:transform .22s cubic-bezier(.22,.68,0,1)}
+#log-overlay.open #log-panel{transform:translateY(0) scale(1)}
+
+/* Sales PIN unlock panel — reuses the app's existing ccFadeIn entrance
+   keyframe (already used for view swaps and rota card/table crossfades)
+   rather than inventing a new one, since it's an inline full-bleed panel,
+   not a floating overlay. */
+#sales-pin-overlay.cc-fade{animation:ccFadeIn .18s ease-out}
 </style>
 </head>
 <body>
@@ -850,7 +909,7 @@ body{
      auto-updating banner with an explicit-choice popup; see the JS at the bottom
      of the file for why every silent auto-reload path was removed. -->
 <div id="update-modal-overlay" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);align-items:center;justify-content:center">
-  <div style="background:#1c1c2e;border:1px solid rgba(255,255,255,.08);border-radius:18px;padding:24px;width:calc(100% - 48px);max-width:340px;box-shadow:0 12px 40px rgba(0,0,0,.6)">
+  <div id="update-modal-card" style="background:#1c1c2e;border:1px solid rgba(255,255,255,.08);border-radius:18px;padding:24px;width:calc(100% - 48px);max-width:340px;box-shadow:0 12px 40px rgba(0,0,0,.6)">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
       <img src="./favicon.png" style="width:38px;height:38px;border-radius:10px;flex-shrink:0" onerror="this.style.display='none'">
       <div>
@@ -1126,7 +1185,7 @@ body{
 
 <!-- ══ CHANGE PIN SHEET ══════════════════════════════ -->
 <div id="change-pin-overlay" onclick="if(event.target===this)closeChangePinSheet()" style="display:none;position:fixed;inset:0;z-index:9600;background:rgba(0,0,0,0.6);align-items:flex-end;justify-content:center">
-  <div style="background:var(--surface);border-radius:20px 20px 0 0;padding:24px;width:100%;max-width:480px;padding-bottom:max(24px,env(safe-area-inset-bottom,0px))">
+  <div id="change-pin-sheet" style="background:var(--surface);border-radius:20px 20px 0 0;padding:24px;width:100%;max-width:480px;padding-bottom:max(24px,env(safe-area-inset-bottom,0px))">
     <div style="text-align:center;margin-bottom:20px">
       <div style="font-size:22px;font-weight:700;letter-spacing:-0.3px" id="change-pin-title">Change Sales PIN</div>
       <div style="font-size:13px;color:var(--text3);margin-top:4px" id="change-pin-sub">Enter a new numeric PIN (4–6 digits)</div>
@@ -1208,7 +1267,7 @@ body{
 
 <!-- Receipt Preview Modal -->
 <div id="receipt-overlay" style="display:none;position:fixed;inset:0;z-index:9600;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);align-items:flex-end;justify-content:center">
-  <div style="width:100%;max-width:480px;background:var(--surface);border-radius:20px 20px 0 0;border-top:1px solid var(--border2);padding:16px 16px 32px;max-height:85dvh;display:flex;flex-direction:column;gap:12px">
+  <div id="receipt-sheet" style="width:100%;max-width:480px;background:var(--surface);border-radius:20px 20px 0 0;border-top:1px solid var(--border2);padding:16px 16px 32px;max-height:85dvh;display:flex;flex-direction:column;gap:12px">
     <div style="display:flex;align-items:center;justify-content:space-between">
       <div style="font-size:15px;font-weight:700;color:var(--text)">Receipt Preview</div>
       <div onclick="closeReceiptModal()" style="cursor:pointer;font-size:20px;color:var(--text3);padding:4px 8px">×</div>
@@ -1310,7 +1369,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 256; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 257; // ← bump this on every deploy — auto-shows in Settings
 // Detect an installed iOS/Android Home Screen PWA — Realtime/network behave very
 // differently here vs a normal browser tab (see the v226 fix in the reconnect logic
 // below), so several recovery paths branch on this.
@@ -1413,7 +1472,9 @@ function pickStaffColor(name,type=null){
   document.getElementById('cp-swatches').innerHTML=COLOR_PALETTE.map(hex=>`
     <div class="cp-swatch${hex===cur?' active':''}" data-hex="${hex}" style="background:${hex}" onclick="selectStaffColor('${hex}')"></div>
   `).join('');
-  document.getElementById('color-sheet-overlay').style.display='flex';
+  const _csOv=document.getElementById('color-sheet-overlay');
+  _csOv.style.display='flex';
+  requestAnimationFrame(()=>_csOv.classList.add('open'));
 }
 function selectStaffColor(hex){
   if(!_cpTarget)return;
@@ -1428,7 +1489,9 @@ function selectStaffColor(hex){
   renderStaff();renderRota();
 }
 function closeColorSheet(){
-  document.getElementById('color-sheet-overlay').style.display='none';
+  const ov=document.getElementById('color-sheet-overlay');
+  ov.classList.remove('open');
+  setTimeout(()=>{ov.style.display='none';},220);
   _cpTarget=null;_cpType=null;
 }
 
@@ -2399,16 +2462,26 @@ function renderActivityLog(){
 }
 function openLog(){
   renderActivityLog();
-  document.getElementById('log-overlay').style.display='flex';
+  const ov=document.getElementById('log-overlay');
+  ov.style.display='flex';
+  requestAnimationFrame(()=>ov.classList.add('open'));
 }
-function closeLog(){document.getElementById('log-overlay').style.display='none';}
+function closeLog(){
+  const ov=document.getElementById('log-overlay');
+  ov.classList.remove('open');
+  setTimeout(()=>{ov.style.display='none';},220);
+}
 
 /* ─── Sync confirm ───────────────────────────────────── */
 function confirmSyncAll(){
-  document.getElementById('sync-confirm-overlay').style.display='flex';
+  const ov=document.getElementById('sync-confirm-overlay');
+  ov.style.display='flex';
+  requestAnimationFrame(()=>ov.classList.add('open'));
 }
 function closeSyncConfirm(){
-  document.getElementById('sync-confirm-overlay').style.display='none';
+  const ov=document.getElementById('sync-confirm-overlay');
+  ov.classList.remove('open');
+  setTimeout(()=>{ov.style.display='none';},200);
 }
 
 /* ─── Generic confirm dialog ────────────────────────────── */
@@ -2420,10 +2493,14 @@ function showGenericConfirm(title, msg, btnLabel, callback){
     closeGenericConfirm();
     callback();
   };
-  document.getElementById('generic-confirm-overlay').style.display='flex';
+  const ov=document.getElementById('generic-confirm-overlay');
+  ov.style.display='flex';
+  requestAnimationFrame(()=>ov.classList.add('open'));
 }
 function closeGenericConfirm(){
-  document.getElementById('generic-confirm-overlay').style.display='none';
+  const ov=document.getElementById('generic-confirm-overlay');
+  ov.classList.remove('open');
+  setTimeout(()=>{ov.style.display='none';},200);
 }
 
 /* ─── Input (prompt replacement) dialog ─────────────────── */
@@ -2436,11 +2513,15 @@ function showInputDialog(title, defaultValue, callback){
     closeInputDialog();
     callback(val);
   };
-  document.getElementById('input-dialog-overlay').style.display='flex';
+  const ov=document.getElementById('input-dialog-overlay');
+  ov.style.display='flex';
+  requestAnimationFrame(()=>ov.classList.add('open'));
   setTimeout(()=>{ input.focus(); input.select(); }, 80);
 }
 function closeInputDialog(){
-  document.getElementById('input-dialog-overlay').style.display='none';
+  const ov=document.getElementById('input-dialog-overlay');
+  ov.classList.remove('open');
+  setTimeout(()=>{ov.style.display='none';},200);
 }
 
 /* ─── Save Rota + Staff to Cloud ─────────────────────── */
@@ -2815,6 +2896,9 @@ function showSalesPinOverlay(onSuccess){
   _buildPinPad();
   const ov=document.getElementById('sales-pin-overlay');
   ov.style.display='flex';
+  ov.classList.remove('cc-fade');
+  void ov.offsetWidth; // restart the entrance animation each time this is shown
+  ov.classList.add('cc-fade');
 }
 
 function cancelPinOverlay(){
@@ -2906,6 +2990,7 @@ function openChangePinSheet(){
   if(sub)sub.textContent=hasPIN?'Enter your current PIN, then choose a new one (4–6 digits)':'Choose a numeric PIN (4–6 digits)';
   const ov=document.getElementById('change-pin-overlay');
   ov.style.display='flex';
+  requestAnimationFrame(()=>ov.classList.add('open'));
   setTimeout(()=>{
     if(hasPIN&&curInput)curInput.focus();
     else if(newInput)newInput.focus();
@@ -2913,7 +2998,9 @@ function openChangePinSheet(){
 }
 
 function closeChangePinSheet(){
-  document.getElementById('change-pin-overlay').style.display='none';
+  const ov=document.getElementById('change-pin-overlay');
+  ov.classList.remove('open');
+  setTimeout(()=>{ov.style.display='none';},220);
 }
 
 async function saveNewPin(){
@@ -3922,8 +4009,20 @@ async function signOut(){
 }
 
 /* ─── User Menu ──────────────────────────────────────── */
-function toggleUserMenu(){document.getElementById('user-menu').classList.toggle('open');}
-function closeUserMenu(){document.getElementById('user-menu').classList.remove('open');}
+function toggleUserMenu(){
+  const m=document.getElementById('user-menu');
+  if(m.classList.contains('open')){closeUserMenu();return;}
+  m.style.display='block';
+  void m.offsetWidth; // force reflow so the fade/scale-in transition actually plays
+  m.classList.add('open');
+}
+function closeUserMenu(){
+  const m=document.getElementById('user-menu');
+  if(!m)return;
+  if(!m.classList.contains('open')){m.style.display='none';return;}
+  m.classList.remove('open');
+  setTimeout(()=>{if(m&&!m.classList.contains('open'))m.style.display='none';},160);
+}
 // Apply saved unique-per-day state on load
 const _sw=document.getElementById('unique-switch-settings');
 if(_sw)_sw.classList.toggle('on',uniquePerDay);
@@ -5201,7 +5300,9 @@ function printDaySales(){
   // Share button: hide if not supported
   const shareBtn=document.getElementById('rcp-share-btn');
   if(shareBtn) shareBtn.style.display=navigator.share?'':'none';
-  document.getElementById('receipt-overlay').style.display='flex';
+  const _rcpOv=document.getElementById('receipt-overlay');
+  _rcpOv.style.display='flex';
+  requestAnimationFrame(()=>_rcpOv.classList.add('open'));
   // Pre-connect silently while user reads the preview — so "Print" taps instantly with no picker
   if(navigator.bluetooth&&navigator.bluetooth.getDevices&&!_btChar){
     const _pn=localStorage.getItem(_BT_NAME_KEY);
@@ -5216,7 +5317,9 @@ function printDaySales(){
 }
 
 function closeReceiptModal(){
-  document.getElementById('receipt-overlay').style.display='none';
+  const ov=document.getElementById('receipt-overlay');
+  ov.classList.remove('open');
+  setTimeout(()=>{ov.style.display='none';},220);
 }
 
 async function copyReceipt(){
@@ -5691,7 +5794,7 @@ setInterval(function(){
 
 <!-- Confirm Dialog -->
 <div id="confirm-overlay" style="display:none;position:fixed;inset:0;z-index:9500;align-items:center;justify-content:center;background:rgba(0,0,0,.6);padding:24px">
-  <div style="width:100%;max-width:320px;background:#252525;border-radius:16px;padding:24px;box-shadow:0 8px 32px rgba(0,0,0,.6)">
+  <div id="confirm-card" style="width:100%;max-width:320px;background:#252525;border-radius:16px;padding:24px;box-shadow:0 8px 32px rgba(0,0,0,.6)">
     <div id="cfm-title" style="font-size:17px;font-weight:700;color:var(--text);margin-bottom:8px"></div>
     <div id="cfm-body" style="font-size:13px;color:var(--text2);line-height:1.5;margin-bottom:20px"></div>
     <div style="display:flex;gap:10px">
@@ -5714,7 +5817,7 @@ setInterval(function(){
 
 <!-- Sync Confirm Dialog -->
 <div id="sync-confirm-overlay">
-  <div style="width:100%;max-width:320px;background:#252525;border-radius:16px;padding:24px;box-shadow:0 8px 32px rgba(0,0,0,.6)">
+  <div id="sync-confirm-card" style="width:100%;max-width:320px;background:#252525;border-radius:16px;padding:24px;box-shadow:0 8px 32px rgba(0,0,0,.6)">
     <div style="font-size:17px;font-weight:700;color:var(--text);margin-bottom:8px">Sync All Data?</div>
     <div style="font-size:13px;color:var(--text2);line-height:1.5;margin-bottom:20px">This will push your local changes to the cloud, then pull the latest rota, staff and sales from all users.</div>
     <div style="display:flex;gap:10px">
@@ -5726,7 +5829,7 @@ setInterval(function(){
 
 <!-- Input Dialog (replaces native prompt() for staff rename) -->
 <div id="input-dialog-overlay" style="display:none;position:fixed;inset:0;z-index:9600;background:rgba(0,0,0,.65);align-items:center;justify-content:center;padding:24px">
-  <div style="width:100%;max-width:320px;background:#252525;border-radius:16px;padding:24px;box-shadow:0 8px 32px rgba(0,0,0,.6)">
+  <div id="input-dialog-card" style="width:100%;max-width:320px;background:#252525;border-radius:16px;padding:24px;box-shadow:0 8px 32px rgba(0,0,0,.6)">
     <div id="inp-dlg-title" style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:12px"></div>
     <input id="inp-dlg-field" type="text" style="width:100%;box-sizing:border-box;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;outline:none;margin-bottom:16px" onkeydown="if(event.key==='Enter')document.getElementById('inp-dlg-ok').click();if(event.key==='Escape')closeInputDialog()">
     <div style="display:flex;gap:10px">
@@ -5738,7 +5841,7 @@ setInterval(function(){
 
 <!-- Generic Confirm Dialog (replaces native confirm() for Paste Week, Clear Week) -->
 <div id="generic-confirm-overlay">
-  <div style="width:100%;max-width:320px;background:#252525;border-radius:16px;padding:24px;box-shadow:0 8px 32px rgba(0,0,0,.6)">
+  <div id="generic-confirm-card" style="width:100%;max-width:320px;background:#252525;border-radius:16px;padding:24px;box-shadow:0 8px 32px rgba(0,0,0,.6)">
     <div id="gc-title" style="font-size:17px;font-weight:700;color:var(--text);margin-bottom:8px"></div>
     <div id="gc-msg" style="font-size:13px;color:var(--text2);line-height:1.5;margin-bottom:20px"></div>
     <div style="display:flex;gap:10px">
@@ -5750,7 +5853,7 @@ setInterval(function(){
 
 <!-- Colour Picker Sheet -->
 <div id="color-sheet-overlay" style="display:none;position:fixed;inset:0;z-index:9000;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.55)" onclick="if(event.target===this)closeColorSheet()">
-  <div style="width:100%;max-width:480px;background:#1a1a2e;border-radius:18px 18px 0 0;padding:20px 20px 32px;box-shadow:0 -4px 24px rgba(0,0,0,.6)">
+  <div id="color-sheet" style="width:100%;max-width:480px;background:#1a1a2e;border-radius:18px 18px 0 0;padding:20px 20px 32px;box-shadow:0 -4px 24px rgba(0,0,0,.6)">
     <div style="width:36px;height:4px;background:#333;border-radius:2px;margin:0 auto 18px"></div>
     <div style="font-size:13px;color:var(--text2);text-align:center;margin-bottom:16px">Choose colour for <strong id="cp-title" style="color:var(--text)"></strong></div>
     <div id="cp-swatches" style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:20px"></div>
@@ -5774,12 +5877,15 @@ function _showUpdateModal(version){
   var sub = document.getElementById('update-modal-sub');
   if(sub) sub.textContent = version ? ('Version ' + version + ' is ready') : 'A new version is ready';
   ov.style.display = 'flex';
+  requestAnimationFrame(()=>ov.classList.add('open'));
 }
 
 function _dismissUpdateModal(){
   _updateDismissedThisSession = true;
   var ov = document.getElementById('update-modal-overlay');
-  if(ov) ov.style.display = 'none';
+  if(!ov) return;
+  ov.classList.remove('open');
+  setTimeout(()=>{ov.style.display = 'none';},200);
 }
 
 // Nuclear update: sync everything to cloud first, then wipe cache + reload from network.
