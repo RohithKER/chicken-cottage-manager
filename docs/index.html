@@ -1302,7 +1302,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 254; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 255; // ← bump this on every deploy — auto-shows in Settings
 // Detect an installed iOS/Android Home Screen PWA — Realtime/network behave very
 // differently here vs a normal browser tab (see the v226 fix in the reconnect logic
 // below), so several recovery paths branch on this.
@@ -1852,7 +1852,13 @@ function _buildUserPermRow(u){
   // column-gap stays wider at 14px so the two columns read as clearly
   // separate, matching that same 14px rhythm rather than the tighter 8px.
   const wrap=document.createElement('div');
-  wrap.style.cssText='background:var(--surface2);border-radius:var(--r);border:1px solid var(--border);overflow:hidden';
+  // flex-shrink:0 is required here, not cosmetic: perms-list is a column flex
+  // container with a capped height (overflow-y:auto), and adding
+  // overflow:hidden to a flex item changes its automatic minimum size from
+  // "min-content" down to 0 (per the flex sizing spec) — without this, the
+  // container was free to crush every card down to ~1 checkbox row tall to
+  // make them all fit, instead of letting perms-list scroll normally.
+  wrap.style.cssText='background:var(--surface2);border-radius:var(--r);border:1px solid var(--border);overflow:hidden;flex-shrink:0';
   const emailDiv=document.createElement('div');
   emailDiv.style.cssText='font-size:13px;font-weight:600;color:var(--text);word-break:break-all;padding:10px 14px;border-bottom:1px solid var(--border)';
   emailDiv.textContent=u.email||u.user_id;
