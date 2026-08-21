@@ -1279,7 +1279,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 246; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 247; // ← bump this on every deploy — auto-shows in Settings
 // Detect an installed iOS/Android Home Screen PWA — Realtime/network behave very
 // differently here vs a normal browser tab (see the v226 fix in the reconnect logic
 // below), so several recovery paths branch on this.
@@ -2579,7 +2579,7 @@ function setViewMode(mode){
   // crossfade feel for the list/table toggle, purely cosmetic.
   const wrap=_currentRotaWrap();
   if(wrap){
-    wrap.classList.remove('cc-fade');
+    wrap.classList.remove('cc-fade','cc-week-l','cc-week-r'); // mutually exclusive with the week-slide animation below
     void wrap.offsetWidth;
     wrap.classList.add('cc-fade');
   }
@@ -2829,7 +2829,7 @@ function changeWeek(d){
     // only from this explicit user action, never from a realtime update.
     const wrap=_currentRotaWrap();
     if(wrap){
-      wrap.classList.remove('cc-week-l','cc-week-r');
+      wrap.classList.remove('cc-week-l','cc-week-r','cc-fade'); // mutually exclusive with the view-toggle fade above
       void wrap.offsetWidth; // restart the animation even if pressed twice in a row
       wrap.classList.add(d>0?'cc-week-l':'cc-week-r');
     }
