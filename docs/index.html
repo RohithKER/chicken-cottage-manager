@@ -205,6 +205,21 @@ body{
 .view.active{display:block}
 #view-rota{padding:0}
 #view-sales.active{display:flex;flex-direction:column;padding:0;height:100%;position:relative;overflow:hidden}
+/* v246 — quick fade+slide when a view/panel becomes visible. Runs purely off
+   display:none→block (or the toggle of a dedicated class below), so it never
+   fires from an unrelated realtime re-render — those only ever touch a view's
+   innerHTML, never its .active class or these fade classes. */
+@keyframes ccFadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.view.active{animation:ccFadeIn .18s ease-out}
+.rota-cards-wrap.cc-fade,.rota-table-wrap.cc-fade{animation:ccFadeIn .18s ease-out}
+/* Week navigation — directional slide matching next/prev arrow pressed.
+   Only ever applied from changeWeek(), an explicit user tap — never from a
+   realtime update, so unrelated schedule changes from other users never
+   trigger this on someone who didn't just navigate weeks. */
+@keyframes ccWeekSlideL{from{opacity:0;transform:translateX(18px)}to{opacity:1;transform:translateX(0)}}
+@keyframes ccWeekSlideR{from{opacity:0;transform:translateX(-18px)}to{opacity:1;transform:translateX(0)}}
+.cc-week-l{animation:ccWeekSlideL .2s ease-out}
+.cc-week-r{animation:ccWeekSlideR .2s ease-out}
 
 /* ─── Day Cards ──────────────────────────────────── */
 .rota-cards-wrap{padding:12px}
@@ -792,6 +807,15 @@ body{
 /* ─── Rota overflow menu ─────────────────────── */
 .rm-item{display:flex;align-items:center;gap:8px;padding:10px 12px;font-size:13px;color:var(--text);cursor:pointer;border-radius:9px;white-space:nowrap;transition:background .1s}
 .rm-item:active{background:var(--surface2)}
+/* v246 — "···" overflow menu: fade + slight scale/slide instead of an instant
+   appear/disappear. transition (not a keyframe) so it also reverses smoothly
+   on close, same technique as the shift-assign modal. */
+#rota-menu{
+  opacity:0;transform:scale(.94) translateY(-6px);transform-origin:top right;
+  transition:opacity .16s ease,transform .16s cubic-bezier(.22,.68,0,1);
+  pointer-events:none;
+}
+#rota-menu.open{opacity:1;transform:scale(1) translateY(0);pointer-events:auto}
 /* ─── Sync-confirm overlay fix ───────────────── */
 #sync-confirm-overlay{position:fixed;inset:0;z-index:9400;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;padding:24px}
 /* ─── Generic confirm overlay ────────────────── */
@@ -1255,7 +1279,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 245; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 246; // ← bump this on every deploy — auto-shows in Settings
 // Detect an installed iOS/Android Home Screen PWA — Realtime/network behave very
 // differently here vs a normal browser tab (see the v226 fix in the reconnect logic
 // below), so several recovery paths branch on this.
@@ -2551,6 +2575,14 @@ function setViewMode(mode){
     document.getElementById(`${t}-table-wrap`).style.display=mode==='table'?'block':'none';
   });
   renderRota();
+  // Subtle fade-in on whichever wrap just became visible — a lightweight
+  // crossfade feel for the list/table toggle, purely cosmetic.
+  const wrap=_currentRotaWrap();
+  if(wrap){
+    wrap.classList.remove('cc-fade');
+    void wrap.offsetWidth;
+    wrap.classList.add('cc-fade');
+  }
 }
 
 /* ─── Navigation ─────────────────────────────────────── */
@@ -2781,11 +2813,27 @@ function setType(t){
   document.getElementById('rota-delivery').style.display=t==='delivery'?'':'none';
 }
 
+function _currentRotaWrap(){
+  // Whichever wrap is actually visible right now, based on type + viewMode
+  const id=`${state.type}-${viewMode==='cards'?'cards':'table'}-wrap`;
+  return document.getElementById(id);
+}
+
 function changeWeek(d){
   state.weekOffset+=d;
   document.getElementById('week-label').textContent=weekLabel(state.weekOffset);
   // Load schedules AND early shifts for the new window — early tags need fresh data too
-  Promise.all([loadSchedules(),loadEarlyShift()]).then(renderRota);
+  Promise.all([loadSchedules(),loadEarlyShift()]).then(()=>{
+    renderRota();
+    // Directional slide matching the arrow pressed — purely cosmetic, applied
+    // only from this explicit user action, never from a realtime update.
+    const wrap=_currentRotaWrap();
+    if(wrap){
+      wrap.classList.remove('cc-week-l','cc-week-r');
+      void wrap.offsetWidth; // restart the animation even if pressed twice in a row
+      wrap.classList.add(d>0?'cc-week-l':'cc-week-r');
+    }
+  });
 }
 
 /* ─── Modal ──────────────────────────────────────────── */
@@ -3585,11 +3633,18 @@ function updatePasteBtn(){
 function toggleRotaMenu(){
   updatePasteBtn();
   const m=document.getElementById('rota-menu');
-  m.style.display=m.style.display==='none'?'block':'none';
+  if(m.classList.contains('open')){closeRotaMenu();return;}
+  m.style.display='block';
+  void m.offsetWidth; // force reflow so the fade/scale-in transition actually plays
+  m.classList.add('open');
 }
 function closeRotaMenu(){
   const m=document.getElementById('rota-menu');
-  if(m)m.style.display='none';
+  if(!m)return;
+  if(!m.classList.contains('open')){m.style.display='none';return;}
+  m.classList.remove('open');
+  // Let the .16s fade/scale-out finish before actually hiding it
+  setTimeout(()=>{if(m&&!m.classList.contains('open'))m.style.display='none';},160);
 }
 // Close rota menu on outside tap
 document.addEventListener('click',function(e){
