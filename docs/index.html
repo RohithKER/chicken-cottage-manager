@@ -958,7 +958,7 @@ body{
       <div class="staff-list" id="sl-delivery"></div>
       <div class="add-form" id="staff-add-panel">
         <label>Add Staff Member</label>
-        <input class="input" id="ns-name" placeholder="Full name" autocorrect="off" autocapitalize="words" style="margin-bottom:8px">
+        <input class="input" id="ns-name" placeholder="Full name" autocorrect="off" autocapitalize="words" maxlength="40" style="margin-bottom:8px">
         <select class="input" id="ns-type">
           <option value="inside">Staff</option>
           <option value="delivery">Delivery</option>
@@ -1279,7 +1279,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 248; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 249; // ← bump this on every deploy — auto-shows in Settings
 // Detect an installed iOS/Android Home Screen PWA — Realtime/network behave very
 // differently here vs a normal browser tab (see the v226 fix in the reconnect logic
 // below), so several recovery paths branch on this.
@@ -1363,7 +1363,11 @@ function applyStaffColors(){
   let css='';
   names.forEach(n=>{
     const hex=getStaffHex(n);const{r,g,b}=hexToRgb(hex);
-    css+=`[data-s="${n}"],.sc-${n}{background:rgba(${r},${g},${b},.18);color:${hex};border-color:rgba(${r},${g},${b},.5)}\n`;
+    // CSS.escape() (not HTML-escaping) — this string is going into a stylesheet
+    // selector, not HTML, so a name containing e.g. a quote or brace needs to be
+    // neutralized as a CSS token, not as markup.
+    const cssName=CSS.escape(n);
+    css+=`[data-s="${cssName}"],.sc-${cssName}{background:rgba(${r},${g},${b},.18);color:${hex};border-color:rgba(${r},${g},${b},.5)}\n`;
   });
   let st=document.getElementById('staff-colors-style');
   if(!st){st=document.createElement('style');st.id='staff-colors-style';document.head.appendChild(st);}
@@ -2276,8 +2280,10 @@ function logActivity(msg,type='info'){
 function renderActivityLog(){
   const el=document.getElementById('log-list');
   if(!el)return;
+  // v249 security fix: log messages embed staff names/emails (user-controlled
+  // free text) — escHtml() before inserting into innerHTML.
   el.innerHTML=_actLog.length?_actLog.map(e=>
-    `<div class="log-entry ${e.type}"><span class="log-time">${e.time}</span><span class="log-msg">${e.msg}</span></div>`
+    `<div class="log-entry ${e.type}"><span class="log-time">${escHtml(e.time)}</span><span class="log-msg">${escHtml(e.msg)}</span></div>`
   ).join(''):'<div class="log-empty">No activity yet</div>';
 }
 function openLog(){
@@ -2449,15 +2455,18 @@ function _buildPillsHtml(type,day,col,staff,earlyMap){
   _prevCellNames[key]=staff.slice();
   const current=staff.map(n=>{
     const et=earlyMap.get(n);
-    const tag=et?`<span class="early-tag">${et}</span>`:'';
+    const tag=et?`<span class="early-tag">${escHtml(et)}</span>`:'';
     const cls=added.includes(n)?'pill pill-pop':'pill';
-    return`<span class="${cls}" style="${pillStyle(n,type)}">${n}${tag}</span>`;
+    // v249 security fix: staff names are free text and were being inserted into
+    // innerHTML completely unescaped — a name containing e.g. an <img onerror=...>
+    // tag would execute in every other logged-in user's browser (stored XSS).
+    return`<span class="${cls}" style="${pillStyle(n,type)}">${escHtml(n)}${tag}</span>`;
   }).join('');
   // Departing names still get rendered for one pass (fading out) even though
   // they're no longer in `staff` — a delayed cleanup pass below removes the
   // actual DOM nodes once the fade finishes. The "empty" fallback text in the
   // callers is shown immediately regardless, so nothing ever looks stuck.
-  const exiting=removed.map(n=>`<span class="pill pill-exit" style="${pillStyle(n,type)}">${n}</span>`).join('');
+  const exiting=removed.map(n=>`<span class="pill pill-exit" style="${pillStyle(n,type)}">${escHtml(n)}</span>`).join('');
   return current+exiting;
 }
 
@@ -2514,10 +2523,11 @@ function renderCards(type){
       const earlyMap=getEarlyMap(state.weekOffset,day);
       const pillsHtml=_buildPillsHtml(type,day,col,staff,earlyMap);
       const pills=staff.length?pillsHtml:(`<span class="empty-label">Tap to assign</span>`+pillsHtml);
-      html+=`<div class="shift-row${col==='OFF'?' off-row':''}" onclick="openModal('${day}','${col}')">
-        <span class="shift-label">${col}</span>
+      // v249 security fix: column names are user-editable free text — escape.
+      html+=`<div class="shift-row${col==='OFF'?' off-row':''}" onclick="openModal('${day}','${escHtml(escJsStr(col))}')">
+        <span class="shift-label">${escHtml(col)}</span>
         <div class="pills-wrap">${pills}</div>
-        <div class="sync-dot" id="dot-${type}-${day}-${col}"></div>
+        <div class="sync-dot" id="dot-${type}-${day}-${escHtml(col)}"></div>
       </div>`;
     });
     html+='</div>';
@@ -2527,9 +2537,13 @@ function renderCards(type){
 
 function renderTable(type){
   const cols=COLS[type];
+  // v249 security fix: column names are user-editable free text (see the column
+  // editor) and were being inserted into innerHTML unescaped — escHtml() the
+  // visible text, and escHtml(escJsStr()) anywhere it's embedded in an inline
+  // onclick JS-string argument.
   let html=`<table class="rota-tbl"><thead><tr>
     <th>Day</th>
-    ${cols.map(c=>`<th${c==='OFF'?' class="off-th"':''}>${c}</th>`).join('')}
+    ${cols.map(c=>`<th${c==='OFF'?' class="off-th"':''}>${escHtml(c)}</th>`).join('')}
   </tr></thead><tbody>`;
   DAYS.forEach((day,di)=>{
     html+=`<tr>
@@ -2542,9 +2556,9 @@ function renderTable(type){
       const earlyMap=getEarlyMap(state.weekOffset,day);
       const pillsHtml=_buildPillsHtml(type,day,col,staff,earlyMap);
       const pills=staff.length?pillsHtml:(`<span class="td-empty">—</span>`+pillsHtml);
-      html+=`<td class="shift-cell${col==='OFF'?' off-cell':''}" onclick="openModal('${day}','${col}')">
+      html+=`<td class="shift-cell${col==='OFF'?' off-cell':''}" onclick="openModal('${day}','${escHtml(escJsStr(col))}')">
         <div class="td-pills">${pills}</div>
-        <span class="tbl-sync" id="tdot-${type}-${day}-${col}"></span>
+        <span class="tbl-sync" id="tdot-${type}-${day}-${escHtml(col)}"></span>
       </td>`;
     });
     html+=`</tr>`;
@@ -2563,11 +2577,15 @@ function renderStaff(){
     if(!state.staff[t]||!state.staff[t].length){
       el.innerHTML='<div style="color:var(--text3);font-size:13px;padding:8px 0">No staff yet</div>';return;
     }
+    // v249 security fix: staff names are free text and were being inserted into
+    // innerHTML unescaped, both as visible text and inside inline onclick JS
+    // strings — escHtml() for display/attribute contexts, escHtml(escJsStr())
+    // wherever a name is embedded inside a single-quoted onclick argument.
     el.innerHTML=state.staff[t].map(n=>`<div class="staff-item">
-      <div class="staff-color-dot" ${canEdit?`onclick="pickStaffColor('${n}','${t}')" style="width:28px;height:28px;border-radius:50%;background:${getStaffHex(n,t)};flex-shrink:0;cursor:pointer;border:2px solid rgba(255,255,255,.2)"`:`style="width:28px;height:28px;border-radius:50%;background:${getStaffHex(n,t)};flex-shrink:0;border:2px solid rgba(255,255,255,.2)"`}></div>
-      <span class="pill" style="${pillStyle(n,t)}${canEdit?';cursor:pointer;user-select:none':''}" ${canEdit?`onclick="renameStaff('${t}','${n}')" title="Tap to rename"`:''}>${n}</span>
+      <div class="staff-color-dot" ${canEdit?`onclick="pickStaffColor('${escHtml(escJsStr(n))}','${t}')" style="width:28px;height:28px;border-radius:50%;background:${getStaffHex(n,t)};flex-shrink:0;cursor:pointer;border:2px solid rgba(255,255,255,.2)"`:`style="width:28px;height:28px;border-radius:50%;background:${getStaffHex(n,t)};flex-shrink:0;border:2px solid rgba(255,255,255,.2)"`}></div>
+      <span class="pill" style="${pillStyle(n,t)}${canEdit?';cursor:pointer;user-select:none':''}" ${canEdit?`onclick="renameStaff('${t}','${escHtml(escJsStr(n))}')" title="Tap to rename"`:''}>${escHtml(n)}</span>
       <div style="flex:1"></div>
-      ${canEdit?`<button class="btn-del" onclick="removeStaff('${t}','${n}')">×</button>`:''}
+      ${canEdit?`<button class="btn-del" onclick="removeStaff('${t}','${escHtml(escJsStr(n))}')">×</button>`:''}
     </div>`).join('');
   });
 }
@@ -2855,12 +2873,13 @@ function openModal(day,col){
   const pool=state.staff[state.type]||[];
   document.getElementById('sh-title').textContent=`${day} — ${col}`;
   document.getElementById('sh-sub').textContent='Tap names to assign to this shift';
+  // v249 security fix: escape staff names — free text hitting innerHTML.
   document.getElementById('picker-list').innerHTML=pool.map(n=>{
     const sel=modalSel.includes(n)?'sel':'';
-    return `<div class="pi ${sel}" onclick="togglePick(this,'${n}')">
+    return `<div class="pi ${sel}" onclick="togglePick(this,'${escHtml(escJsStr(n))}')">
       <div class="pi-check">${sel?'✓':''}</div>
-      <span class="pill" style="${pillStyle(n,state.type)}">${n}</span>
-      <span class="pi-name">${n}</span>
+      <span class="pill" style="${pillStyle(n,state.type)}">${escHtml(n)}</span>
+      <span class="pi-name">${escHtml(n)}</span>
     </div>`;
   }).join('');
   // Early shift section — all days
@@ -2898,9 +2917,13 @@ function _renderEarlySection(day){
     const opts=[`<option value=""${!t?' selected':''}>No early</option>`,
       ...EARLY_TIMES.map(v=>`<option value="${v}"${v===t?' selected':''}>${v}</option>`)
     ].join('');
+    // v249 security fix: escape staff name — free text hitting innerHTML.
+    // Note: escHtml() on the id attribute is safe for the pickEarlyTime lookup
+    // below, since the browser HTML-decodes attribute entities back to the
+    // original string when parsing, so element.id ends up === 'ets-'+n either way.
     return `<div class="early-item">
-      <span class="pill" style="${pillStyle(n,state.type)}">${n}</span>
-      <select class="early-time-sel${t?'':' off'}" id="ets-${n}" onchange="pickEarlyTime('${n}',this.value)">${opts}</select>
+      <span class="pill" style="${pillStyle(n,state.type)}">${escHtml(n)}</span>
+      <select class="early-time-sel${t?'':' off'}" id="ets-${escHtml(n)}" onchange="pickEarlyTime('${escHtml(escJsStr(n))}',this.value)">${opts}</select>
     </div>`;
   }).join('');
 }
@@ -2986,7 +3009,7 @@ function handleOverlay(e){if(e.target===document.getElementById('overlay'))close
 /* ─── Staff CRUD ─────────────────────────────────────── */
 async function addStaff(){
   if(!requirePerm('can_edit_staffs','manage staff'))return;
-  const name=document.getElementById('ns-name').value.trim();
+  const name=sanitizeNameInput(document.getElementById('ns-name').value,40);
   const type=document.getElementById('ns-type').value;
   if(!name){toast('Enter a name');return;}
   // Un-blacklist if they were previously removed
@@ -3099,6 +3122,7 @@ async function purgeStaffFromTypeCloud(name,schedType){
 function renameStaff(type,oldName){
   if(!requirePerm('can_edit_staffs','manage staff'))return;
   showInputDialog(`Rename "${oldName}":`, oldName, function(newName){
+    newName=sanitizeNameInput(newName,40);
     if(!newName||newName===oldName)return;
     _doRenameStaff(oldName, newName);
   });
@@ -3189,9 +3213,10 @@ function refreshColEditorTabs(){
 
 function renderColList(){
   const cols=COLS[colEditorType];
+  // v249 security fix: column names are free text — escHtml() the attribute value.
   document.getElementById('col-list').innerHTML=cols.map((c,i)=>`
     <div class="col-row">
-      <input class="col-input" value="${c}" id="col-inp-${i}" placeholder="Shift name">
+      <input class="col-input" value="${escHtml(c)}" id="col-inp-${i}" placeholder="Shift name" maxlength="20">
       <button class="btn-icon" onclick="removeColRow(${i})" title="Remove">✕</button>
     </div>`).join('');
 }
@@ -3214,7 +3239,7 @@ function saveColEditor(){
   const inputs=document.querySelectorAll('.col-input');
   const newCols=[];
   inputs.forEach(inp=>{
-    const v=inp.value.trim();
+    const v=sanitizeNameInput(inp.value,20);
     if(v)newCols.push(v.toUpperCase());
   });
   if(!newCols.length){toast('Add at least 1 column');return;}
@@ -4608,9 +4633,10 @@ function _renderDriverPayments(canEdit=true){
     const row=document.createElement('div');
     row.style.cssText='display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.04)';
 
-    const driverOpts=drivers.map(d=>`<option value="${d}"${d===p.driver?' selected':''}>${d}</option>`).join('');
+    // v249 security fix: driver names are staff free text — escHtml() before innerHTML.
+    const driverOpts=drivers.map(d=>`<option value="${escHtml(d)}"${d===p.driver?' selected':''}>${escHtml(d)}</option>`).join('');
     const hasDriver=drivers.includes(p.driver);
-    const extraOpt=(!hasDriver&&p.driver)?`<option value="${p.driver}" selected>${p.driver}</option>`:'';
+    const extraOpt=(!hasDriver&&p.driver)?`<option value="${escHtml(p.driver)}" selected>${escHtml(p.driver)}</option>`:'';
 
     if(canEdit){
       // Driver select
@@ -4647,7 +4673,7 @@ function _renderDriverPayments(canEdit=true){
       row.appendChild(toggle);
       row.appendChild(rem);
     } else {
-      row.innerHTML=`<span style="flex:2;font-size:15px;color:var(--text)">${p.driver||'—'}</span>
+      row.innerHTML=`<span style="flex:2;font-size:15px;color:var(--text)">${p.driver?escHtml(p.driver):'—'}</span>
         <span style="flex:1;font-size:15px;color:var(--text)">£${(p.amount||0).toFixed(2)}</span>
         <span style="padding:5px 10px;border-radius:7px;background:${p.paid?'var(--green)':'#555'};color:#fff;font-size:12px;font-weight:700">${p.paid?'Paid':'Unpaid'}</span>`;
     }
@@ -5171,7 +5197,26 @@ function forgetBtPrinter(){
   toast('Printer forgotten — next print will ask again');
 }
 
-function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+// v249 security fix: for values embedded inside a single-quoted inline-JS
+// string literal, e.g. onclick="fn('${...}')". HTML-entity-escaping a quote
+// character (as escHtml alone does) is NOT sufficient here — the browser
+// decodes HTML entities in an attribute value BEFORE handing it to the JS
+// engine, so an entity-escaped quote round-trips back into a real quote and
+// can still break out of the string. Real (non-entity) backslash-escaping
+// survives that decode step untouched, so it must run first; escHtml() is
+// still applied on top of the result for the surrounding HTML attribute
+// (double-quote/</>/&) — see every onclick="...('${escHtml(escJsStr(x))}')"
+// call site below.
+function escJsStr(s){return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\r?\n/g,'\\n');}
+// v249 security fix (defense in depth): the real XSS fix is escaping on the
+// render side above — this just keeps obviously-hostile input (markup
+// characters, absurd lengths) out of staff/column names at the source, so
+// even a hypothetical rendering path that's missed doesn't get handed a full
+// <script> payload to work with. Not a substitute for escHtml() at render.
+function sanitizeNameInput(s,maxLen){
+  return String(s||'').replace(/[<>]/g,'').trim().slice(0,maxLen||40);
+}
 
 // Set logo images from embedded data URI
 (function(){
