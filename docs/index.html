@@ -251,6 +251,14 @@ body{
   font-size:12px;font-weight:600;white-space:nowrap;border:none;color:#fff;
   letter-spacing:0.1px;
 }
+/* v244 — pill enter/exit animation. Applied only to pills a render diff has
+   identified as genuinely new/removed for that one cell (see _buildPillsHtml),
+   never to the whole table, so an unrelated realtime update elsewhere on the
+   grid never replays this. Snappy, no bounce/overshoot — a work tool, not a game. */
+@keyframes pillPopIn{from{opacity:0;transform:scale(.85)}to{opacity:1;transform:scale(1)}}
+@keyframes pillPopOut{from{opacity:1;transform:scale(1)}to{opacity:0;transform:scale(.85)}}
+.pill.pill-pop{animation:pillPopIn .18s ease-out}
+.pill.pill-exit{animation:pillPopOut .18s ease-in forwards;pointer-events:none}
 #pin-dots{transition:transform .08s ease-in-out}
 .empty-label{font-size:12px;color:var(--text3);padding-top:3px;opacity:0.6}
 .sync-dot{
@@ -512,13 +520,16 @@ body{
   width:100%;max-width:480px;background:var(--surface);
   border-radius:22px 22px 0 0;border-top:1px solid var(--border2);
   padding:0 0 calc(20px + var(--safe-bottom));
-  transform:translateY(100%);
-  transition:transform .28s cubic-bezier(.32,.72,0,1);
+  /* v244: slide-up now pairs with a subtle scale so it reads as "growing into
+     place" rather than a flat slide — kept short (220ms) and overshoot-free to
+     stay snappy/professional rather than bouncy. */
+  transform:translateY(60px) scale(.96);
+  transition:transform .22s cubic-bezier(.22,.68,0,1);
   max-height:85dvh;display:flex;flex-direction:column;
   box-shadow:0 -4px 40px rgba(0,0,0,.6);
   will-change:transform;
 }
-#overlay.open #sheet{transform:translateY(0)}
+#overlay.open #sheet{transform:translateY(0) scale(1)}
 .sh-handle{width:40px;height:4px;background:var(--border2);border-radius:2px;margin:12px auto 0;flex-shrink:0}
 .sh-hdr{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 12px;flex-shrink:0;border-bottom:1px solid var(--border)}
 .sh-title{font-size:17px;font-weight:700;letter-spacing:-0.3px}
@@ -871,7 +882,7 @@ body{
       <div id="week-label">This week</div>
       <button onclick="changeWeek(1)">›</button>
     </div>
-    <div class="icon-btn" id="sync-btn" onclick="refreshFromCloud()" title="Refresh data from cloud"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></div>
+    <div class="icon-btn" id="sync-btn" onclick="refreshFromCloud()" title="Refresh data from cloud"><span class="refresh-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></span></div>
     <div class="icon-btn" onclick="toggleUserMenu()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
   </div>
 
@@ -1244,7 +1255,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 243; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 244; // ← bump this on every deploy — auto-shows in Settings
 // Detect an installed iOS/Android Home Screen PWA — Realtime/network behave very
 // differently here vs a normal browser tab (see the v226 fix in the reconnect logic
 // below), so several recovery paths branch on this.
@@ -1888,7 +1899,12 @@ async function loadFromCloud(){
 
 async function syncAll(){
   const btn=document.getElementById('sync-btn');
-  if(btn){btn.classList.add('syncing');btn.title='Syncing…';}
+  // v244: the spin animation targets .refresh-icon (see CSS), not the outer
+  // .icon-btn — this used to add 'syncing' to the wrong element, so the icon
+  // never actually spun during a sync despite the CSS/keyframe existing.
+  const icon=btn?btn.querySelector('.refresh-icon'):null;
+  if(icon)icon.classList.add('syncing');
+  if(btn)btn.title='Syncing…';
   let ok=false;
   logActivity('Sync started…', 'saving');
   const _tout=ms=>new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),ms));
@@ -1941,10 +1957,12 @@ async function syncAll(){
     logActivity('Sync failed: '+(e.message==='timeout'?'timed out':e.message), 'error');
     toast(e.message==='timeout'?'Sync timed out — check connection':'Sync failed — check connection');
   }finally{
+    if(icon)icon.classList.remove('syncing');
     if(btn){
-      btn.classList.remove('syncing');
-      if(ok){btn.textContent='✓';btn.style.color='#4CC4A0';}
-      setTimeout(()=>{if(btn){btn.textContent='↻';btn.style.color='';}},1800);
+      // Tint the (unchanged) icon green briefly on success rather than
+      // swapping its content — the icon is a real SVG now, not a text glyph.
+      if(ok)btn.style.color='#4CC4A0';
+      setTimeout(()=>{if(btn)_updateSaveIndicator();},1800);
       btn.title='Sync all data';
     }
     if(ok)toast('All data synced ✓');
@@ -1983,8 +2001,10 @@ async function refreshFromCloud(){
   }finally{
     if(icon){icon.classList.remove('syncing');}
     if(btn){
-      if(ok){if(icon)icon.textContent='✓';btn.style.color='#4CC4A0';}
-      setTimeout(()=>{if(btn&&icon){icon.textContent='↻';_updateSaveIndicator();}},1800);
+      // Tint the (unchanged) icon green briefly on success rather than
+      // swapping its content — the icon is a real SVG now, not a text glyph.
+      if(ok)btn.style.color='#4CC4A0';
+      setTimeout(()=>{if(btn)_updateSaveIndicator();},1800);
       btn.title='Refresh data from cloud';
     }
     if(ok)toast('Data refreshed ✓');
@@ -2376,7 +2396,52 @@ function setShift(type,off,day,col,names){
 }
 
 /* ─── Render ─────────────────────────────────────────── */
+/* ─── Pill enter/exit animation (v244) ──────────────────
+   Purely a rendering-layer diff — reads/writes only this local cache, never
+   touches state.schedules, Supabase, or the realtime handlers. renderTable()/
+   renderCards() still rebuild every cell's HTML from scratch on every call
+   exactly as before; this only decides, per cell, which names are new since
+   the LAST time that exact cell was rendered, so only the pill(s) that
+   actually changed in that one cell animate — a save on Monday/Morning never
+   replays an animation on Tuesday/Night, and an unrelated realtime update from
+   another user only animates the single cell that update touched. */
+let _prevCellNames={};
+let _rotaHasRenderedBefore=false; // false only for the very first render (app boot) — skip animating everything on load
+let _rotaAnimateThisPass=false;
+
+function _buildPillsHtml(type,day,col,staff,earlyMap){
+  const key=`${type}|${day}|${col}`;
+  const prev=_prevCellNames[key]||[];
+  const added=_rotaAnimateThisPass?staff.filter(n=>!prev.includes(n)):[];
+  const removed=_rotaAnimateThisPass?prev.filter(n=>!staff.includes(n)):[];
+  _prevCellNames[key]=staff.slice();
+  const current=staff.map(n=>{
+    const et=earlyMap.get(n);
+    const tag=et?`<span class="early-tag">${et}</span>`:'';
+    const cls=added.includes(n)?'pill pill-pop':'pill';
+    return`<span class="${cls}" style="${pillStyle(n,type)}">${n}${tag}</span>`;
+  }).join('');
+  // Departing names still get rendered for one pass (fading out) even though
+  // they're no longer in `staff` — a delayed cleanup pass below removes the
+  // actual DOM nodes once the fade finishes. The "empty" fallback text in the
+  // callers is shown immediately regardless, so nothing ever looks stuck.
+  const exiting=removed.map(n=>`<span class="pill pill-exit" style="${pillStyle(n,type)}">${n}</span>`).join('');
+  return current+exiting;
+}
+
 function renderRota(){
+  const animate=_rotaHasRenderedBefore;
+  _rotaAnimateThisPass=animate;
+  _rotaHasRenderedBefore=true;
+  _renderRotaInner();
+  if(animate){
+    // Sweep up any exit-animating ghost pills a little after the .18s fade
+    // finishes. Purely cosmetic DOM tidying — nothing reads these nodes.
+    setTimeout(()=>{document.querySelectorAll('.pill-exit').forEach(el=>el.remove());},240);
+  }
+}
+
+function _renderRotaInner(){
   // Runtime guard: catches COLS corruption that slips past the startup check (e.g. set mid-session)
   if(_hasTimeCol(COLS.inside)){
     console.warn('cc: renderRota — COLS.inside still corrupted, resetting');
@@ -2415,11 +2480,8 @@ function renderCards(type){
     cols.forEach(col=>{
       const staff=getShift(type,state.weekOffset,day,col);
       const earlyMap=getEarlyMap(state.weekOffset,day);
-      const pills=staff.length?staff.map(n=>{
-        const et=earlyMap.get(n);
-        const tag=et?`<span class="early-tag">${et}</span>`:'';
-        return `<span class="pill" style="${pillStyle(n,type)}">${n}${tag}</span>`;
-      }).join(''):`<span class="empty-label">Tap to assign</span>`;
+      const pillsHtml=_buildPillsHtml(type,day,col,staff,earlyMap);
+      const pills=staff.length?pillsHtml:(`<span class="empty-label">Tap to assign</span>`+pillsHtml);
       html+=`<div class="shift-row${col==='OFF'?' off-row':''}" onclick="openModal('${day}','${col}')">
         <span class="shift-label">${col}</span>
         <div class="pills-wrap">${pills}</div>
@@ -2446,13 +2508,8 @@ function renderTable(type){
     cols.forEach(col=>{
       const staff=getShift(type,state.weekOffset,day,col);
       const earlyMap=getEarlyMap(state.weekOffset,day);
-      const pills=staff.length
-        ?staff.map(n=>{
-            const et=earlyMap.get(n);
-            const tag=et?`<span class="early-tag">${et}</span>`:'';
-            return`<span class="pill" style="${pillStyle(n,type)}">${n}${tag}</span>`;
-          }).join('')
-        :`<span class="td-empty">—</span>`;
+      const pillsHtml=_buildPillsHtml(type,day,col,staff,earlyMap);
+      const pills=staff.length?pillsHtml:(`<span class="td-empty">—</span>`+pillsHtml);
       html+=`<td class="shift-cell${col==='OFF'?' off-cell':''}" onclick="openModal('${day}','${col}')">
         <div class="td-pills">${pills}</div>
         <span class="tbl-sync" id="tdot-${type}-${day}-${col}"></span>
@@ -2864,9 +2921,9 @@ function closeModal(){
   const ov=document.getElementById('overlay');
   ov.classList.remove('open');
   // pointer-events:none is set by CSS when .open is removed — no click-through during fade
-  // Don't clear ov.style.display here: let the sheet slide down (0.28s) before hiding
+  // Don't clear ov.style.display here: let the sheet slide down (0.22s) before hiding
   _modalClosedAt=Date.now();
-  setTimeout(()=>{ov.style.display='none';modalCtx=null;},280);
+  setTimeout(()=>{ov.style.display='none';modalCtx=null;},220);
 }
 function handleOverlay(e){if(e.target===document.getElementById('overlay'))closeModal();}
 
