@@ -490,8 +490,11 @@ body{
    8%, and instead of relying on the pill to carry the highlight alone, gave the
    active icon itself a touch more visual weight (slightly heavier stroke) so
    it's doing real work too, closer in spirit to Instagram's outline→filled
-   icon swap without needing a second set of solid icon assets for every tab. */
-.nav-btn.active .nav-btn-inner{background:rgba(91,156,245,0.08)}
+   icon swap without needing a second set of solid icon assets for every tab.
+   v240 — went further per request: removed the pill background entirely.
+   Active state is now carried purely by color (var(--accent)) + the stroke-
+   weight bump added in v239, matching the true Instagram look (no background
+   box at all, just the icon/label itself changing). */
 .nav-icon{display:flex;align-items:center;justify-content:center;width:24px;height:24px}
 .nav-btn.active{color:var(--accent)}
 .nav-btn.active .nav-icon svg{stroke-width:2.4}
@@ -1239,7 +1242,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 239; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 240; // ← bump this on every deploy — auto-shows in Settings
 // Detect an installed iOS/Android Home Screen PWA — Realtime/network behave very
 // differently here vs a normal browser tab (see the v226 fix in the reconnect logic
 // below), so several recovery paths branch on this.
