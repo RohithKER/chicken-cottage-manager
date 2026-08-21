@@ -824,7 +824,23 @@ body{
 /* ─── Sync-confirm overlay fix ───────────────── */
 #sync-confirm-overlay{position:fixed;inset:0;z-index:9400;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;padding:24px}
 /* ─── Generic confirm overlay ────────────────── */
-#generic-confirm-overlay{position:fixed;inset:0;z-index:9500;background:rgba(0,0,0,.65);display:none;align-items:center;justify-content:center;padding:24px}
+/* v253 — was z-index:9500, which sat BELOW #perms-overlay (9700) and the
+   9600-tier sheets (change-pin/receipt/input-dialog). That meant confirming
+   "Remove User" from inside Manage Permissions rendered the confirm dialog
+   behind the panel — visible as a dimmed backdrop with no visible buttons,
+   forcing the admin to close Manage Permissions first to see it. Bumped
+   above every modal that can trigger it (9700 perms-overlay is the highest),
+   staying below update-modal-overlay (9999), which must always win. */
+#generic-confirm-overlay{position:fixed;inset:0;z-index:9800;background:rgba(0,0,0,.65);display:none;align-items:center;justify-content:center;padding:24px}
+/* ─── Manage Permissions open/close animation ── */
+/* v253 — same fade+scale technique as #overlay/#sheet (shift-assign modal)
+   and #rota-menu: opacity + transform transitions (not keyframes) so both
+   open AND close animate smoothly, toggled via a plain .open class exactly
+   like those two. 220ms to match the shift-assign modal's sheet timing. */
+#perms-overlay{opacity:0;transition:opacity .22s;pointer-events:none}
+#perms-overlay.open{opacity:1;pointer-events:auto}
+#perms-sheet{transform:translateY(40px) scale(.96);transition:transform .22s cubic-bezier(.22,.68,0,1)}
+#perms-overlay.open #perms-sheet{transform:translateY(0) scale(1)}
 </style>
 </head>
 <body>
@@ -1218,8 +1234,8 @@ body{
 
 <!-- Admin Permissions Panel -->
 <div id="perms-overlay" style="display:none;position:fixed;inset:0;z-index:9700;background:rgba(0,0,0,.75);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);align-items:flex-end;justify-content:center">
-  <div style="width:100%;max-width:480px;background:var(--surface);border-radius:20px 20px 0 0;border-top:1px solid var(--border2);padding:16px 16px calc(env(safe-area-inset-bottom,0px)+20px);max-height:90dvh;display:flex;flex-direction:column;gap:0">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-shrink:0">
+  <div id="perms-sheet" style="width:100%;max-width:480px;background:var(--surface);border-radius:20px 20px 0 0;border-top:1px solid var(--border2);padding:16px 16px calc(env(safe-area-inset-bottom,0px)+20px);max-height:90dvh;display:flex;flex-direction:column;gap:0">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding-bottom:12px;margin-bottom:14px;border-bottom:1px solid var(--border);flex-shrink:0">
       <div style="font-size:16px;font-weight:700;color:var(--text)">⚙️ Manage Permissions</div>
       <div onclick="closePermsPanel()" style="cursor:pointer;font-size:20px;color:var(--text3);padding:4px 8px">×</div>
     </div>
@@ -1286,7 +1302,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 253; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 254; // ← bump this on every deploy — auto-shows in Settings
 // Detect an installed iOS/Android Home Screen PWA — Realtime/network behave very
 // differently here vs a normal browser tab (see the v226 fix in the reconnect logic
 // below), so several recovery paths branch on this.
@@ -1775,6 +1791,11 @@ async function openPermsPanel(){
   closeUserMenu();
   const overlay=document.getElementById('perms-overlay');
   overlay.style.display='flex';
+  // v253 — same open choreography as openModal()/#overlay: flip display first
+  // (paints at opacity:0 per the CSS default), then add .open on the next
+  // frame so the opacity+transform transition actually has something to
+  // animate from, instead of jumping straight to the end state.
+  requestAnimationFrame(()=>overlay.classList.add('open'));
   _loadPermsData();
 }
 async function _loadPermsData(){
@@ -1812,19 +1833,36 @@ async function _loadPermsData(){
 }
 
 function closePermsPanel(){
-  document.getElementById('perms-overlay').style.display='none';
+  // v253 — mirror closeModal(): drop .open so the fade/scale-out plays, THEN
+  // hide via display:none after the 220ms transition finishes, instead of
+  // cutting the animation off instantly.
+  const overlay=document.getElementById('perms-overlay');
+  overlay.classList.remove('open');
+  setTimeout(()=>{overlay.style.display='none';},220);
 }
 
 function _buildUserPermRow(u){
+  // v253 — spacing polish, values pulled directly from the Sales day-entry
+  // screen's .ss-section/.ss-section-hdr/.ss-row CSS (searched and confirmed
+  // in the stylesheet) rather than eyeballed: card padding lives on a header
+  // + content split (like .ss-section-hdr / .ss-row) instead of one flat 14px
+  // wrap, the horizontal unit is 14px throughout (.ss-section-hdr, .ss-row,
+  // .ss-foot all use it), and the checkbox grid's row-gap is 10px (.ss-row's
+  // own internal gap) instead of the old 8px used for BOTH axes at once —
+  // column-gap stays wider at 14px so the two columns read as clearly
+  // separate, matching that same 14px rhythm rather than the tighter 8px.
   const wrap=document.createElement('div');
-  wrap.style.cssText='background:var(--surface2);border-radius:var(--r);padding:14px;border:1px solid var(--border)';
+  wrap.style.cssText='background:var(--surface2);border-radius:var(--r);border:1px solid var(--border);overflow:hidden';
   const emailDiv=document.createElement('div');
-  emailDiv.style.cssText='font-size:13px;font-weight:600;color:var(--text);margin-bottom:10px;word-break:break-all';
+  emailDiv.style.cssText='font-size:13px;font-weight:600;color:var(--text);word-break:break-all;padding:10px 14px;border-bottom:1px solid var(--border)';
   emailDiv.textContent=u.email||u.user_id;
   wrap.appendChild(emailDiv);
 
+  const content=document.createElement('div');
+  content.style.cssText='padding:12px 14px';
+
   const permsGrid=document.createElement('div');
-  permsGrid.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:8px';
+  permsGrid.style.cssText='display:grid;grid-template-columns:1fr 1fr;row-gap:10px;column-gap:14px';
 
   const fields=[
     {key:'is_admin',label:'Admin'},
@@ -1857,13 +1895,19 @@ function _buildUserPermRow(u){
     permsGrid.appendChild(row);
   });
 
-  wrap.appendChild(permsGrid);
+  content.appendChild(permsGrid);
 
   // Remove user button — hidden for the currently signed-in user
   if(!user||u.user_id!==user.id){
+    // v253 — border-top + padding-top separation instead of a bare margin-top,
+    // matching .ss-foot's own "footer" treatment (border-top:1px solid
+    // var(--border), padding-top scaled to the same 14px unit) so this reads
+    // as a distinct footer action rather than just another cramped row.
+    const rmWrap=document.createElement('div');
+    rmWrap.style.cssText='margin-top:14px;padding-top:14px;border-top:1px solid var(--border)';
     const rmBtn=document.createElement('button');
     rmBtn.textContent='Remove User';
-    rmBtn.style.cssText='margin-top:12px;width:100%;padding:9px;background:transparent;border:1px solid rgba(255,107,122,.4);color:var(--red);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer';
+    rmBtn.style.cssText='width:100%;padding:9px;background:transparent;border:1px solid rgba(255,107,122,.4);color:var(--red);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer';
     rmBtn.onclick=()=>{
       showGenericConfirm(
         'Remove User',
@@ -1897,9 +1941,11 @@ function _buildUserPermRow(u){
         }
       );
     };
-    wrap.appendChild(rmBtn);
+    rmWrap.appendChild(rmBtn);
+    content.appendChild(rmWrap);
   }
 
+  wrap.appendChild(content);
   return wrap;
 }
 
