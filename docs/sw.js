@@ -1,11 +1,21 @@
-/* CC Manager Service Worker — v244 */
+/* CC Manager Service Worker — v245 */
 
-const CACHE = 'cc-v244';
+const CACHE = 'cc-v245';
 const CDN_SUPABASE = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
 
 self.addEventListener('install', event => {
-  // Skip waiting immediately so new versions are never blocked behind stale old ones
-  self.skipWaiting();
+  // v245: do NOT call self.skipWaiting() here. Unconditional skipWaiting() on
+  // install is what let a newly-installed SW become the active controller on
+  // its own — independent of anything the page's update popup decides — which
+  // is exactly why a full close+reopen of the app silently landed on the new
+  // version even when the user had never tapped "Update" (or had tapped
+  // "Don't Update"). A worker installed here now correctly sits in the
+  // "waiting" state until the page explicitly tells it to proceed (see the
+  // 'message' listener below), matching the standard consent-gated PWA update
+  // pattern. The app's own "Update" button (_applyUpdate() in index.html)
+  // doesn't even need that message — it unregisters this registration
+  // entirely and reloads, so the fresh registration that follows has no
+  // active worker to wait behind and activates on its own, exactly as before.
   event.waitUntil(
     caches.open(CACHE).then(cache =>
       Promise.all([
@@ -25,6 +35,13 @@ self.addEventListener('install', event => {
 });
 
 self.addEventListener('activate', event => {
+  // clients.claim() only runs once this worker has actually been allowed to
+  // activate — which, now that install() no longer force-skips waiting, only
+  // happens via the explicit consent path below (or the browser's own default
+  // behaviour of activating a waiting worker once zero clients remain on the
+  // old one, e.g. the app was fully closed everywhere — a separate, lower-level
+  // browser mechanism this file doesn't control). Once activation legitimately
+  // happens, claiming existing clients immediately and notifying them is correct.
   event.waitUntil(
     caches.keys()
       .then(keys => Promise.all(
@@ -32,13 +49,21 @@ self.addEventListener('activate', event => {
       ))
       .then(() => self.clients.claim())
       .then(async () => {
-        // Tell all open pages to reload so they get the fresh HTML immediately
+        // Tell all open pages a new version is active. index.html no longer
+        // auto-reloads on this message — it only shows the Update/Don't Update
+        // popup and waits for the user (see the SW_UPDATED handler there).
         const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-        clients.forEach(client => client.postMessage({ type: 'SW_UPDATED', version: 244 }));
+        clients.forEach(client => client.postMessage({ type: 'SW_UPDATED', version: 245 }));
       })
   );
 });
 
+// v245: the ONLY path that may move a waiting worker past skipWaiting. Nothing
+// in index.html currently sends this message (the "Update" button uses a more
+// thorough unregister+reload approach instead — see the note in install()
+// above), but this listener is kept as the correct, spec-standard hook for
+// consent-gated activation: a waiting worker only ever skips waiting when
+// explicitly told to, never on its own.
 self.addEventListener('message', event => {
   if(event.data === 'SKIP_WAITING') self.skipWaiting();
 });
