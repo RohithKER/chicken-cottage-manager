@@ -709,6 +709,11 @@ body{
 .breakdown-rm{width:28px;height:28px;border-radius:50%;border:none;background:rgba(220,60,60,.12);color:#e05555;font-size:18px;line-height:28px;cursor:pointer;flex-shrink:0;padding:0;text-align:center}
 .breakdown-add{width:36px;height:36px;border-radius:50%;border:none;background:var(--accent);color:#fff;font-size:22px;line-height:36px;cursor:pointer;flex-shrink:0;padding:0;text-align:center}
 .breakdown-collapse{width:100%;margin-top:6px;background:none;border:1px solid var(--border);border-radius:8px;color:var(--text3);font-size:12px;padding:7px;cursor:pointer}
+.cash-bd-hdr{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text3);margin:2px 0 6px}
+.cash-bd-hdr:not(:first-child){margin-top:12px}
+.cash-bd-row .cash-bd-lbl{flex:0 0 40px;font-size:13px;font-weight:600;color:var(--text2);text-align:right}
+.cash-bd-row input{text-align:right}
+.cash-bd-sub{flex:0 0 62px;font-size:12px;color:var(--text3);text-align:right}
 
 /* Day Entry Sheet */
 #sales-overlay{
@@ -1141,7 +1146,8 @@ body{
       <!-- Delivery section -->
       <div class="ss-section">
         <div class="ss-section-hdr">Delivery Platforms</div>
-        <div class="ss-row"><label>Just Eat</label><input type="number" autocomplete="off" id="sd-je" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
+        <div class="ss-row"><div class="ss-row-lbl"><label>Just Eat</label><button class="breakdown-toggle" id="je-toggle" onclick="toggleBreakdown('je')"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="je-badge">Add breakdown</span></button></div><input type="number" autocomplete="off" id="sd-je" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
+        <div id="je-panel" style="display:none" class="breakdown-panel"><div id="je-items"></div><button class="breakdown-collapse" onclick="toggleBreakdown('je')">▲ Collapse</button></div>
         <div class="ss-row"><div class="ss-row-lbl"><label>CC App</label><button class="breakdown-toggle" id="ca-toggle" onclick="toggleBreakdown('ca')"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="ca-badge">Add breakdown</span></button></div><input type="number" autocomplete="off" id="sd-cc" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
         <div id="ca-panel" style="display:none" class="breakdown-panel"><div id="ca-items"></div><button class="breakdown-collapse" onclick="toggleBreakdown('ca')">▲ Collapse</button></div>
         <div class="ss-row"><div class="ss-row-lbl"><label>Uber Eats</label><button class="breakdown-toggle" id="ue-toggle" onclick="toggleBreakdown('ue')"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="ue-badge">Add breakdown</span></button></div><input type="number" autocomplete="off" id="sd-ue" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
@@ -1153,7 +1159,8 @@ body{
       <!-- Payments section -->
       <div class="ss-section">
         <div class="ss-section-hdr">Payments</div>
-        <div class="ss-row"><label>Cash</label><input type="number" autocomplete="off" id="sd-cash" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
+        <div class="ss-row"><div class="ss-row-lbl"><label>Cash</label><button class="breakdown-toggle" id="cash-toggle" onclick="toggleCashBreakdown()"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="cash-badge">Notes/coins breakdown</span></button></div><input type="number" autocomplete="off" id="sd-cash" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
+        <div id="cash-panel" style="display:none" class="breakdown-panel"><div id="cash-items"></div><button class="breakdown-collapse" onclick="toggleCashBreakdown()">▲ Collapse</button></div>
         <div class="ss-row"><div class="ss-row-lbl"><label>Card</label><button class="breakdown-toggle" id="cd-toggle" onclick="toggleBreakdown('cd')"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="cd-badge">Add breakdown</span></button></div><input type="number" autocomplete="off" id="sd-card" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
         <div id="cd-panel" style="display:none" class="breakdown-panel"><div id="cd-items"></div><button class="breakdown-collapse" onclick="toggleBreakdown('cd')">▲ Collapse</button></div>
         <div class="ss-total-row"><label>Day Total</label><div class="ss-total-val" id="sd-day-total" style="color:var(--green)">£0.00</div></div>
@@ -1279,7 +1286,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 250; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 251; // ← bump this on every deploy — auto-shows in Settings
 // Detect an installed iOS/Android Home Screen PWA — Realtime/network behave very
 // differently here vs a normal browser tab (see the v226 fix in the reconnect logic
 // below), so several recovery paths branch on this.
@@ -4542,10 +4549,10 @@ function changeSalesWeek(dir){
   loadSalesWeek();
 }
 
-// ── Order Breakdown (Uber Eats / Deliveroo) ──────────────────────────────────
-let _bdItems={ue:[],dr:[],cd:[],ca:[]};
+// ── Order Breakdown (Just Eat / Uber Eats / Deliveroo / Card / CC App) ───────
+let _bdItems={je:[],ue:[],dr:[],cd:[],ca:[]};
 let _bdFocusNew=false; // flag: focus newly added item row instead of "Add amount"
-let _pendingBd={ue:'',dr:'',cd:'',ca:''}; // tracks live value in "Add amount" input before confirmed
+let _pendingBd={je:'',ue:'',dr:'',cd:'',ca:''}; // tracks live value in "Add amount" input before confirmed
 let _driverPayments=[]; // [{driver:'Name',amount:0,paid:false},...]
 function _updateToggleBtn(f){
   const btn=document.getElementById(f+'-toggle');
@@ -4617,21 +4624,117 @@ function _addBdItemFromInput(f,inp){
 function _syncBdTotal(f){
   const items=_bdItems[f];
   const sum=items.reduce((a,b)=>a+(b||0),0);
-  const fieldId=f==='ue'?'sd-ue':f==='cd'?'sd-card':f==='ca'?'sd-cc':'sd-dr';
+  const fieldId=f==='je'?'sd-je':f==='ue'?'sd-ue':f==='cd'?'sd-card':f==='ca'?'sd-cc':'sd-dr';
   const el=document.getElementById(fieldId);
   // Always update — even when items is empty so stale values are cleared
   if(el){el.value=sum>0?sum.toFixed(2):'';calcDaySales();}
   _updateToggleBtn(f);
 }
 function _resetBreakdown(){
-  _bdItems={ue:[],dr:[],cd:[],ca:[]};
-  ['ue','dr','cd','ca'].forEach(f=>{
+  _bdItems={je:[],ue:[],dr:[],cd:[],ca:[]};
+  ['je','ue','dr','cd','ca'].forEach(f=>{
     const panel=document.getElementById(f+'-panel');
     if(panel)panel.style.display='none';
     _updateToggleBtn(f);
     const items=document.getElementById(f+'-items');
     if(items)items.innerHTML='';
   });
+  _resetCashBreakdown();
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ── Cash Breakdown (UK notes/coins, quantity → auto-calculated total) ───────
+// Same overall pattern as the order breakdowns above (toggle button + collapsible
+// panel that feeds the main total field), but the underlying data model is a
+// quantity-per-denomination object rather than a list of order amounts, since
+// there's no "add another order" concept here — every denomination is always
+// present as one row.
+const CASH_DENOMS=[
+  {key:'n50',label:'\xa350',value:50,group:'Notes'},
+  {key:'n20',label:'\xa320',value:20,group:'Notes'},
+  {key:'n10',label:'\xa310',value:10,group:'Notes'},
+  {key:'n5',label:'\xa35',value:5,group:'Notes'},
+  {key:'c2',label:'\xa32',value:2,group:'Coins'},
+  {key:'c1',label:'\xa31',value:1,group:'Coins'},
+  {key:'p50',label:'50p',value:0.5,group:'Coins'},
+  {key:'p20',label:'20p',value:0.2,group:'Coins'},
+  {key:'p10',label:'10p',value:0.1,group:'Coins'},
+  {key:'p5',label:'5p',value:0.05,group:'Coins'},
+  {key:'p2',label:'2p',value:0.02,group:'Coins'},
+  {key:'p1',label:'1p',value:0.01,group:'Coins'}
+];
+let _cashBd={}; // {n50:qty, n20:qty, ..., p1:qty}
+
+function _updateCashToggleBtn(){
+  const btn=document.getElementById('cash-toggle');
+  const panel=document.getElementById('cash-panel');
+  const badge=document.getElementById('cash-badge');
+  if(!btn||!badge)return;
+  const open=panel&&panel.style.display!=='none';
+  btn.classList.toggle('open',open);
+  const noteCount=CASH_DENOMS.filter(d=>d.group==='Notes').reduce((s,d)=>s+(_cashBd[d.key]||0),0);
+  const coinCount=CASH_DENOMS.filter(d=>d.group==='Coins').reduce((s,d)=>s+(_cashBd[d.key]||0),0);
+  if(noteCount||coinCount){
+    badge.textContent=`${noteCount} note${noteCount!==1?'s':''} \xb7 ${coinCount} coin${coinCount!==1?'s':''}`;
+    btn.classList.add('has-items');
+  }else{
+    badge.textContent='Notes/coins breakdown';
+    btn.classList.remove('has-items');
+  }
+}
+function toggleCashBreakdown(){
+  const panel=document.getElementById('cash-panel');
+  if(!panel)return;
+  const open=panel.style.display==='none';
+  panel.style.display=open?'block':'none';
+  if(open)_renderCashBd();
+  _updateCashToggleBtn();
+}
+function _renderCashBd(){
+  const wrap=document.getElementById('cash-items');
+  if(!wrap)return;
+  wrap.innerHTML='';
+  let curGroup=null;
+  CASH_DENOMS.forEach(d=>{
+    if(d.group!==curGroup){
+      curGroup=d.group;
+      const hdr=document.createElement('div');
+      hdr.className='cash-bd-hdr';
+      hdr.textContent=curGroup;
+      wrap.appendChild(hdr);
+    }
+    const row=document.createElement('div');
+    row.className='breakdown-item cash-bd-row';
+    const lbl=document.createElement('span');
+    lbl.className='cash-bd-lbl';
+    lbl.textContent=d.label;
+    const inp=document.createElement('input');
+    inp.type='number';inp.step='1';inp.min='0';inp.inputMode='numeric';inp.autocomplete='off';inp.style.fontSize='16px';
+    inp.placeholder='0';
+    inp.value=_cashBd[d.key]||'';
+    const sub=document.createElement('span');
+    sub.className='cash-bd-sub';
+    const updateSub=()=>{const qty=_cashBd[d.key]||0;sub.textContent=qty?'\xa3'+(qty*d.value).toFixed(2):'';};
+    inp.oninput=()=>{_cashBd[d.key]=parseInt(inp.value)||0;updateSub();_syncCashBdTotal();};
+    updateSub();
+    row.appendChild(lbl);row.appendChild(inp);row.appendChild(sub);
+    wrap.appendChild(row);
+  });
+}
+function _syncCashBdTotal(){
+  const total=CASH_DENOMS.reduce((sum,d)=>sum+(_cashBd[d.key]||0)*d.value,0);
+  const el=document.getElementById('sd-cash');
+  // Always update — even when everything is zero so stale values are cleared
+  if(el){el.value=total>0?total.toFixed(2):'';calcDaySales();}
+  _updateCashToggleBtn();
+}
+function _resetCashBreakdown(){
+  _cashBd={};
+  const panel=document.getElementById('cash-panel');
+  if(panel)panel.style.display='none';
+  _updateCashToggleBtn();
+  const items=document.getElementById('cash-items');
+  if(items)items.innerHTML='';
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -4742,14 +4845,20 @@ function openDayEntry(dateStr){
   _driverPayments=Array.isArray(r.driver_payments)?r.driver_payments.map(p=>({driver:p.driver||'',amount:parseFloat(p.amount)||0,paid:!!p.paid})):[];
   _renderDriverPayments(canEdit);
   _resetBreakdown();
+  _bdItems.je=(Array.isArray(r.just_eat_items)?r.just_eat_items:[]).map(Number);
   _bdItems.ue=(Array.isArray(r.uber_eats_items)?r.uber_eats_items:[]).map(Number);
   _bdItems.dr=(Array.isArray(r.deliveroo_items)?r.deliveroo_items:[]).map(Number);
   _bdItems.cd=(Array.isArray(r.card_items)?r.card_items:[]).map(Number);
   _bdItems.ca=(Array.isArray(r.cc_app_items)?r.cc_app_items:[]).map(Number);
+  if(_bdItems.je.length)_syncBdTotal('je');
   if(_bdItems.ue.length)_syncBdTotal('ue');
   if(_bdItems.dr.length)_syncBdTotal('dr');
   if(_bdItems.cd.length)_syncBdTotal('cd');
   if(_bdItems.ca.length)_syncBdTotal('ca');
+  _cashBd=(r.cash_breakdown&&typeof r.cash_breakdown==='object')?{...r.cash_breakdown}:{};
+  const _cashBdHasQty=CASH_DENOMS.some(d=>(_cashBd[d.key]||0)>0);
+  if(_cashBdHasQty)_syncCashBdTotal();
+  else _updateCashToggleBtn();
   calcDaySales();
 
   // Show/hide edit controls based on permission
@@ -4772,7 +4881,7 @@ function openDayEntry(dateStr){
 
 function closeDayEntry(){
   // Clear any pending typed-but-unconfirmed breakdown inputs so they can't leak into another day
-  ['ue','dr','cd','ca'].forEach(k=>_pendingBd[k]='');
+  ['je','ue','dr','cd','ca'].forEach(k=>_pendingBd[k]='');
   const ov=document.getElementById('sales-overlay');
   ov.classList.remove('open');
   setTimeout(()=>{ov.style.display='none';},260);
@@ -4808,7 +4917,7 @@ function calcDaySales(){
 
 function _flushPendingBdInputs(){
   // Capture any value typed in "Add amount" but not yet confirmed with Enter/+
-  ['ue','dr','cd','ca'].forEach(f=>{
+  ['je','ue','dr','cd','ca'].forEach(f=>{
     const v=parseFloat(_pendingBd[f])||0;
     if(v){_bdItems[f].push(v);_syncBdTotal(f);}
     _pendingBd[f]='';
@@ -4825,10 +4934,12 @@ async function saveDaySales(){
     deliveroo:getSdVal('sd-dr'),
     cash:getSdVal('sd-cash'),
     card:getSdVal('sd-card'),
+    just_eat_items:_bdItems.je,
     uber_eats_items:_bdItems.ue,
     deliveroo_items:_bdItems.dr,
     card_items:_bdItems.cd,
     cc_app_items:_bdItems.ca,
+    cash_breakdown:_cashBd,
     notes:(document.getElementById('sd-notes')||{}).value||'',
     driver_payments:_driverPayments,
     unlocked_until:_unlockUntilISO() // 6h grace — visible to all accounts after save
