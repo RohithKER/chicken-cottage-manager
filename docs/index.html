@@ -483,13 +483,18 @@ body{
   width:48px;height:30px;border-radius:10px;
   transition:background .2s;
 }
-.nav-btn.active .nav-btn-inner{background:rgba(91,156,245,0.15)}
+/* v239 — toned down toward an Instagram-style minimal active state per request.
+   Removed the ::after underline bar entirely (it was a second, redundant "this
+   one's active" signal stacked on top of the pill + color change, and reads as
+   busy). Softened the background pill from a fairly visible 15% tint down to
+   8%, and instead of relying on the pill to carry the highlight alone, gave the
+   active icon itself a touch more visual weight (slightly heavier stroke) so
+   it's doing real work too, closer in spirit to Instagram's outline→filled
+   icon swap without needing a second set of solid icon assets for every tab. */
+.nav-btn.active .nav-btn-inner{background:rgba(91,156,245,0.08)}
 .nav-icon{display:flex;align-items:center;justify-content:center;width:24px;height:24px}
 .nav-btn.active{color:var(--accent)}
-.nav-btn.active::after{
-  content:'';position:absolute;top:0;left:30%;right:30%;
-  height:2.5px;background:var(--accent);border-radius:0 0 4px 4px;
-}
+.nav-btn.active .nav-icon svg{stroke-width:2.4}
 
 /* ─── Modal / Bottom Sheet ───────────────────────── */
 #overlay{
@@ -1234,7 +1239,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 238; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 239; // ← bump this on every deploy — auto-shows in Settings
 // Detect an installed iOS/Android Home Screen PWA — Realtime/network behave very
 // differently here vs a normal browser tab (see the v226 fix in the reconnect logic
 // below), so several recovery paths branch on this.
