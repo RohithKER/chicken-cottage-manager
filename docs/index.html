@@ -1286,7 +1286,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 251; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 252; // ← bump this on every deploy — auto-shows in Settings
 // Detect an installed iOS/Android Home Screen PWA — Realtime/network behave very
 // differently here vs a normal browser tab (see the v226 fix in the reconnect logic
 // below), so several recovery paths branch on this.
@@ -1501,7 +1501,7 @@ function _reconcileBlacklist(){
 let user = null;
 
 // ─── Permissions ──────────────────────────────────────
-let _perms={is_admin:false,can_edit_rota:false,can_edit_delivery:false,can_edit_staffs:false,can_view_sales:false,can_edit_sales:false,can_edit_settings:false,can_view_staff_rota:true,can_view_driver_rota:true};
+let _perms={is_admin:false,can_edit_rota:false,can_edit_delivery:false,can_edit_staffs:false,can_view_sales:false,can_edit_sales:false,can_edit_settings:false,can_view_staff_rota:true,can_view_driver_rota:true,can_view_staff_tab:true};
 
 // v249 security review (fix 6, low priority): this email is visible to anyone who
 // views the page source — there's no way to truly hide a value from a static
@@ -1539,7 +1539,8 @@ function _applyPermData(data){
     // View-rota perms default to true when undefined so existing users don't lose access before the DB column exists
     // Hardcoded admins always get true regardless of DB value
     can_view_staff_rota:isHardcoded||(data.can_view_staff_rota!==false),
-    can_view_driver_rota:isHardcoded||(data.can_view_driver_rota!==false)
+    can_view_driver_rota:isHardcoded||(data.can_view_driver_rota!==false),
+    can_view_staff_tab:isHardcoded||(data.can_view_staff_tab!==false)
   };
 }
 /* Cache permissions to localStorage so returning users never block on this */
@@ -1592,7 +1593,8 @@ async function loadPermissions(userId,email){
         can_edit_sales:false,
         can_edit_settings:false,
         can_view_staff_rota:true,
-        can_view_driver_rota:true
+        can_view_driver_rota:true,
+        can_view_staff_tab:true
       };
       const ins=await Promise.race([
         db.from('user_permissions').insert(defaults).select().maybeSingle(),
@@ -1646,7 +1648,7 @@ async function loadPermissions(userId,email){
     if(isHardcodedAdmin){
       _perms={is_admin:true,can_edit_rota:true,can_edit_delivery:true,
               can_edit_staffs:true,can_view_sales:true,can_edit_sales:true,can_edit_settings:true,
-              can_view_staff_rota:true,can_view_driver_rota:true};
+              can_view_staff_rota:true,can_view_driver_rota:true,can_view_staff_tab:true};
     }
   }
   _applyPermUI();
@@ -1691,6 +1693,8 @@ function _applyPermUI(){
   if(adminItem)adminItem.style.display=_perms.is_admin?'':'none';
   const salesBtn=document.getElementById('nav-sales');
   if(salesBtn)salesBtn.style.display=(_perms.can_view_sales||_perms.can_edit_sales)?'':'none';
+  const staffBtn=document.getElementById('nav-staff');
+  if(staffBtn)staffBtn.style.display=_perms.can_view_staff_tab?'':'none';
   // Sales edit controls — hidden for view-only users
   const saveSalesBtn=document.getElementById('save-sales-btn');
   if(saveSalesBtn)saveSalesBtn.style.display=canEditSales?'':'none';
@@ -1716,7 +1720,14 @@ function _applyPermUI(){
   // If user is currently viewing rota but has no view perms, kick them to another visible tab
   const rotaView=document.getElementById('view-rota');
   if(rotaView&&rotaView.classList.contains('active')&&!canStaffRota&&!canDriverRota){
-    if(_perms.can_edit_staffs||_perms.is_admin)showView('staff');
+    if((_perms.can_edit_staffs||_perms.is_admin)&&_perms.can_view_staff_tab)showView('staff');
+    else if(_perms.can_view_sales||_perms.can_edit_sales)showView('sales');
+    else showView('settings');
+  }
+  // Same treatment for the Staff tab itself, now gated by its own view permission
+  const staffView=document.getElementById('view-staff');
+  if(staffView&&staffView.classList.contains('active')&&!_perms.can_view_staff_tab){
+    if(canStaffRota||canDriverRota)showView('rota');
     else if(_perms.can_view_sales||_perms.can_edit_sales)showView('sales');
     else showView('settings');
   }
@@ -1814,6 +1825,7 @@ function _buildUserPermRow(u){
     {key:'can_edit_settings',label:'Edit Settings'},
     {key:'can_view_staff_rota',label:'View Staff Rota',defaultTrue:true},
     {key:'can_view_driver_rota',label:'View Driver Rota',defaultTrue:true},
+    {key:'can_view_staff_tab',label:'View Staff Tab',defaultTrue:true},
   ];
 
   fields.forEach(f=>{
@@ -1861,7 +1873,8 @@ function _buildUserPermRow(u){
               can_edit_sales:false,
               can_edit_settings:false,
               can_view_staff_rota:false,
-              can_view_driver_rota:false
+              can_view_driver_rota:false,
+              can_view_staff_tab:false
             }).eq('user_id',u.user_id);
             if(error)throw error;
             toast('User removed ✓');
@@ -2646,6 +2659,10 @@ function showView(v){
     _salesUnlocked=false;
     _updateSalesLockBtn();
   }
+  // Staff tab visibility permission — matches can_view_staff_rota/can_view_driver_rota's
+  // plain-boolean pattern (no is_admin bypass; hardcoded admins get true via
+  // _applyPermData's isHardcoded logic, same safety net those two use).
+  if(v==='staff'&&!_perms.can_view_staff_tab)return;
   _doShowView(v);
 }
 
@@ -3827,7 +3844,7 @@ async function signOut(){
   await db.auth.signOut({scope:'local'});
   // Keep permission cache (keyed to user ID) so re-login is instant with no pending flash
   user=null;
-  _perms={is_admin:false,can_edit_rota:false,can_edit_delivery:false,can_edit_staffs:false,can_view_sales:false,can_edit_sales:false,can_edit_settings:false,can_view_staff_rota:true,can_view_driver_rota:true};
+  _perms={is_admin:false,can_edit_rota:false,can_edit_delivery:false,can_edit_staffs:false,can_view_sales:false,can_edit_sales:false,can_edit_settings:false,can_view_staff_rota:true,can_view_driver_rota:true,can_view_staff_tab:true};
   state.schedules={};
   _saveSchedCache({});
   showScreen('auth');closeUserMenu();
@@ -3966,7 +3983,8 @@ async function approveUser(userId,email){
   const{error}=await db.from('user_permissions').update({
     status:'approved',
     can_view_staff_rota:true,
-    can_view_driver_rota:true
+    can_view_driver_rota:true,
+    can_view_staff_tab:true
   }).eq('user_id',userId);
   if(error){toast('Error: '+error.message);return;}
   toast(`✓ ${email} approved`);
