@@ -196,6 +196,7 @@ body{
   padding:7px 10px;border:none;background:none;
   color:var(--text3);font-size:12px;font-weight:500;cursor:pointer;
   transition:all .15s;white-space:nowrap;min-height:36px;
+  display:flex;align-items:center;justify-content:center;
 }
 .vt-btn.active{background:var(--surface2);color:var(--text);font-weight:700}
 
@@ -570,7 +571,9 @@ body{
 /* Early shift section inside modal */
 .early-toggle-btn{width:100%;text-align:left;background:none;border:none;border-top:1px solid var(--border2);padding:11px 16px;font-size:12px;color:var(--text3);cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:7px;flex-shrink:0;transition:color .15s}
 .early-toggle-btn.active{color:#ffb347}
-.early-chevron{font-size:10px;opacity:.8;margin-left:auto}
+.early-chevron{opacity:.8;margin-left:auto;display:flex;align-items:center}
+.early-chevron svg{transition:transform .2s}
+.early-chevron.up svg{transform:rotate(180deg)}
 .early-section{padding:4px 16px 6px;flex-shrink:0;max-height:220px;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain}
 .early-item{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.04)}
 .early-item:last-child{border-bottom:none}
@@ -1042,8 +1045,8 @@ body{
     </div>
     <!-- View toggle -->
     <div class="view-toggle">
-      <button class="vt-btn active" id="vt-cards" onclick="setViewMode('cards')">☰</button>
-      <button class="vt-btn" id="vt-table" onclick="setViewMode('table')">⊞</button>
+      <button class="vt-btn active" id="vt-cards" onclick="setViewMode('cards')" title="Card view"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
+      <button class="vt-btn" id="vt-table" onclick="setViewMode('table')" title="Table view"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg></button>
     </div>
   </div>
 
@@ -1180,7 +1183,7 @@ body{
         <button onclick="changeSalesWeek(-1)">‹</button>
         <div id="sales-week-label">Loading…</div>
         <button onclick="changeSalesWeek(1)">›</button>
-        <button id="sales-lock-btn" onclick="toggleSalesLock()" style="margin-left:6px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:6px 10px;font-size:16px;cursor:pointer;line-height:1" title="Unlock sales figures">🔒</button>
+        <button id="sales-lock-btn" onclick="toggleSalesLock()" style="margin-left:6px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:6px 10px;font-size:16px;cursor:pointer;line-height:1;display:flex;align-items:center" title="Unlock sales figures"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></button>
       </div>
       <!-- Sales save row -->
       <div style="padding:8px 10px 10px">
@@ -1253,22 +1256,22 @@ body{
       <div class="ss-section">
         <div class="ss-section-hdr">Delivery Platforms</div>
         <div class="ss-row"><div class="ss-row-lbl"><label>Just Eat</label><button class="breakdown-toggle" id="je-toggle" onclick="toggleBreakdown('je')"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="je-badge">Add breakdown</span></button></div><input type="number" autocomplete="off" id="sd-je" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
-        <div id="je-panel" style="display:none" class="breakdown-panel"><div id="je-items"></div><button class="breakdown-collapse" onclick="toggleBreakdown('je')">▲ Collapse</button></div>
+        <div id="je-panel" style="display:none" class="breakdown-panel"><div id="je-items"></div><button class="breakdown-collapse" onclick="toggleBreakdown('je')"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" style="transform:rotate(180deg);margin-right:4px;vertical-align:-1px"><path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Collapse</button></div>
         <div class="ss-row"><div class="ss-row-lbl"><label>CC App</label><button class="breakdown-toggle" id="ca-toggle" onclick="toggleBreakdown('ca')"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="ca-badge">Add breakdown</span></button></div><input type="number" autocomplete="off" id="sd-cc" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
-        <div id="ca-panel" style="display:none" class="breakdown-panel"><div id="ca-items"></div><button class="breakdown-collapse" onclick="toggleBreakdown('ca')">▲ Collapse</button></div>
+        <div id="ca-panel" style="display:none" class="breakdown-panel"><div id="ca-items"></div><button class="breakdown-collapse" onclick="toggleBreakdown('ca')"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" style="transform:rotate(180deg);margin-right:4px;vertical-align:-1px"><path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Collapse</button></div>
         <div class="ss-row"><div class="ss-row-lbl"><label>Uber Eats</label><button class="breakdown-toggle" id="ue-toggle" onclick="toggleBreakdown('ue')"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="ue-badge">Add breakdown</span></button></div><input type="number" autocomplete="off" id="sd-ue" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
-        <div id="ue-panel" style="display:none" class="breakdown-panel"><div id="ue-items"></div><button class="breakdown-collapse" onclick="toggleBreakdown('ue')">▲ Collapse</button></div>
+        <div id="ue-panel" style="display:none" class="breakdown-panel"><div id="ue-items"></div><button class="breakdown-collapse" onclick="toggleBreakdown('ue')"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" style="transform:rotate(180deg);margin-right:4px;vertical-align:-1px"><path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Collapse</button></div>
         <div class="ss-row"><div class="ss-row-lbl"><label>Deliveroo</label><button class="breakdown-toggle" id="dr-toggle" onclick="toggleBreakdown('dr')"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="dr-badge">Add breakdown</span></button></div><input type="number" autocomplete="off" id="sd-dr" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
-        <div id="dr-panel" style="display:none" class="breakdown-panel"><div id="dr-items"></div><button class="breakdown-collapse" onclick="toggleBreakdown('dr')">▲ Collapse</button></div>
+        <div id="dr-panel" style="display:none" class="breakdown-panel"><div id="dr-items"></div><button class="breakdown-collapse" onclick="toggleBreakdown('dr')"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" style="transform:rotate(180deg);margin-right:4px;vertical-align:-1px"><path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Collapse</button></div>
         <div class="ss-total-row"><label>Delivery Total</label><div class="ss-total-val" id="sd-del-total" style="color:var(--accent2)">£0.00</div></div>
       </div>
       <!-- Payments section -->
       <div class="ss-section">
         <div class="ss-section-hdr">Payments</div>
         <div class="ss-row"><div class="ss-row-lbl"><label>Cash</label><button class="breakdown-toggle" id="cash-toggle" onclick="toggleCashBreakdown()"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="cash-badge">Notes/coins breakdown</span></button></div><input type="number" autocomplete="off" id="sd-cash" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
-        <div id="cash-panel" style="display:none" class="breakdown-panel"><div id="cash-items"></div><button class="breakdown-collapse" onclick="toggleCashBreakdown()">▲ Collapse</button></div>
+        <div id="cash-panel" style="display:none" class="breakdown-panel"><div id="cash-items"></div><button class="breakdown-collapse" onclick="toggleCashBreakdown()"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" style="transform:rotate(180deg);margin-right:4px;vertical-align:-1px"><path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Collapse</button></div>
         <div class="ss-row"><div class="ss-row-lbl"><label>Card</label><button class="breakdown-toggle" id="cd-toggle" onclick="toggleBreakdown('cd')"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="cd-badge">Add breakdown</span></button></div><input type="number" autocomplete="off" id="sd-card" placeholder="0.00" step="0.01" min="0" oninput="calcDaySales()"></div>
-        <div id="cd-panel" style="display:none" class="breakdown-panel"><div id="cd-items"></div><button class="breakdown-collapse" onclick="toggleBreakdown('cd')">▲ Collapse</button></div>
+        <div id="cd-panel" style="display:none" class="breakdown-panel"><div id="cd-items"></div><button class="breakdown-collapse" onclick="toggleBreakdown('cd')"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" style="transform:rotate(180deg);margin-right:4px;vertical-align:-1px"><path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Collapse</button></div>
         <div class="ss-total-row"><label>Day Total</label><div class="ss-total-val" id="sd-day-total" style="color:var(--green)">£0.00</div></div>
       </div>
       <!-- Driver Payments section -->
@@ -1290,7 +1293,7 @@ body{
       <div style="display:flex;gap:8px">
         <button class="btn-sm ghost" style="flex:1;padding:10px;font-size:13px" onclick="closeDayEntry()">Cancel</button>
         <button class="btn-sm ghost" id="day-clear-btn" style="flex:1;padding:10px;font-size:13px;color:var(--red);border-color:rgba(255,107,122,.3)" onclick="clearDayEntry()">Clear</button>
-        <button class="btn-sm ghost" style="flex:1;padding:10px;font-size:13px" onclick="printDaySales()">🖨 Print</button>
+        <button class="btn-sm ghost" style="flex:1;padding:10px;font-size:13px;display:flex;align-items:center;justify-content:center;gap:5px" onclick="printDaySales()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Print</button>
       </div>
     </div>
   </div>
@@ -1306,10 +1309,10 @@ body{
     <pre id="receipt-text-preview" style="font-family:'Courier New',Courier,monospace;font-size:12px;color:var(--text2);background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;overflow-y:auto;flex:1;white-space:pre;line-height:1.5;margin:0"></pre>
     <!-- Notes now live in the Day Entry sheet instead -->
     <!-- BT Print button — shown on Android Chrome only -->
-    <button onclick="btPrintFromModal()" id="rcp-bt-btn" style="display:none;width:100%;padding:14px;border-radius:10px;border:none;background:var(--accent);color:#fff;font-size:15px;font-weight:700;cursor:pointer;letter-spacing:-0.2px">🖨 Print to Bluetooth Printer</button>
+    <button onclick="btPrintFromModal()" id="rcp-bt-btn" style="display:none;width:100%;padding:14px;border-radius:10px;border:none;background:var(--accent);color:#fff;font-size:15px;font-weight:700;cursor:pointer;letter-spacing:-0.2px;align-items:center;justify-content:center;gap:7px"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Print to Bluetooth Printer</button>
     <div style="display:flex;gap:8px;flex-shrink:0">
-      <button onclick="copyReceipt()" style="flex:1;padding:12px;border-radius:10px;border:1px solid var(--border2);background:var(--surface2);color:var(--text);font-size:14px;font-weight:600;cursor:pointer">📋 Copy</button>
-      <button onclick="shareReceipt()" id="rcp-share-btn" style="flex:1;padding:12px;border-radius:10px;border:1px solid var(--border2);background:var(--surface2);color:var(--text);font-size:14px;font-weight:600;cursor:pointer">📤 Share</button>
+      <button onclick="copyReceipt()" style="flex:1;padding:12px;border-radius:10px;border:1px solid var(--border2);background:var(--surface2);color:var(--text);font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Copy</button>
+      <button onclick="shareReceipt()" id="rcp-share-btn" style="flex:1;padding:12px;border-radius:10px;border:1px solid var(--border2);background:var(--surface2);color:var(--text);font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>Share</button>
     </div>
     <div style="text-align:center;margin-top:2px" id="rcp-bt-info"></div>
   </div>
@@ -1318,8 +1321,8 @@ body{
 <!-- User Menu -->
 <div id="user-menu">
   <div class="um-email" id="um-email">Loading...</div>
-  <div class="um-item" id="um-admin" onclick="openPermsPanel()" style="display:none">⚙️ Manage Permissions</div>
-  <div class="um-item danger" onclick="signOut()">🚪 Sign Out</div>
+  <div class="um-item" id="um-admin" onclick="openPermsPanel()" style="display:none"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Manage Permissions</div>
+  <div class="um-item danger" onclick="signOut()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Sign Out</div>
 </div>
 
 <!-- Admin Permissions Panel -->
@@ -1334,7 +1337,7 @@ body{
        them. Icon and label are now explicit flex children with a real 8px gap. -->
   <div id="perms-sheet" style="width:100%;max-width:480px;background:var(--surface);border-radius:20px 20px 0 0;border-top:1px solid var(--border2);padding:0 0 calc(env(safe-area-inset-bottom,0px)+20px);max-height:90dvh;display:flex;flex-direction:column;gap:0">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 12px;border-bottom:1px solid var(--border);flex-shrink:0">
-      <div style="font-size:16px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px"><span>⚙️</span><span>Manage Permissions</span></div>
+      <div style="font-size:16px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg><span>Manage Permissions</span></div>
       <div onclick="closePermsPanel()" style="cursor:pointer;font-size:20px;color:var(--text3);padding:4px 8px">×</div>
     </div>
     <div id="perms-list" style="overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1;min-height:0;display:flex;flex-direction:column;gap:12px;padding:14px 16px 8px">
@@ -1353,7 +1356,7 @@ body{
     </div>
     <div class="sh-sub" id="sh-sub"></div>
     <div class="picker-list" id="picker-list"></div>
-    <button class="early-toggle-btn" id="early-toggle-btn" style="display:none" onclick="toggleEarlyExpanded()">⏰ Add early shifts</button>
+    <button class="early-toggle-btn" id="early-toggle-btn" style="display:none" onclick="toggleEarlyExpanded()"><span style="display:flex;align-items:center;gap:6px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><span>Add early shifts</span></span></button>
     <div class="early-section" id="early-section" style="display:none">
       <div id="early-list"></div>
     </div>
@@ -1400,7 +1403,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 258; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 259; // ← bump this on every deploy — auto-shows in Settings
 // Detect an installed iOS/Android Home Screen PWA — Realtime/network behave very
 // differently here vs a normal browser tab (see the v226 fix in the reconnect logic
 // below), so several recovery paths branch on this.
@@ -2882,12 +2885,18 @@ function _updatePinStatusLabel(){
   if(el) el.textContent=_salesPin?`PIN set (${_salesPin.length} digits)`:'No PIN set — tap to create one';
 }
 
+// v259 — SVG lock/unlock icons (matching the clean 2px-stroke icon style used
+// throughout the nav bar and toolbar) instead of the 🔒/🔓 emoji glyphs, which
+// render inconsistently across platforms/fonts and stood out next to the rest
+// of the icon set.
+const _ICON_LOCK='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
+const _ICON_UNLOCK='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>';
 function _updateSalesLockBtn(){
   const btn=document.getElementById('sales-lock-btn');
   if(!btn)return;
   if(!_salesPin){btn.style.display='none';return;}
   btn.style.display='';
-  btn.textContent=_salesUnlocked?'🔓':'🔒';
+  btn.innerHTML=_salesUnlocked?_ICON_UNLOCK:_ICON_LOCK;
   btn.title=_salesUnlocked?'Numbers visible — tap to lock':'Tap to unlock sales figures';
 }
 
@@ -3127,19 +3136,26 @@ function openModal(day,col){
 }
 
 const EARLY_TIMES=['3pm','3:30pm','4pm','4:30pm','5pm','5:30pm','6pm','6:30pm','7pm'];
+// v259 — shared markup for the early-shifts toggle button: SVG clock icon
+// (matching the app's icon style) instead of the ⏰ emoji, and the chevron
+// reuses the exact same small SVG already used by .breakdown-toggle
+// (rotated via the .early-chevron.up CSS rule) instead of plain ▲/▼ text,
+// so both toggle affordances in the Sales/Rota sheets look consistent.
+function _earlyToggleHtml(cnt,expanded){
+  const label=cnt>0?`Early shifts (${cnt})`:'Add early shifts';
+  return `<span style="display:flex;align-items:center;gap:6px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><span>${label}</span></span><span class="early-chevron${expanded?' up':''}"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`;
+}
 function _renderEarlySection(day){
   const sec=document.getElementById('early-section');
   const toggleBtn=document.getElementById('early-toggle-btn');
   const list=document.getElementById('early-list');
   const hasStaff=modalSel.length>0&&modalCtx?.col!=='OFF';
   if(!sec)return;
-  // Toggle button is always the single header — shows ▼ (collapsed) or ▲ (expanded)
+  // Toggle button is always the single header — chevron rotates to point up when expanded
   if(toggleBtn){
     toggleBtn.style.display=hasStaff?'flex':'none';
-    const cnt=modalEarlyMap.size;
-    const label=cnt>0?`⏰ Early shifts (${cnt})`:'⏰ Add early shifts';
-    toggleBtn.innerHTML=`<span>${label}</span><span class="early-chevron">${earlyExpanded?'▲':'▼'}</span>`;
-    toggleBtn.className='early-toggle-btn'+(cnt>0?' active':'');
+    toggleBtn.innerHTML=_earlyToggleHtml(modalEarlyMap.size,earlyExpanded);
+    toggleBtn.className='early-toggle-btn'+(modalEarlyMap.size>0?' active':'');
   }
   if(!hasStaff||!earlyExpanded){
     sec.style.display='none';
@@ -3168,10 +3184,8 @@ function pickEarlyTime(name,time){
   // Update toggle button count
   const toggleBtn=document.getElementById('early-toggle-btn');
   if(toggleBtn){
-    const cnt=modalEarlyMap.size;
-    const label=cnt>0?`⏰ Early shifts (${cnt})`:'⏰ Add early shifts';
-    toggleBtn.innerHTML=`<span>${label}</span><span class="early-chevron">▲</span>`;
-    toggleBtn.className='early-toggle-btn'+(cnt>0?' active':'');
+    toggleBtn.innerHTML=_earlyToggleHtml(modalEarlyMap.size,true);
+    toggleBtn.className='early-toggle-btn'+(modalEarlyMap.size>0?' active':'');
   }
   // Update select style live
   const sel=document.getElementById('ets-'+name);
@@ -5322,7 +5336,7 @@ function printDaySales(){
   document.getElementById('receipt-text-preview').textContent=_currentReceiptText;
   // BT Print button: only on Android Chrome (has navigator.bluetooth)
   const btBtn=document.getElementById('rcp-bt-btn');
-  if(btBtn) btBtn.style.display=navigator.bluetooth?'':'none';
+  if(btBtn) btBtn.style.display=navigator.bluetooth?'flex':'none';
   // Show saved printer name under BT button
   const btInfo=document.getElementById('rcp-bt-info');
   if(btInfo){
@@ -5540,7 +5554,7 @@ async function printViaBluetooth(text){
     toast('Print error: '+e.message);
     return false;
   }finally{
-    if(btBtn){btBtn.textContent='🖨 Print to Bluetooth Printer';btBtn.disabled=false;}
+    if(btBtn){btBtn.innerHTML='<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Print to Bluetooth Printer';btBtn.disabled=false;}
   }
 }
 
