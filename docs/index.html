@@ -291,6 +291,18 @@ body{
 .rota-tbl tr:nth-child(even) td.day-cell{background:var(--surface2)}
 .rota-tbl td.shift-cell{
   cursor:pointer;transition:background .12s;
+  /* v232 — table/grid view only: a native <tr> already sizes each row to its own
+     tallest cell (no cross-row fixed height exists anywhere in this table), so the
+     "dead space at the bottom" the user saw wasn't a row-height problem — it was
+     vertical-align:top (inherited from the base .rota-tbl td rule) leaving shorter
+     cells' pills stuck at the top of that row's height with the leftover space
+     sitting below them. Overriding to middle here re-centers the pills within
+     whatever height the row ends up needing, filling that leftover space evenly
+     instead of dumping it all at the bottom. Left alignment needs no change — the
+     pills already flex-wrap left-to-right with no justify-content override, so
+     they're left-aligned by default within the (unaffected) horizontal axis.
+  */
+  vertical-align:middle;
 }
 .rota-tbl td.shift-cell:active{background:rgba(255,255,255,.05)}
 .td-day{font-size:12px;font-weight:700;color:var(--text)}
@@ -1184,7 +1196,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 231; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 232; // ← bump this on every deploy — auto-shows in Settings
 // Detect an installed iOS/Android Home Screen PWA — Realtime/network behave very
 // differently here vs a normal browser tab (see the v226 fix in the reconnect logic
 // below), so several recovery paths branch on this.
