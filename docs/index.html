@@ -290,26 +290,32 @@ body{
 }
 .rota-tbl tr:nth-child(even) td.day-cell{background:var(--surface2)}
 .rota-tbl td.shift-cell{
+  position:relative;
   cursor:pointer;transition:background .12s;
-  /* v232 — table/grid view only: a native <tr> already sizes each row to its own
-     tallest cell (no cross-row fixed height exists anywhere in this table), so the
-     "dead space at the bottom" the user saw wasn't a row-height problem — it was
-     vertical-align:top (inherited from the base .rota-tbl td rule) leaving shorter
-     cells' pills stuck at the top of that row's height with the leftover space
-     sitting below them. Overriding to middle here re-centers the pills within
-     whatever height the row ends up needing, filling that leftover space evenly
-     instead of dumping it all at the bottom. Left alignment needs no change — the
-     pills already flex-wrap left-to-right with no justify-content override, so
-     they're left-aligned by default within the (unaffected) horizontal axis.
+  /* v233 — v232 used vertical-align:middle on the <td> itself to re-center shorter
+     cells' pills within a row's shared height. That measured as mathematically
+     exact in Chromium (verified live: content-box center landed within ~2px of the
+     cell's own center, in every row tested, both on a synthetic repro and on the
+     real deployed page with real data) — but the live iPhone/WKWebView report
+     still showed the old top-aligned-with-dead-space-at-bottom look after
+     confirming v232 was installed, which Chromium testing alone can't explain away.
+     table-cell vertical-align interacting with a flex child (.td-pills) is exactly
+     the kind of table-layout corner case WebKit and Blink have historically not
+     agreed on. Rather than keep trusting vertical-align's cross-engine behavior,
+     centering is now done inside .td-pills itself with flexbox (height:100% of the
+     cell + align-content:center for the wrapped-line cross axis) — flexbox
+     alignment is far more consistently implemented across engines than table
+     vertical-align edge cases. vertical-align:top below is now just an inert
+     fallback box-position, not what does the centering.
   */
-  vertical-align:middle;
+  vertical-align:top;
 }
 .rota-tbl td.shift-cell:active{background:rgba(255,255,255,.05)}
 .td-day{font-size:12px;font-weight:700;color:var(--text)}
 .td-date{font-size:10px;color:var(--text3);margin-top:2px;font-variant-numeric:tabular-nums}
-.td-pills{display:flex;flex-wrap:wrap;gap:3px;min-height:24px}
+.td-pills{display:flex;flex-wrap:wrap;align-content:center;gap:3px;min-height:24px;height:100%}
 .td-empty{font-size:11px;color:var(--text3);opacity:0.55;padding-top:4px;letter-spacing:.3px}
-.tbl-sync{display:inline-block;width:5px;height:5px;border-radius:50%;background:transparent;margin-left:3px;vertical-align:middle;transition:background .2s}
+.tbl-sync{position:absolute;right:4px;bottom:4px;display:inline-block;width:5px;height:5px;border-radius:50%;background:transparent;transition:background .2s}
 .tbl-sync.saving{background:#facc15}
 .tbl-sync.saved{background:var(--green)}
 
@@ -1196,7 +1202,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 232; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 233; // ← bump this on every deploy — auto-shows in Settings
 // Detect an installed iOS/Android Home Screen PWA — Realtime/network behave very
 // differently here vs a normal browser tab (see the v226 fix in the reconnect logic
 // below), so several recovery paths branch on this.
