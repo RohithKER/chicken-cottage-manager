@@ -434,15 +434,26 @@ body{
   width:100%;max-width:480px;
   display:flex;
   background:rgba(22,22,22,0.97);border-top:1px solid var(--border);
-  padding-bottom:var(--safe-bottom);
   z-index:20;
   backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  /* v234 — previously padding-bottom:var(--safe-bottom) lived here. That correctly
+     extended the bar's own background down to the true bottom edge on notched/
+     home-indicator iPhones, but the tap targets (icon+label inside .nav-btn) kept
+     their original position above that padding, so the safe-area space just looked
+     like an unclaimed strip of background below the icons rather than the icons
+     themselves sitting closer to the edge. Moved the safe-area allowance onto
+     .nav-btn's own min-height instead (see below), with justify-content:center, so
+     the icon/label group visually shifts down together with the bar rather than
+     staying pinned above a growing gap. Requires viewport-fit=cover on the
+     <meta name="viewport"> tag to get a non-zero env(safe-area-inset-bottom) at
+     all — already present in this file (checked), so no change needed there.
+  */
 }
 .nav-btn{
-  flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
   padding:8px 4px 6px;background:none;border:none;cursor:pointer;
   color:var(--text3);font-size:10px;font-weight:500;transition:color .2s;letter-spacing:0.2px;
-  position:relative;min-height:52px;
+  position:relative;min-height:calc(52px + var(--safe-bottom));
 }
 .nav-btn-inner{
   display:flex;align-items:center;justify-content:center;
@@ -1200,7 +1211,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 233; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 234; // ← bump this on every deploy — auto-shows in Settings
 // Detect an installed iOS/Android Home Screen PWA — Realtime/network behave very
 // differently here vs a normal browser tab (see the v226 fix in the reconnect logic
 // below), so several recovery paths branch on this.
