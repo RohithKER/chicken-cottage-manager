@@ -1184,7 +1184,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 230; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 231; // ← bump this on every deploy — auto-shows in Settings
 // Detect an installed iOS/Android Home Screen PWA — Realtime/network behave very
 // differently here vs a normal browser tab (see the v226 fix in the reconnect logic
 // below), so several recovery paths branch on this.
@@ -1475,10 +1475,20 @@ async function loadPermissions(userId,email){
     }
     _userStatus=data?.status||'pending';
     if(_userStatus==='removed'){
-      // Removed user wants to rejoin — reset to pending so admin can re-approve
+      // Removed user wants to rejoin — reset to pending so admin can re-approve.
+      // v231: this MUST go through the cc_request_rejoin() RPC, not a plain
+      // .update() — the perms_update RLS policy only allows admins to update
+      // user_permissions, so a removed (non-admin) user's own .update() call was
+      // being silently blocked by RLS: no JS error, zero rows actually changed,
+      // and the row stayed 'removed' forever — invisible to the admin's pending
+      // list, even though this code optimistically set _userStatus='pending'
+      // locally as if it had worked. The RPC is a narrow SECURITY DEFINER
+      // function that can only ever flip the CALLER'S OWN row from 'removed' to
+      // 'pending', nothing else, so it doesn't need broad update rights.
       try{localStorage.removeItem(_PERM_CACHE_KEY+userId);}catch{}
       if(!isHardcodedAdmin){
-        await db.from('user_permissions').update({status:'pending'}).eq('user_id',userId);
+        const{error:rejoinErr}=await db.rpc('cc_request_rejoin');
+        if(rejoinErr)console.warn('cc: cc_request_rejoin failed:',rejoinErr);
         _userStatus='pending';
         if(data)data.status='pending';
       }
@@ -1516,8 +1526,11 @@ async function _refreshPermsBackground(userId,email,isHardcodedAdmin){
       // Row deleted or admin removed this user — clear their cache and sign them out
       try{localStorage.removeItem(_PERM_CACHE_KEY+userId);}catch{}
       if(!isHardcodedAdmin){
-        // Reset to pending so they can rejoin via approval
-        await db.from('user_permissions').update({status:'pending'}).eq('user_id',userId);
+        // Reset to pending so they can rejoin via approval — via cc_request_rejoin()
+        // RPC, not a plain .update() (see v231 comment in loadPermissions() above:
+        // RLS blocks a non-admin's own update, silently, so it never actually landed).
+        const{error:rejoinErr}=await db.rpc('cc_request_rejoin');
+        if(rejoinErr)console.warn('cc: cc_request_rejoin failed:',rejoinErr);
         _userStatus='pending';
         const el=document.getElementById('pending-email-display');
         if(el)el.textContent=email;
@@ -3715,7 +3728,20 @@ async function loadPendingUsers(){
 }
 
 async function approveUser(userId,email){
-  const{error}=await db.from('user_permissions').update({status:'approved'}).eq('user_id',userId);
+  // v231: also reset the view-rota flags to the standard "just approved" baseline —
+  // not just the status column. removeUser() zeroes EVERY permission flag (including
+  // can_view_staff_rota/can_view_driver_rota) when kicking someone; if approve only
+  // flipped status back to 'approved' and left those alone, a rejoining user would be
+  // nominally approved but unable to see either rota — cosmetic, not actually let back
+  // in. This matches exactly what a first-time signup gets by default (view-only, no
+  // edit/admin rights), so a rejoin now behaves identically to a first-time approval,
+  // and is a harmless no-op for a genuine first-time approval (those flags are already
+  // true at that point).
+  const{error}=await db.from('user_permissions').update({
+    status:'approved',
+    can_view_staff_rota:true,
+    can_view_driver_rota:true
+  }).eq('user_id',userId);
   if(error){toast('Error: '+error.message);return;}
   toast(`✓ ${email} approved`);
   loadPendingUsers();
@@ -4021,11 +4047,19 @@ function setupRealtime(){
     .subscribe();
   _realtimeChannels.push(_earlyCh);
 
-  // Admin: auto-refresh pending list when a new user signs in
+  // Admin: auto-refresh pending list when a new user signs in — v231: also on UPDATE,
+  // not just INSERT. A rejoining removed user doesn't insert a new row, it flips their
+  // EXISTING row's status back to 'pending' (via cc_request_rejoin()), so an INSERT-only
+  // listener here would silently miss it — the admin would only see it next time they
+  // happened to open Settings, not live like a brand-new signup. Rejoin requests should
+  // show up identically to first-time ones.
   if(_perms.is_admin){
     const _signupCh=db.channel('cc-new-signups')
       .on('postgres_changes',{event:'INSERT',schema:'public',table:'user_permissions'},()=>{
         loadPendingUsers();
+      })
+      .on('postgres_changes',{event:'UPDATE',schema:'public',table:'user_permissions'},payload=>{
+        if(payload.new&&payload.new.status==='pending')loadPendingUsers();
       })
       .subscribe();
     _realtimeChannels.push(_signupCh);
