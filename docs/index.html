@@ -1286,7 +1286,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 252; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 253; // ← bump this on every deploy — auto-shows in Settings
 // Detect an installed iOS/Android Home Screen PWA — Realtime/network behave very
 // differently here vs a normal browser tab (see the v226 fix in the reconnect logic
 // below), so several recovery paths branch on this.
@@ -1540,7 +1540,18 @@ function _applyPermData(data){
     // Hardcoded admins always get true regardless of DB value
     can_view_staff_rota:isHardcoded||(data.can_view_staff_rota!==false),
     can_view_driver_rota:isHardcoded||(data.can_view_driver_rota!==false),
-    can_view_staff_tab:isHardcoded||(data.can_view_staff_tab!==false)
+    // v253 — NO isHardcoded bypass here, unlike the two rota flags above. Those exist
+    // to prevent a hardcoded admin from ever being locked out of real data access by
+    // accident. can_view_staff_tab only controls a bottom-nav BUTTON's visibility —
+    // there's no lockout risk (Manage Permissions itself is gated by is_admin, not by
+    // this flag, so an admin can always re-check the box for themselves). The bypass
+    // being here at all was copied from the rota pattern without re-examining whether
+    // it applied, and it meant a hardcoded admin's own "View Staff Tab" checkbox did
+    // nothing — toggling it off in the DB never hid the tab for them, which is exactly
+    // the bug reported: unchecked it on rohithkrishna.erumbhapurath@gmail.com (a
+    // hardcoded admin), and the tab kept showing on every reload because this line
+    // forced the flag back to true regardless of the real (false) DB value.
+    can_view_staff_tab:data.can_view_staff_tab!==false
   };
 }
 /* Cache permissions to localStorage so returning users never block on this */
@@ -2659,9 +2670,9 @@ function showView(v){
     _salesUnlocked=false;
     _updateSalesLockBtn();
   }
-  // Staff tab visibility permission — matches can_view_staff_rota/can_view_driver_rota's
-  // plain-boolean pattern (no is_admin bypass; hardcoded admins get true via
-  // _applyPermData's isHardcoded logic, same safety net those two use).
+  // Staff tab visibility permission — plain boolean, no is_admin or hardcoded-admin
+  // bypass at all (v253: removed the hardcoded-admin bypass from _applyPermData too —
+  // this flag only gates a nav button, not data access, so there's no lockout risk).
   if(v==='staff'&&!_perms.can_view_staff_tab)return;
   _doShowView(v);
 }
