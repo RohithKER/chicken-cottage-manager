@@ -16,7 +16,18 @@
 <style>
 /* ─── Reset ──────────────────────────────────────── */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%;height:100dvh;overflow:hidden;overscroll-behavior:none}
+/* v284 — dropped the "height:100%;height:100dvh" override pattern down to a
+   plain 100% on html/body and #app/#main-app below. In a Home-Screen
+   standalone PWA there is no dynamically-appearing/disappearing browser
+   toolbar for dvh to account for in the first place (that's the entire
+   reason dvh exists over vh) — so it was never solving a real problem here,
+   while v283's fix (moving --safe-bottom to #bottom-nav's own padding) had
+   zero visible effect on a real-device screenshot, which rules out the
+   "auto-height doesn't include child padding" theory and points instead at
+   the outer shell's own height calculation being unreliable on this device.
+   100% against a Home Screen PWA's fixed native window is the simpler,
+   better-supported quantity — removing dvh as a variable entirely. */
+html,body{height:100%;overflow:hidden;overscroll-behavior:none}
 body{
   font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',sans-serif;
   /* v282 TEMP DEBUG — do not ship: bright magenta stand-in for #191919, purely
@@ -64,7 +75,7 @@ body{
 }
 
 /* ─── Shell ──────────────────────────────────────── */
-#app{display:flex;flex-direction:column;height:100%;height:100dvh;max-width:480px;margin:0 auto;position:relative}
+#app{display:flex;flex-direction:column;height:100%;max-width:480px;margin:0 auto;position:relative}
 
 /* ─── Auth Screen ────────────────────────────────── */
 #auth-screen{
@@ -1106,7 +1117,7 @@ body{
 </div>
 
 <!-- Main App -->
-<div id="main-app" style="display:none;flex-direction:column;height:100%;height:100dvh">
+<div id="main-app" style="display:none;flex-direction:column;height:100%">
 
   <div id="header">
     <img class="logo" id="app-logo" src="" alt="CC" style="width:32px;height:32px;border-radius:50%;object-fit:cover;flex-shrink:0">
@@ -1599,15 +1610,18 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 283; // ← bump this on every deploy — auto-shows in Settings
-// v282/v283: TEMPORARY DEBUG BUILD — body/#bottom-nav swapped to magenta/cyan
-// to diagnose the bottom-nav black-gap report. See matching comments at the
-// body{} rule and #bottom-nav{} rule. v282's screenshot proved the gap is a
-// real layout bug (magenta, not black, showed below the bar) — v283 applies
-// the root-cause fix (see the v283 comment on #bottom-nav) while KEEPING the
-// debug colors for one more round of device confirmation. MUST be reverted
-// to the real #191919 theme colors once that screenshot comes back — do not
-// leave this shipped.
+const APP_VERSION = 284; // ← bump this on every deploy — auto-shows in Settings
+// v282-v284: TEMPORARY DEBUG BUILD — body/#bottom-nav swapped to magenta/cyan
+// to diagnose the bottom-nav black-gap report. v282's screenshot proved the
+// gap is a real layout bug (magenta, not black). v283 (moving --safe-bottom
+// onto #bottom-nav's own padding) had ZERO visible effect on a real-device
+// screenshot — ruling that theory out. v284 relocates #bottom-nav to be a
+// direct child of <body> (fully independent of #app/#main-app's own
+// height/dvh handling) and adds an on-screen diagnostic HUD (top of screen)
+// reporting real measured values, so the next screenshot gives hard evidence
+// either way instead of another blind guess. MUST be reverted to the real
+// #191919 theme colors AND have the HUD removed once this is resolved — do
+// not leave this shipped.
 // Detect an installed iOS/Android Home Screen PWA — Realtime/network behave very
 // differently here vs a normal browser tab (see the v226 fix in the reconnect logic
 // below), so several recovery paths branch on this.
@@ -1615,6 +1629,65 @@ const IS_STANDALONE = (window.matchMedia && window.matchMedia('(display-mode: st
 document.addEventListener('DOMContentLoaded',()=>{
   const el=document.getElementById('app-version-label');
   if(el)el.textContent=`Version ${APP_VERSION}${IS_STANDALONE?' • PWA':''} • Cloud sync`;
+});
+// v284 TEMP DEBUG — do not ship past this diagnostic round.
+// Part 1: physically relocate #bottom-nav to be a DIRECT CHILD OF <body>,
+// completely independent of #app/#main-app's own nesting/height calculation.
+// v283 (moving --safe-bottom's declaration onto #bottom-nav's own
+// padding-bottom) had zero visible effect on a real-device screenshot, which
+// rules out "auto-height doesn't include child padding" as the cause and
+// means the whole #app > #main-app > #bottom-nav nesting itself is suspect,
+// not just how #bottom-nav's own box is sized. This makes #bottom-nav as
+// structurally simple as possible: <body> is its ONLY ancestor from here on,
+// so nothing about #app/#main-app's height/flex/dvh handling can be involved
+// even indirectly. showScreen() above already toggles #bottom-nav's display
+// in lockstep with #main-app to compensate for it no longer being hidden
+// automatically as a side effect of #main-app's own display:none.
+document.addEventListener('DOMContentLoaded',()=>{
+  const bn=document.getElementById('bottom-nav');
+  if(bn && bn.parentElement!==document.body){
+    bn.style.display='none'; // starts hidden; showScreen('main') reveals it
+    document.body.appendChild(bn);
+  }
+});
+// Part 2: on-screen diagnostic HUD — a real device screenshot with this build
+// gives us hard numbers instead of another blind CSS guess. Answers exactly
+// what the user asked: does #bottom-nav's own rendered bottom edge actually
+// reach window.innerHeight? Does visualViewport.height differ from
+// innerHeight (a real, documented source of iOS fixed-position/safe-area
+// mismatches)? What is --safe-bottom actually resolving to on this device?
+// REMOVE this whole HUD block once the bottom-nav gap is confirmed fixed.
+function _debugHud(){
+  let hud=document.getElementById('_debug-hud');
+  if(!hud){
+    hud=document.createElement('div');
+    hud.id='_debug-hud';
+    hud.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99999;'+
+      'background:rgba(0,0,0,0.85);color:#0f0;font:10px/1.4 monospace;'+
+      'padding:4px 6px;white-space:pre-wrap;pointer-events:none;';
+    document.body.appendChild(hud);
+  }
+  const bn=document.getElementById('bottom-nav');
+  const rect=bn?bn.getBoundingClientRect():null;
+  const vv=window.visualViewport;
+  const probe=document.createElement('div');
+  probe.style.cssText='position:fixed;bottom:0;height:0;padding-bottom:env(safe-area-inset-bottom,0px);visibility:hidden';
+  document.body.appendChild(probe);
+  const safeAreaProbe=getComputedStyle(probe).paddingBottom;
+  document.body.removeChild(probe);
+  hud.textContent=
+    `v284 DEBUG HUD — innerHeight:${window.innerHeight} `+
+    `docElClientHeight:${document.documentElement.clientHeight} `+
+    `vvHeight:${vv?vv.height:'n/a'} vvOffsetTop:${vv?vv.offsetTop:'n/a'}\n`+
+    `navRect.bottom:${rect?rect.bottom.toFixed(1):'n/a'} `+
+    `navRect.top:${rect?rect.top.toFixed(1):'n/a'} `+
+    `navParent:${bn?bn.parentElement.id||bn.parentElement.tagName:'n/a'} `+
+    `envSafeAreaBottomProbe:${safeAreaProbe}`;
+}
+document.addEventListener('DOMContentLoaded',()=>{
+  setTimeout(_debugHud,300);
+  window.addEventListener('resize',()=>setTimeout(_debugHud,300));
+  window.addEventListener('orientationchange',()=>setTimeout(_debugHud,300));
 });
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
 // Days with early starters and their start time label
@@ -4539,6 +4612,13 @@ function showScreen(screen){
   document.getElementById('auth-screen').style.display='none';
   document.getElementById('pending-screen').style.display='none';
   document.getElementById('main-app').style.display='none';
+  // v284: #bottom-nav was moved to be a direct child of <body> (see the
+  // _relocateBottomNav() call below) so it's no longer hidden automatically
+  // when #main-app is display:none — it needs its own explicit toggle here,
+  // in lockstep with main-app, so it still only shows on the actual app
+  // screens and not during loading/auth/pending.
+  const _bn=document.getElementById('bottom-nav');
+  if(_bn)_bn.style.display='none';
   if(screen==='loading'){
     document.getElementById('loading-screen').style.display='flex';
   }else if(screen==='auth'){
@@ -4547,6 +4627,7 @@ function showScreen(screen){
     document.getElementById('pending-screen').style.display='flex';
   }else if(screen==='main'){
     document.getElementById('main-app').style.display='flex';
+    if(_bn)_bn.style.display='flex';
     setViewMode(viewMode);
   }
 }
