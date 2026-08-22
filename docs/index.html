@@ -1548,7 +1548,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 280; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 281; // ← bump this on every deploy — auto-shows in Settings
 // Detect an installed iOS/Android Home Screen PWA — Realtime/network behave very
 // differently here vs a normal browser tab (see the v226 fix in the reconnect logic
 // below), so several recovery paths branch on this.
@@ -2386,6 +2386,11 @@ async function syncAll(){
     // clear (see step 0b above) — those must never be re-confirmed to the
     // server as real data. In practice step 0b just retried/cleared all of
     // them, so this filter is defense-in-depth, not the primary guard.
+    // v281: the primary guard against stale rows entering state.schedules in
+    // the first place now lives in loadSchedules()'s and the Realtime
+    // handler's merge (_isStaleAgainstClear) — see the _clearedAt comment
+    // above _pendingClears. This filter stays as-is; it only needs to catch
+    // the brief in-flight-delete window, which _pendingClears already covers.
     const pushRows=Object.entries(state.schedules)
       .filter(([key])=>{
         const parts=key.split('|');
@@ -2586,6 +2591,15 @@ async function loadSchedules(){
       // DELETE hasn't landed yet. Never let that stale read resurrect it —
       // see the _pendingClears comment above for the full bug this closes.
       if(_pendingClears.has(`${row.schedule_type}|${row.week_key}`)) return;
+      // v281 — THIS specific GET may have been issued long before the clear
+      // (a periodic poll / heartbeat / hard-reconnect that got stuck on a
+      // stale connection) and only just now resolved, well after the clear
+      // already confirmed and the check above stopped applying. Compare the
+      // row's own last-write time against when this week+type was last
+      // cleared — a row that predates the clear is a stale leftover no
+      // matter how late it arrived; a row written after (by this device or
+      // any other) is legitimate and merges in normally.
+      if(_isStaleAgainstClear(row)) return;
       state.schedules[k]=row.staff_names||[];
     });
     _saveSchedCache(state.schedules);
@@ -2646,6 +2660,65 @@ let _pendingSaleSet=_loadPendingSales();   // sale dates with unconfirmed cloud 
 // and syncAll()'s bulk push now filters those rows out too, so even if
 // something else briefly repopulates state.schedules, it can't be re-
 // confirmed to the server while a clear is still outstanding.
+//
+// v281 — v279 was incomplete: _pendingClears only protects the WINDOW WHILE
+// THE DELETE ITSELF IS IN FLIGHT (typically well under a second). It does
+// nothing for a completely different, already-in-flight request that was
+// issued BEFORE the clear even started and simply takes a long time to
+// resolve — which this app's own _hardReconnect comment documents as a real,
+// expected failure mode on this exact connection ("every fetch hangs for
+// 60-120s" on a stale/suspended-then-resumed connection). Confirmed live:
+// a user cleared Delivery for a week, added a few new shifts on top, tested
+// refresh and force-quit-reopen (both fine — nothing stale was in flight at
+// that point), then left the app backgrounded overnight. Hours later almost
+// every pre-clear name was back, EXCEPT the cells re-written after the clear.
+// Sequence: a GET that had been issued before the clear (periodic poll /
+// heartbeat / hard-reconnect — any of these can fire loadSchedules() at any
+// time) got stuck on a stale connection and didn't resolve until well after
+// the DELETE had already confirmed and removed the _pendingClears entry —
+// so by the time that old response finally landed, nothing was blocking it
+// from merging the pre-clear rows straight back into state.schedules, which
+// then got persisted to the local cache and, on the next bulk push
+// (_applyUpdate()'s syncAll(), "Save to Cloud", or a manual sync), written
+// back to Supabase as fresh, confirmed data — permanently undoing the clear.
+// A short "refresh / force-quit-reopen" test right after clearing can never
+// catch this: a force-quit kills every in-flight request outright, and nothing
+// stale had had time to queue up yet either way.
+//
+// Fix: _clearedAt records WHEN each week+type's clear last actually
+// confirmed. Every place that merges an incoming row (loadSchedules()'s GET,
+// the schedules Realtime handler) now also checks that row's own
+// server-side updated_at against _clearedAt for its week+type — if the row's
+// last real write predates the confirmed clear, it's discarded no matter how
+// stale/delayed the request that carried it was, with no arbitrary timeout
+// to tune or outrun. A row genuinely written after the clear (by this device
+// or any other — updated_at is the server's clock, not this device's
+// _localSaveTs, so this works across devices) still merges in normally.
+const _CLEARED_AT_KEY='cc_cleared_at_v1';
+function _loadClearedAt(){
+  try{
+    const raw=JSON.parse(localStorage.getItem(_CLEARED_AT_KEY)||'{}');
+    // Prune anything older than 30 days so this can't grow forever across months of use.
+    const cutoff=Date.now()-30*24*60*60*1000;
+    Object.keys(raw).forEach(k=>{if(raw[k]<cutoff)delete raw[k];});
+    return raw;
+  }catch{return {};}
+}
+function _saveClearedAt(){try{localStorage.setItem(_CLEARED_AT_KEY,JSON.stringify(_clearedAt));}catch{}}
+let _clearedAt=_loadClearedAt(); // `${schedule_type}|${week_key}` → Date.now() a clear last confirmed
+function _markCleared(typeWeekKey){
+  _clearedAt[typeWeekKey]=Date.now();
+  _saveClearedAt();
+}
+// Returns true if this row's own last-write time predates a confirmed clear for
+// its week+type — i.e. it's a stale leftover that must never be allowed to
+// resurrect, regardless of which code path is asking or how late it arrived.
+function _isStaleAgainstClear(row){
+  const clearedAt=_clearedAt[`${row.schedule_type}|${row.week_key}`];
+  if(!clearedAt)return false;
+  const rowTs=row.updated_at?new Date(row.updated_at).getTime():0;
+  return rowTs<clearedAt;
+}
 const _PCLEAR_KEY='cc_pending_clears_v1';
 function _loadPendingClears(){try{return new Set(JSON.parse(localStorage.getItem(_PCLEAR_KEY)||'[]'));}catch{return new Set();}}
 function _savePendingClears(){try{localStorage.setItem(_PCLEAR_KEY,JSON.stringify([..._pendingClears]));}catch{}}
@@ -2657,6 +2730,7 @@ async function _retryPendingClear(typeWeekKey){
     if(error)throw error;
     _pendingClears.delete(typeWeekKey);
     _savePendingClears();
+    _markCleared(typeWeekKey); // v281 — record confirmation time so a stale in-flight read can't resurrect this week
     logActivity(`Week ${wk} (${type}) clear confirmed ✓`,'success');
     return true;
   }catch(e){
@@ -4309,6 +4383,7 @@ function clearWeek(){
         if(error)throw error;
         _pendingClears.delete(typeWeekKey);
         _savePendingClears();
+        _markCleared(typeWeekKey); // v281 — see _isStaleAgainstClear comment above _pendingClears
         logActivity(`Week ${wk} (${type}) cleared ✓`,'success');
         toast('Week cleared ✓');
       }catch(e){
@@ -4656,6 +4731,11 @@ function setupRealtime(){
         // and reinstate it. Same guard as loadSchedules() — never let a
         // week+type with an unconfirmed Clear Week accept incoming rows.
         if(_pendingClears.has(`${r.schedule_type}|${r.week_key}`)) return;
+        // v281 — same reasoning as loadSchedules()'s _isStaleAgainstClear
+        // check: a queued/replayed event can still arrive well after the
+        // clear already confirmed. Trust the row's own updated_at, not just
+        // whether a delete is still nominally in flight.
+        if(_isStaleAgainstClear(r)) return;
         if(!_pendingShiftSet.has(k)){
           if(r.staff_names&&r.staff_names.length>0){
             // Skip (v227) if we confirmed a local save for this key within the last
