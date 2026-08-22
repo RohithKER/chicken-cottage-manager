@@ -1403,7 +1403,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 259; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 260; // ← bump this on every deploy — auto-shows in Settings
 // Detect an installed iOS/Android Home Screen PWA — Realtime/network behave very
 // differently here vs a normal browser tab (see the v226 fix in the reconnect logic
 // below), so several recovery paths branch on this.
@@ -5910,16 +5910,44 @@ setInterval(function(){
 </div>
 <!-- Service Worker registration — shows the update popup; "Update" clears all caches
      for a clean reload. v243: every path that used to silently auto-reload now only
-     ever shows this popup — _applyUpdate() only runs from an explicit user tap. -->
+     ever shows this popup — _applyUpdate() only runs from an explicit user tap.
+
+     v260 — root cause of a THIRD report of unconsented auto-updates (this time
+     reproducible during ordinary use, not just after a force-quit): two compounding
+     bugs, both fixed in this deploy.
+       1. sw.js's fetch handler served HTML "network-first, always freshest" —
+          completely independent of this popup/consent system. Every navigation
+          (including the ones iOS triggers on its own when it silently discards and
+          reloads a backgrounded standalone PWA's WKWebView — no force-quit needed)
+          fetched and ran whatever was newest on the server, popup or not, "Don't
+          Update" or not. Fixed in sw.js: HTML is now cache-first, so what's already
+          installed keeps running until _applyUpdate() explicitly changes it.
+       2. _updateDismissedThisSession lived only in a plain JS variable. Any fresh
+          page load — including exactly the iOS background/foreground reload above —
+          starts a new JS context and silently resets it to false, so "Don't Update"
+          never actually survived past the moment the popup closed. It's now backed
+          by localStorage (see _isVersionDismissed/_setVersionDismissed below) so a
+          dismissal survives reloads, backgrounding, and full relaunches, and is keyed
+          per-version so a *later* new version still prompts. -->
 <script>
 var _waitingSW = null;
-var _updateDismissedThisSession = false; // set once the user taps "Don't Update"
+
+// v260: durable replacement for the old in-memory _updateDismissedThisSession flag.
+// Keyed by version so dismissing v260 doesn't suppress a future v261 prompt.
+function _isVersionDismissed(version){
+  try{ return localStorage.getItem('cc_update_dismissed_v') === String(version); }catch(e){ return false; }
+}
+function _setVersionDismissed(version){
+  try{ localStorage.setItem('cc_update_dismissed_v', String(version)); }catch(e){}
+}
+var _lastShownVersion = null; // version currently displayed in the popup, if open
 
 // Shows the update popup. version is optional (a concrete number when known, e.g. from
 // a Supabase row or an SW_UPDATED message); left blank the popup just says a new
 // version is ready. Never called from a silent/automatic reload path.
 function _showUpdateModal(version){
-  if(_updateDismissedThisSession) return; // user already said not now — don't nag mid-session
+  if(version && _isVersionDismissed(version)) return; // user already said not now for this exact version
+  _lastShownVersion = version || null;
   var ov = document.getElementById('update-modal-overlay');
   if(!ov) return;
   var sub = document.getElementById('update-modal-sub');
@@ -5929,7 +5957,7 @@ function _showUpdateModal(version){
 }
 
 function _dismissUpdateModal(){
-  _updateDismissedThisSession = true;
+  if(_lastShownVersion) _setVersionDismissed(_lastShownVersion);
   var ov = document.getElementById('update-modal-overlay');
   if(!ov) return;
   ov.classList.remove('open');
@@ -5968,8 +5996,29 @@ async function _applyUpdate(){
   // doesn't falsely re-show the popup (the freshly installed SW always fires
   // SW_UPDATED once it activates, even though there's nothing new to show).
   try{ sessionStorage.setItem('cc_sw_just_applied','1'); }catch(e){}
+  // v260: also clear any stale per-version dismissal — irrelevant once the user has
+  // explicitly updated, and we don't want a leftover dismissal for this version
+  // suppressing a legitimate re-prompt if it's somehow redeployed later.
+  try{ localStorage.removeItem('cc_update_dismissed_v'); }catch(e){}
   window.location.reload(true);
 }
+
+// v260: one-time boot diagnostic — if this build's own version is HIGHER than
+// whatever the user last explicitly consented to via _applyUpdate(), something
+// changed the running code without a consent tap (this should be impossible after
+// the fixes above, but this makes any recurrence visible in the Activity Log
+// instead of silently invisible, which is exactly how this bug went unnoticed
+// three times). It only logs — there's no old code left to roll back to, and the
+// popup/consent flow above already covers telling the user about genuine updates.
+(function _auditVersionDrift(){
+  try{
+    var lastConsented = localStorage.getItem('cc_consented_version');
+    if(lastConsented && Number(lastConsented) < APP_VERSION){
+      console.warn('cc: running v'+APP_VERSION+' but last explicit "Update" tap was for v'+lastConsented+' — code changed without consent. Investigate sw.js fetch/activate behavior.');
+    }
+    localStorage.setItem('cc_consented_version', String(APP_VERSION));
+  }catch(e){}
+})();
 
 if('serviceWorker' in navigator){
   // When a new SW activates it sends SW_UPDATED. v243: this used to auto-reload
@@ -5994,12 +6043,20 @@ if('serviceWorker' in navigator){
     }
   });
 
-  // The ?v= suffix changes the registration URL, forcing iOS to bypass HTTP cache and fetch
-  // a fresh sw.js even when the browser would otherwise serve a cached copy.
+  // v260: no longer calling reg.update() here. That call was the primary trigger for
+  // this whole bug class — it proactively asked the browser to fetch and install a
+  // new SW into the "waiting" slot behind the active one on EVERY single app open,
+  // maximizing the odds that iOS's background/foreground reload cycle would catch a
+  // waiting worker mid-transition and (per the browser's own default lifecycle,
+  // independent of skipWaiting) auto-promote it. Registering still happens below —
+  // that's needed for normal offline caching — but proactively soliciting a new SW
+  // install is now left to: (a) the browser's own much-less-frequent default update
+  // check, which sw.js's activate() now handles passively (see its comments), and
+  // (b) the explicit "Update" tap, which unregisters+reloads and never needs this
+  // call at all. Detecting that a new version exists is handled safely and
+  // separately by the Supabase app_settings version poll/Realtime watcher above —
+  // a plain DB row comparison that can never itself change what's cached or served.
   navigator.serviceWorker.register('./sw.js').then(function(reg){
-    // Force a fresh SW fetch on every app open — critical for iOS PWA home screen shortcuts
-    reg.update();
-
     if(reg.waiting){
       _waitingSW = reg.waiting;
       _showUpdateModal();
