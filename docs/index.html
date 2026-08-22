@@ -131,7 +131,13 @@ body{
   font-size:16px;flex-shrink:0;
 }
 #header h1{font-size:15px;font-weight:700;letter-spacing:-0.4px;flex-shrink:0}
-.week-nav{display:flex;align-items:center;gap:0}
+/* v271: week-nav now stretches to fill the full toolbar row on its own (the
+   "···" menu / lock icon that used to share this row moved up into #header,
+   next to the refresh button — see #rota-more-wrap/#delivery-more-wrap/
+   #sales-lock-wrap below). flex:1 + space-between spreads the two equal-size
+   arrow buttons to the edges and centers the label between them, matching
+   how #sales-week-nav already laid its three children out. */
+.week-nav{display:flex;align-items:center;justify-content:space-between;gap:0;flex:1}
 #header-spacer{flex:1;min-width:0}
 .week-nav button{
   background:none;border:none;color:var(--text2);
@@ -142,8 +148,10 @@ body{
 .week-nav button:active{background:var(--surface2)}
 /* v269: was #week-label — now a class, since Rota and Delivery are separate
    tabs and each has its own week-nav/label element (kept in sync together by
-   _setWeekLabels()). */
-.rota-week-label{font-size:12px;color:var(--text2);min-width:62px;text-align:center;font-weight:500}
+   _setWeekLabels()).
+   v271: bumped size/weight to match Sales' #sales-week-label — previously
+   noticeably smaller/lighter than Sales' "This week" style. */
+.rota-week-label{font-size:14px;font-weight:700;color:var(--text);letter-spacing:-0.2px;text-align:center}
 .icon-btn{
   background:var(--surface2);border:1px solid var(--border);
   border-radius:8px;width:36px;height:36px;
@@ -1005,6 +1013,47 @@ body{
     <h1>CC Chelmsford</h1>
     <div id="header-spacer"></div>
     <div class="icon-btn" id="sync-btn" onclick="refreshFromCloud()" title="Refresh data from cloud"><span class="refresh-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></span></div>
+    <!-- v271: "···" overflow menu (Rota/Delivery) and the Sales lock icon
+         moved up into row 1, next to refresh — they used to sit at the far
+         right of row 2 (the week-nav row). #header is shared by every tab, so
+         all three wraps live here and _doShowView() toggles which one (if
+         any) is visible for the active tab, same pattern as #rota-toolbar/
+         #delivery-toolbar. Built from <div class="icon-btn"> (not <button>)
+         to match #sync-btn exactly — this also fixes the "···" dots
+         rendering in iOS Safari's default blue button-tint color, since a
+         plain <button> with no -webkit-appearance reset picks up that tint,
+         while a div never gets native control styling in the first place. -->
+    <div id="rota-more-wrap" style="position:relative;display:none">
+      <div class="icon-btn" id="rota-more-btn" onclick="toggleRotaMenu('rota-menu')" title="More" style="font-size:15px;letter-spacing:1px;line-height:1">···</div>
+      <div id="rota-menu" style="display:none;position:absolute;top:calc(100% + 6px);right:0;z-index:600;background:var(--surface);border:1px solid var(--border2);border-radius:14px;padding:6px;min-width:168px;box-shadow:0 8px 28px rgba(0,0,0,.6)">
+        <div class="rm-item" onclick="shareRota();closeRotaMenu('rota-menu')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg> Share Rota</div>
+        <div class="rm-item" onclick="openLog();closeRotaMenu('rota-menu')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> Activity Log</div>
+        <div style="height:1px;background:var(--border);margin:4px 0"></div>
+        <div class="rm-item" onclick="saveRotaStaffToCloud();closeRotaMenu('rota-menu')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg> Save to Cloud</div>
+        <div class="rm-item" onclick="confirmSyncAll();closeRotaMenu('rota-menu')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> Full Sync (push + pull)</div>
+        <div style="height:1px;background:var(--border);margin:4px 0"></div>
+        <div class="rm-item" onclick="copyWeek();closeRotaMenu('rota-menu')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy Week</div>
+        <div class="rm-item rm-paste-item" onclick="pasteWeek();closeRotaMenu('rota-menu')" style="display:none"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg> Paste Week</div>
+        <div class="rm-item" onclick="clearWeek();closeRotaMenu('rota-menu')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg> Clear Week</div>
+      </div>
+    </div>
+    <div id="delivery-more-wrap" style="position:relative;display:none">
+      <div class="icon-btn" id="delivery-more-btn" onclick="toggleRotaMenu('delivery-menu')" title="More" style="font-size:15px;letter-spacing:1px;line-height:1">···</div>
+      <div id="delivery-menu" style="display:none;position:absolute;top:calc(100% + 6px);right:0;z-index:600;background:var(--surface);border:1px solid var(--border2);border-radius:14px;padding:6px;min-width:168px;box-shadow:0 8px 28px rgba(0,0,0,.6)">
+        <div class="rm-item" onclick="shareRota();closeRotaMenu('delivery-menu')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg> Share Rota</div>
+        <div class="rm-item" onclick="openLog();closeRotaMenu('delivery-menu')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> Activity Log</div>
+        <div style="height:1px;background:var(--border);margin:4px 0"></div>
+        <div class="rm-item" onclick="saveRotaStaffToCloud();closeRotaMenu('delivery-menu')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg> Save to Cloud</div>
+        <div class="rm-item" onclick="confirmSyncAll();closeRotaMenu('delivery-menu')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> Full Sync (push + pull)</div>
+        <div style="height:1px;background:var(--border);margin:4px 0"></div>
+        <div class="rm-item" onclick="copyWeek();closeRotaMenu('delivery-menu')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy Week</div>
+        <div class="rm-item rm-paste-item" onclick="pasteWeek();closeRotaMenu('delivery-menu')" style="display:none"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg> Paste Week</div>
+        <div class="rm-item" onclick="clearWeek();closeRotaMenu('delivery-menu')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg> Clear Week</div>
+      </div>
+    </div>
+    <div id="sales-lock-wrap" style="display:none">
+      <div class="icon-btn" id="sales-lock-btn" onclick="toggleSalesLock()" title="Tap to unlock sales figures"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+    </div>
   </div>
 
   <!-- v269: Rota (staff shifts) and Delivery (driver shifts) are now separate
@@ -1018,26 +1067,15 @@ body{
        state.type — which _doShowView now sets to 'inside' or 'delivery' when
        switching to the corresponding tab, taking over the job the old
        setType()-via-pill-click used to do. -->
+  <!-- v271: the "···" overflow menu moved up into #header (row 1), next to
+       refresh — see #rota-more-wrap/#delivery-more-wrap above. This toolbar
+       row is now just the week-nav, stretched full width via .week-nav's
+       flex:1 (see CSS). -->
   <div id="rota-toolbar" class="rota-toolbar">
     <div class="week-nav">
       <button onclick="changeWeek(-1)">‹</button>
       <div id="week-label" class="rota-week-label">This week</div>
       <button onclick="changeWeek(1)">›</button>
-    </div>
-    <div style="flex:1"></div>
-    <div style="position:relative">
-      <button class="cp-btn" id="rota-more-btn" onclick="toggleRotaMenu('rota-menu')" title="More" style="font-size:16px;padding:0 9px;letter-spacing:2px">···</button>
-      <div id="rota-menu" style="display:none;position:absolute;top:calc(100% + 6px);right:0;z-index:600;background:var(--surface);border:1px solid var(--border2);border-radius:14px;padding:6px;min-width:168px;box-shadow:0 8px 28px rgba(0,0,0,.6)">
-        <div class="rm-item" onclick="shareRota();closeRotaMenu('rota-menu')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg> Share Rota</div>
-        <div class="rm-item" onclick="openLog();closeRotaMenu('rota-menu')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> Activity Log</div>
-        <div style="height:1px;background:var(--border);margin:4px 0"></div>
-        <div class="rm-item" onclick="saveRotaStaffToCloud();closeRotaMenu('rota-menu')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg> Save to Cloud</div>
-        <div class="rm-item" onclick="confirmSyncAll();closeRotaMenu('rota-menu')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> Full Sync (push + pull)</div>
-        <div style="height:1px;background:var(--border);margin:4px 0"></div>
-        <div class="rm-item" onclick="copyWeek();closeRotaMenu('rota-menu')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy Week</div>
-        <div class="rm-item rm-paste-item" onclick="pasteWeek();closeRotaMenu('rota-menu')" style="display:none"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg> Paste Week</div>
-        <div class="rm-item" onclick="clearWeek();closeRotaMenu('rota-menu')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg> Clear Week</div>
-      </div>
     </div>
   </div>
   <div id="delivery-toolbar" class="rota-toolbar" style="display:none">
@@ -1045,21 +1083,6 @@ body{
       <button onclick="changeWeek(-1)">‹</button>
       <div id="week-label-delivery" class="rota-week-label">This week</div>
       <button onclick="changeWeek(1)">›</button>
-    </div>
-    <div style="flex:1"></div>
-    <div style="position:relative">
-      <button class="cp-btn" id="delivery-more-btn" onclick="toggleRotaMenu('delivery-menu')" title="More" style="font-size:16px;padding:0 9px;letter-spacing:2px">···</button>
-      <div id="delivery-menu" style="display:none;position:absolute;top:calc(100% + 6px);right:0;z-index:600;background:var(--surface);border:1px solid var(--border2);border-radius:14px;padding:6px;min-width:168px;box-shadow:0 8px 28px rgba(0,0,0,.6)">
-        <div class="rm-item" onclick="shareRota();closeRotaMenu('delivery-menu')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg> Share Rota</div>
-        <div class="rm-item" onclick="openLog();closeRotaMenu('delivery-menu')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> Activity Log</div>
-        <div style="height:1px;background:var(--border);margin:4px 0"></div>
-        <div class="rm-item" onclick="saveRotaStaffToCloud();closeRotaMenu('delivery-menu')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg> Save to Cloud</div>
-        <div class="rm-item" onclick="confirmSyncAll();closeRotaMenu('delivery-menu')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> Full Sync (push + pull)</div>
-        <div style="height:1px;background:var(--border);margin:4px 0"></div>
-        <div class="rm-item" onclick="copyWeek();closeRotaMenu('delivery-menu')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy Week</div>
-        <div class="rm-item rm-paste-item" onclick="pasteWeek();closeRotaMenu('delivery-menu')" style="display:none"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg> Paste Week</div>
-        <div class="rm-item" onclick="clearWeek();closeRotaMenu('delivery-menu')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg> Clear Week</div>
-      </div>
     </div>
   </div>
 
@@ -1192,12 +1215,13 @@ body{
         </div>
       </div>
 
-      <!-- Week Nav -->
+      <!-- Week Nav — v271: the lock icon moved up into #header (row 1), next
+           to refresh — see #sales-lock-wrap above. This row is now just the
+           week-nav (arrows + label), matching Rota/Delivery's row 2. -->
       <div id="sales-week-nav">
         <button onclick="changeSalesWeek(-1)">‹</button>
         <div id="sales-week-label">Loading…</div>
         <button onclick="changeSalesWeek(1)">›</button>
-        <button id="sales-lock-btn" onclick="toggleSalesLock()" style="margin-left:6px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:6px 10px;font-size:16px;cursor:pointer;line-height:1;display:flex;align-items:center" title="Unlock sales figures"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></button>
       </div>
 
       <!-- Weekly Table -->
@@ -1416,7 +1440,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 270; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 271; // ← bump this on every deploy — auto-shows in Settings
 // Detect an installed iOS/Android Home Screen PWA — Realtime/network behave very
 // differently here vs a normal browser tab (see the v226 fix in the reconnect logic
 // below), so several recovery paths branch on this.
@@ -2885,6 +2909,15 @@ function _doShowView(v){
   if(rotaToolbar)rotaToolbar.style.display=v==='rota'?'flex':'none';
   const deliveryToolbar=document.getElementById('delivery-toolbar');
   if(deliveryToolbar)deliveryToolbar.style.display=v==='delivery'?'flex':'none';
+  // v271: the "···" menu / Sales lock icon now live in #header (row 1)
+  // instead of each tab's own toolbar row — toggle which wrap (if any) is
+  // visible for the active tab, same on/off pattern as the toolbars above.
+  const rotaMoreWrap=document.getElementById('rota-more-wrap');
+  if(rotaMoreWrap)rotaMoreWrap.style.display=v==='rota'?'':'none';
+  const deliveryMoreWrap=document.getElementById('delivery-more-wrap');
+  if(deliveryMoreWrap)deliveryMoreWrap.style.display=v==='delivery'?'':'none';
+  const salesLockWrap=document.getElementById('sales-lock-wrap');
+  if(salesLockWrap)salesLockWrap.style.display=v==='sales'?'':'none';
   if(v==='rota')state.type='inside';
   if(v==='delivery')state.type='delivery';
   if(v==='staff'){renderStaff();populateNewStaffPalette();}
