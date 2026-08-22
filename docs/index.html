@@ -490,7 +490,21 @@ body{
 
 /* ─── Bottom Nav ─────────────────────────────────── */
 #bottom-nav{
-  position:fixed;left:0;right:0;bottom:0;margin:0 auto;
+  position:fixed;left:0;right:0;
+  /* v286 — the hard evidence from v285's HUD (real device): innerHeight,
+     document.documentElement.clientHeight, visualViewport.height, AND this
+     bar's own getBoundingClientRect().bottom all agreed at 812 — completely
+     self-consistent — while env(safe-area-inset-bottom) correctly probed at
+     34px and the screenshot still showed a real magenta gap below the bar.
+     That combination means #bottom-nav's box is being measured AND painted
+     exactly where CSS says (bottom:0 = the JS-reported viewport edge), but on
+     this device that JS-reported edge is not the true physical bottom — the
+     true edge is ~34px further down, into the area viewport-fit=cover exists
+     specifically to unlock. So bottom:0 was simply the wrong target the whole
+     time, not a rendering bug: we were correctly hitting 812, we just needed
+     to reach past it. Shifting bottom to a negative offset equal to
+     --safe-bottom pushes the box's bottom edge into that unlockable zone. */
+  bottom:calc(-1 * var(--safe-bottom));margin:0 auto;
   width:100%;max-width:480px;
   display:flex;
   /* v282 TEMP DEBUG — do not ship: bright cyan stand-in for #191919. Round 1
@@ -532,7 +546,15 @@ body{
      auto for horizontal centering — functionally identical, but removes
      `transform` from #bottom-nav's own rule entirely, one less variable while
      we're hardening this against WebKit-specific fixed-position quirks. */
-  padding-bottom:var(--safe-bottom);
+  /* v286 — padding-bottom doubled to 2×--safe-bottom to compensate for the
+     bottom:-safe-bottom shift above: one copy keeps the same visual cushion
+     between the label and the true edge that v283 established, and the
+     second copy is the extra box height needed so the TOP of the bar (and
+     therefore the icons/labels inside it) stays at exactly the same screen
+     position as before — only the box's own bottom edge (background/border)
+     extends further down, into the newly-reached true safe area. Nothing
+     about where the tap targets themselves sit should change from this. */
+  padding-bottom:calc(var(--safe-bottom) * 2);
   /* v234 — previously padding-bottom:var(--safe-bottom) lived here. That correctly
      extended the bar's own background down to the true bottom edge on notched/
      home-indicator iPhones, but the tap targets (icon+label inside .nav-btn) kept
@@ -1610,20 +1632,22 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 285; // ← bump this on every deploy — auto-shows in Settings
-// v282-v285: TEMPORARY DEBUG BUILD — body/#bottom-nav swapped to magenta/cyan
-// to diagnose the bottom-nav black-gap report. v282's screenshot proved the
-// gap is a real layout bug (magenta, not black). v283 (moving --safe-bottom
-// onto #bottom-nav's own padding) had ZERO visible effect on a real-device
-// screenshot — ruling that theory out. v284 relocated #bottom-nav to be a
-// direct child of <body> (fully independent of #app/#main-app's own
-// height/dvh handling) and added an on-screen diagnostic HUD (top of screen)
-// reporting real measured values. v285 just hardens the HUD's own timing
-// (hooks into showScreen() + a short repeating refresh) so it reliably shows
-// numbers for whatever screen is actually visible in the screenshot, instead
-// of a fixed-timer snapshot that could catch the app mid-transition. MUST be
-// reverted to the real #191919 theme colors AND have the HUD removed once
-// this is resolved — do not leave this shipped.
+const APP_VERSION = 286; // ← bump this on every deploy — auto-shows in Settings
+// v282-v286: TEMPORARY DEBUG BUILD — body/#bottom-nav swapped to magenta/cyan
+// to diagnose the bottom-nav black-gap report. v282 proved the gap is a real
+// layout bug. v283/v284 (relocating where --safe-bottom is declared, and
+// relocating #bottom-nav to be a direct body child) had zero visible effect.
+// v285's HUD gave the decisive evidence: innerHeight/clientHeight/
+// visualViewport.height/#bottom-nav's own getBoundingClientRect().bottom all
+// agreed at 812, while env(safe-area-inset-bottom) correctly probed 34px —
+// meaning bottom:0 was hitting exactly where CSS says, but that's not the
+// true physical edge on this device; the true edge is ~34px further down,
+// in the zone viewport-fit=cover unlocks. v286 shifts #bottom-nav's bottom
+// to a negative offset (-1 * --safe-bottom) to reach into that zone, with
+// padding-bottom doubled to 2×--safe-bottom so the icons/labels themselves
+// don't shift position — only the box's own background/border extends
+// further down. MUST be reverted to the real #191919 theme colors AND have
+// the HUD removed once this is confirmed — do not leave this shipped.
 // Detect an installed iOS/Android Home Screen PWA — Realtime/network behave very
 // differently here vs a normal browser tab (see the v226 fix in the reconnect logic
 // below), so several recovery paths branch on this.
@@ -1678,13 +1702,15 @@ function _debugHud(){
   const safeAreaProbe=getComputedStyle(probe).paddingBottom;
   document.body.removeChild(probe);
   hud.textContent=
-    `v284 DEBUG HUD — innerHeight:${window.innerHeight} `+
+    `v286 DEBUG HUD — innerHeight:${window.innerHeight} `+
     `docElClientHeight:${document.documentElement.clientHeight} `+
     `vvHeight:${vv?vv.height:'n/a'} vvOffsetTop:${vv?vv.offsetTop:'n/a'}\n`+
     `navRect.bottom:${rect?rect.bottom.toFixed(1):'n/a'} `+
     `navRect.top:${rect?rect.top.toFixed(1):'n/a'} `+
-    `navParent:${bn?bn.parentElement.id||bn.parentElement.tagName:'n/a'} `+
-    `envSafeAreaBottomProbe:${safeAreaProbe}`;
+    `navRect.height:${rect?rect.height.toFixed(1):'n/a'} `+
+    `navParent:${bn?bn.parentElement.id||bn.parentElement.tagName:'n/a'}\n`+
+    `envSafeAreaBottomProbe:${safeAreaProbe} `+
+    `(v286: navRect.bottom should now read ~innerHeight+34 if the fix worked)`;
 }
 document.addEventListener('DOMContentLoaded',()=>{
   setTimeout(_debugHud,300);
