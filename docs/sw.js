@@ -1,6 +1,6 @@
-/* CC Manager Service Worker — v264 */
+/* CC Manager Service Worker — v265 */
 
-const CACHE = 'cc-v264';
+const CACHE = 'cc-v265';
 const CDN_SUPABASE = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
 
 // v260 — ROOT CAUSE of the third auto-update report: this file's fetch handler
@@ -140,7 +140,7 @@ self.addEventListener('activate', event => {
         // auto-reloads on this message — it only shows the Update/Don't Update
         // popup and waits for the user (see the SW_UPDATED handler there).
         const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-        clients.forEach(client => client.postMessage({ type: 'SW_UPDATED', version: 264 }));
+        clients.forEach(client => client.postMessage({ type: 'SW_UPDATED', version: 265 }));
       })
   );
 });
@@ -167,7 +167,12 @@ async function _serveLastConsented(request){
   let names;
   try{ names = await caches.keys(); }catch(e){ return null; }
   names = names.filter(k => k !== CACHE && /^cc-v\d+$/.test(k));
-  names.sort((a, b) => Number(b.slice(5)) - Number(a.slice(5)));
+  // v265: fixed off-by-one — "cc-v" is 4 chars (c,c,-,v), so the version
+  // number starts at index 4, not 5. The old .slice(5) dropped the leading
+  // digit of the version (e.g. "cc-v262".slice(5) === "62", not "262"),
+  // which happened to not affect any pair tested so far (same leading
+  // digit) but would misorder e.g. v199 vs v200.
+  names.sort((a, b) => Number(b.slice(4)) - Number(a.slice(4)));
   for(const name of names){
     try{
       const c = await caches.open(name);
