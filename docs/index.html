@@ -1548,7 +1548,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 279; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 280; // ← bump this on every deploy — auto-shows in Settings
 // Detect an installed iOS/Android Home Screen PWA — Realtime/network behave very
 // differently here vs a normal browser tab (see the v226 fix in the reconnect logic
 // below), so several recovery paths branch on this.
@@ -2555,7 +2555,18 @@ async function saveEarlyToCloud(wk,day){
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function loadSchedules(){
-  const wks=[weekKey(-1),weekKey(0),weekKey(1)];
+  // v280 — this used to ALWAYS fetch only last/this/next week relative to the
+  // real calendar date, never whatever week the user actually had open. Any
+  // week further out than that (view it once, come back days later, second
+  // device, cleared browser storage, etc.) was never re-fetched from
+  // Supabase at all — it just showed whatever happened to already be sitting
+  // in local cache for that week, which for a never-before-loaded week is
+  // nothing. Real data on the server, but the UI rendered it as a blank
+  // week, indistinguishable from "no shifts scheduled". Now the currently-
+  // viewed week (state.weekOffset) is always included alongside the
+  // near-today window, so navigating out to a distant week pulls its real
+  // rows instead of showing empty.
+  const wks=[...new Set([weekKey(-1),weekKey(0),weekKey(1),weekKey(state.weekOffset)])];
   // Seed state.schedules from local cache FIRST so pending-unsynced shifts survive the merge
   const cached=_loadSchedCache();
   Object.assign(state.schedules,cached);
