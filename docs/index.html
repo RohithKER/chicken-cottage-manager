@@ -1548,7 +1548,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 278; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 279; // ← bump this on every deploy — auto-shows in Settings
 // Detect an installed iOS/Android Home Screen PWA — Realtime/network behave very
 // differently here vs a normal browser tab (see the v226 fix in the reconnect logic
 // below), so several recovery paths branch on this.
@@ -2363,6 +2363,15 @@ async function syncAll(){
         await saveShiftToCloud(s.type,s.wk,s.day,s.col,s.names);
       }
     }
+    // 0b. v279 — retry any Clear Week deletes that never confirmed (see the
+    // _pendingClears comment above setShift/loadSchedules for why this
+    // matters: an unconfirmed clear must never be allowed to sit around
+    // indefinitely, since step 3 below would otherwise be free to re-push
+    // whatever's in state.schedules for that week+type as if it were real).
+    if(_pendingClears.size>0){
+      logActivity(`Retrying ${_pendingClears.size} pending week clear(s)…`,'saving');
+      for(const tw of [..._pendingClears]){ await _retryPendingClear(tw); }
+    }
     // 1. Settings: colours, blacklist, column layouts
     await Promise.race([loadColsFromCloud(),_tout(6000)]);
     // 2. Staff list from cloud
@@ -2372,12 +2381,21 @@ async function syncAll(){
       state.staff.delivery=staffData.filter(s=>s.type==='delivery'||s.type==='both').map(s=>s.name);
       _reconcileBlacklist();
     }
-    // 3. Push ALL local schedule changes to Supabase FIRST so nothing is lost
-    const pushRows=Object.entries(state.schedules).map(([key,names])=>{
-      const parts=key.split('|');
-      return{schedule_type:parts[0],week_key:parts[1],day:parts[2],shift_col:parts[3],
-             staff_names:names,updated_at:new Date().toISOString()};
-    });
+    // 3. Push ALL local schedule changes to Supabase FIRST so nothing is lost.
+    // v279: EXCEPT rows belonging to a week+type with a still-unconfirmed
+    // clear (see step 0b above) — those must never be re-confirmed to the
+    // server as real data. In practice step 0b just retried/cleared all of
+    // them, so this filter is defense-in-depth, not the primary guard.
+    const pushRows=Object.entries(state.schedules)
+      .filter(([key])=>{
+        const parts=key.split('|');
+        return !_pendingClears.has(`${parts[0]}|${parts[1]}`);
+      })
+      .map(([key,names])=>{
+        const parts=key.split('|');
+        return{schedule_type:parts[0],week_key:parts[1],day:parts[2],shift_col:parts[3],
+               staff_names:names,updated_at:new Date().toISOString()};
+      });
     if(pushRows.length>0){
       const{error}=await Promise.race([
         db.from('schedules').upsert(pushRows,{onConflict:'schedule_type,week_key,day,shift_col'}),
@@ -2552,6 +2570,11 @@ async function loadSchedules(){
       const k=`${row.schedule_type}|${row.week_key}|${row.day}|${row.shift_col}`;
       if(_pendingShiftSet.has(k)) return; // unconfirmed local save in flight — local wins
       if(Date.now()-(_localSaveTs[k]||0) < _LOCAL_WINS_MS) return; // just-confirmed edit — local wins
+      // v279 — an unconfirmed Clear Week is in flight for this row's whole
+      // week+type: the server may still have this row simply because our
+      // DELETE hasn't landed yet. Never let that stale read resurrect it —
+      // see the _pendingClears comment above for the full bug this closes.
+      if(_pendingClears.has(`${row.schedule_type}|${row.week_key}`)) return;
       state.schedules[k]=row.staff_names||[];
     });
     _saveSchedCache(state.schedules);
@@ -2585,6 +2608,51 @@ function _loadPendingSales(){try{return new Set(JSON.parse(localStorage.getItem(
 function _savePendingSales(){try{localStorage.setItem(_PSALES_KEY,JSON.stringify([..._pendingSaleSet]));}catch{}}
 let _pendingShiftSet=_loadPendingShifts(); // shift keys with unconfirmed cloud saves
 let _pendingSaleSet=_loadPendingSales();   // sale dates with unconfirmed cloud saves
+
+// v279 — root cause of "cleared a week, names came back after an update":
+// clearWeek() deleted state.schedules locally + fired an UNTRACKED, unawaited
+// db.from('schedules').delete() with no equivalent of _pendingShiftSet/
+// _localSaveTs protecting it. Every OTHER write in this file (setShift/
+// saveShiftToCloud) is protected: while a save is in flight, _pendingShiftSet
+// makes loadSchedules() skip overwriting that key from a stale server read,
+// and _localSaveTs gives it a 10s grace window after confirmation too. A
+// clear had neither — so if ANY loadSchedules() call (periodic 1s-heartbeat
+// poll, _hardReconnect/_pwaResume on foreground, realtime resubscribe) ran
+// while the DELETE was still in flight (normal on a slow connection — this is
+// a single network round trip, not instant), it would find the not-yet-
+// deleted rows still on the server and unconditionally write them back into
+// state.schedules — resurrecting the "cleared" names from a live pull.
+// Worse: _applyUpdate() (the "Update" button) calls syncAll() BEFORE
+// reloading, and syncAll() step 3 unconditionally upserts every row currently
+// in state.schedules back to Supabase as a fresh, confirmed write — so if the
+// resurrection above happened to land in the moments before the user tapped
+// "Update" (a very likely moment for a reload/reconnect cycle to fire), that
+// transient glitch got re-saved as real, timestamped data instead of self-
+// correcting on the next fetch. Two-stage bug, one root cause: a clear was
+// never given the same "local wins until confirmed" protection a save gets.
+// _pendingClears (below) closes both paths: loadSchedules()'s merge now
+// skips ANY row belonging to a week+type with an unconfirmed pending clear,
+// and syncAll()'s bulk push now filters those rows out too, so even if
+// something else briefly repopulates state.schedules, it can't be re-
+// confirmed to the server while a clear is still outstanding.
+const _PCLEAR_KEY='cc_pending_clears_v1';
+function _loadPendingClears(){try{return new Set(JSON.parse(localStorage.getItem(_PCLEAR_KEY)||'[]'));}catch{return new Set();}}
+function _savePendingClears(){try{localStorage.setItem(_PCLEAR_KEY,JSON.stringify([..._pendingClears]));}catch{}}
+let _pendingClears=_loadPendingClears(); // `${schedule_type}|${week_key}` entries with an unconfirmed cloud clear
+async function _retryPendingClear(typeWeekKey){
+  const [type,wk]=typeWeekKey.split('|');
+  try{
+    const{error}=await db.from('schedules').delete().eq('schedule_type',type).eq('week_key',wk);
+    if(error)throw error;
+    _pendingClears.delete(typeWeekKey);
+    _savePendingClears();
+    logActivity(`Week ${wk} (${type}) clear confirmed ✓`,'success');
+    return true;
+  }catch(e){
+    console.warn('cc: pending clear retry failed:',typeWeekKey,e);
+    return false;
+  }
+}
 function _updateSaveIndicator(){
   const btn=document.getElementById('sync-btn');
   if(!btn)return;
@@ -2765,12 +2833,21 @@ async function saveRotaStaffToCloud(){
   const _tout=ms=>new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),ms));
   let pushRows=[];
   try{
-    // Push all local schedule rows
-    pushRows=Object.entries(state.schedules).map(([key,names])=>{
-      const parts=key.split('|');
-      return{schedule_type:parts[0],week_key:parts[1],day:parts[2],shift_col:parts[3],
-             staff_names:names,updated_at:new Date().toISOString()};
-    });
+    // Push all local schedule rows. v279: skip any row belonging to a
+    // week+type with a still-unconfirmed Clear Week (see the _pendingClears
+    // comment near setShift/loadSchedules) — same reasoning as syncAll()'s
+    // step 3, applied here since this button is the other place that does a
+    // blind bulk push of everything currently in state.schedules.
+    pushRows=Object.entries(state.schedules)
+      .filter(([key])=>{
+        const parts=key.split('|');
+        return !_pendingClears.has(`${parts[0]}|${parts[1]}`);
+      })
+      .map(([key,names])=>{
+        const parts=key.split('|');
+        return{schedule_type:parts[0],week_key:parts[1],day:parts[2],shift_col:parts[3],
+               staff_names:names,updated_at:new Date().toISOString()};
+      });
     if(pushRows.length>0){
       const{error}=await Promise.race([
         db.from('schedules').upsert(pushRows,{onConflict:'schedule_type,week_key,day,shift_col'}),
@@ -4201,17 +4278,35 @@ function clearWeek(){
     'Clear Week',
     `Clear all shifts for ${weekLabel(state.weekOffset)}?`,
     'Clear',
-    function(){
+    async function(){
       const wk=weekKey();
-      Object.keys(state.schedules).forEach(k=>{if(k.startsWith(`${state.type}|${wk}|`))delete state.schedules[k];});
+      const type=state.type;
+      Object.keys(state.schedules).forEach(k=>{if(k.startsWith(`${type}|${wk}|`))delete state.schedules[k];});
       _saveSchedCache(state.schedules); // persist clear immediately — force-close won't revert it
       renderRota();
-      db.from('schedules').delete()
-        .eq('schedule_type',state.type).eq('week_key',wk)
-        .then(({error})=>{
-          if(error){logActivity('Clear week cloud failed: '+error.message,'error');toast('⚠ Cleared locally — will sync on ↻');}
-          else{logActivity(`Week ${wk} (${state.type}) cleared ✓`,'success');toast('Week cleared ✓');}
-        }).catch(()=>{toast('⚠ Cleared locally — check connection');});
+      // v279 — register BEFORE the delete even starts (not after it fails) so
+      // there is no window at all where a concurrent loadSchedules() (periodic
+      // poll, hard-reconnect, etc.) could read the not-yet-deleted server rows
+      // and resurrect them into state.schedules. See the _pendingClears
+      // comment above for the full failure mode this closes.
+      const typeWeekKey=`${type}|${wk}`;
+      _pendingClears.add(typeWeekKey);
+      _savePendingClears();
+      try{
+        const{error}=await db.from('schedules').delete()
+          .eq('schedule_type',type).eq('week_key',wk);
+        if(error)throw error;
+        _pendingClears.delete(typeWeekKey);
+        _savePendingClears();
+        logActivity(`Week ${wk} (${type}) cleared ✓`,'success');
+        toast('Week cleared ✓');
+      }catch(e){
+        // Leave it in _pendingClears — _retryPendingOnLoad()/syncAll() will
+        // actually retry the delete now (previously this toast promised "will
+        // sync on ↻" but nothing ever retried it).
+        logActivity('Clear week cloud failed: '+(e.message||e),'error');
+        toast('⚠ Cleared locally — will retry on ↻');
+      }
     }
   );
 }
@@ -4430,6 +4525,19 @@ async function approveUser(userId,email){
 async function _retryPendingOnLoad(){
   const shiftCount=_pendingShiftSet.size;
   const salesCount=_pendingSaleSet.size;
+  const clearCount=_pendingClears.size;
+  // v279 — retry any Clear Week deletes left unconfirmed from a previous
+  // session BEFORE anything else touches state.schedules this session (in
+  // particular, before the loadSchedules()/loadFromCloud() calls that follow
+  // shortly after boot). Unlike pending shifts/sales below, a failed clear
+  // retry must NOT have its _pendingClears entry removed — that entry is the
+  // only thing stopping a future fetch from resurrecting the not-actually-
+  // deleted server rows, so it has to persist until the delete truly
+  // succeeds, not just until we've tried once.
+  if(clearCount>0){
+    toast(`⚠ ${clearCount} pending week clear${clearCount!==1?'s':''} found — syncing to cloud…`);
+    for(const tw of [..._pendingClears]){ await _retryPendingClear(tw); }
+  }
   if(shiftCount===0&&salesCount===0)return;
   const total=shiftCount+salesCount;
   toast(`⚠ ${total} unsaved change${total!==1?'s':''} found — syncing to cloud…`);
@@ -4529,6 +4637,14 @@ function setupRealtime(){
         const r=payload.new;
         const k=`${r.schedule_type}|${r.week_key}|${r.day}|${r.shift_col}`;
         const msSinceLocalSave = Date.now() - (_localSaveTs[k] || 0);
+        // v279 — a live INSERT/UPDATE event is a third path (alongside
+        // loadSchedules()'s poll and syncAll()'s bulk push) that could
+        // resurrect a just-cleared week: a delayed/replayed event for a row
+        // that existed before the clear (e.g. queued during a brief
+        // disconnect, delivered after reconnect) would otherwise land here
+        // and reinstate it. Same guard as loadSchedules() — never let a
+        // week+type with an unconfirmed Clear Week accept incoming rows.
+        if(_pendingClears.has(`${r.schedule_type}|${r.week_key}`)) return;
         if(!_pendingShiftSet.has(k)){
           if(r.staff_names&&r.staff_names.length>0){
             // Skip (v227) if we confirmed a local save for this key within the last
