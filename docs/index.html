@@ -1039,13 +1039,13 @@ body{
     <div id="view-rota" class="view active">
       <!-- Staff rota — shown when type=inside -->
       <div id="rota-inside">
-        <div id="inside-cards-wrap" class="rota-cards-wrap"></div>
-        <div id="inside-table-wrap" class="rota-table-wrap" style="display:none"></div>
+        <div id="inside-cards-wrap" class="rota-cards-wrap" style="display:none"></div>
+        <div id="inside-table-wrap" class="rota-table-wrap"></div>
       </div>
       <!-- Delivery rota — shown when type=delivery -->
       <div id="rota-delivery" style="display:none">
-        <div id="delivery-cards-wrap" class="rota-cards-wrap"></div>
-        <div id="delivery-table-wrap" class="rota-table-wrap" style="display:none"></div>
+        <div id="delivery-cards-wrap" class="rota-cards-wrap" style="display:none"></div>
+        <div id="delivery-table-wrap" class="rota-table-wrap"></div>
       </div>
     </div>
 
@@ -1383,7 +1383,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 266; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 267; // ← bump this on every deploy — auto-shows in Settings
 // Detect an installed iOS/Android Home Screen PWA — Realtime/network behave very
 // differently here vs a normal browser tab (see the v226 fix in the reconnect logic
 // below), so several recovery paths branch on this.
@@ -2063,13 +2063,14 @@ let state = {
     }catch{return{};}
   })()
 };
-// v266: hardcoded to 'cards' — the cards/table view-toggle buttons were
-// removed from the header (barely used), so there's no UI left to switch to
-// or back out of 'table' mode. Reading a stale 'table' value out of
-// localStorage here would silently strand anyone who'd previously toggled it
-// with no way back. Table-mode rendering code is left in place (harmless,
+// v266: hardcoded to 'table' — the cards/table view-toggle buttons were
+// removed from the header (barely used), so there's no UI left to switch
+// modes at all. The requested default going forward is table view, so this
+// is pinned to 'table' rather than reading a possibly-stale 'cards' value out
+// of localStorage, which would otherwise silently strand anyone on cards
+// view with no way back. Card-mode rendering code is left in place (harmless,
 // unreachable) rather than ripped out, in case it's wanted again later.
-let viewMode = 'cards';
+let viewMode = 'table';
 let modalCtx = null;
 let modalSel = [];
 let modalEarlyMap = new Map(); // early starters {name→time} being edited in current modal
