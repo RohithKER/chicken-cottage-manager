@@ -188,17 +188,8 @@ body{
   pointer-events:none;text-shadow:0 1px 3px rgba(0,0,0,.5);
 }
 .cp-swatch:active{transform:scale(1.05)}
-.view-toggle{
-  display:flex;background:var(--surface);border:1px solid var(--border);
-  border-radius:9px;overflow:hidden;flex-shrink:0;margin-left:2px;
-}
-.vt-btn{
-  padding:7px 10px;border:none;background:none;
-  color:var(--text3);font-size:12px;font-weight:500;cursor:pointer;
-  transition:all .15s;white-space:nowrap;min-height:36px;
-  display:flex;align-items:center;justify-content:center;
-}
-.vt-btn.active{background:var(--surface2);color:var(--text);font-weight:700}
+/* v266: .view-toggle/.vt-btn (card/table view-toggle buttons) removed along
+   with the header markup — the buttons were barely used. */
 
 /* ─── Content ────────────────────────────────────── */
 #content{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain;padding-bottom:calc(58px + var(--safe-bottom))}
@@ -1010,20 +1001,23 @@ body{
     <img class="logo" id="app-logo" src="" alt="CC" style="width:32px;height:32px;border-radius:50%;object-fit:cover;flex-shrink:0">
     <h1>CC Chelmsford</h1>
     <div id="header-spacer"></div>
-    <div class="week-nav">
-      <button onclick="changeWeek(-1)">‹</button>
-      <div id="week-label">This week</div>
-      <button onclick="changeWeek(1)">›</button>
-    </div>
     <div class="icon-btn" id="sync-btn" onclick="refreshFromCloud()" title="Refresh data from cloud"><span class="refresh-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></span></div>
-    <div class="icon-btn" onclick="toggleUserMenu()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
   </div>
 
   <div id="type-tabs">
     <button class="type-tab active" id="type-tab-staff" onclick="setType('inside')">Staff</button>
     <button class="type-tab" id="type-tab-delivery" onclick="setType('delivery')">Delivery</button>
     <div style="flex:1"></div>
-    <!-- Overflow menu -->
+    <!-- Week nav — moved here from #header (v266) so it sits between the type
+         tabs and the overflow menu instead of the top row; see comment near
+         the removed .view-toggle below. -->
+    <div class="week-nav">
+      <button onclick="changeWeek(-1)">‹</button>
+      <div id="week-label">This week</div>
+      <button onclick="changeWeek(1)">›</button>
+    </div>
+    <!-- Overflow menu — now the rightmost control (v266), where the card/table
+         view toggle used to be, since that toggle was removed as barely used. -->
     <div style="position:relative">
       <button class="cp-btn" id="rota-more-btn" onclick="toggleRotaMenu()" title="More" style="font-size:16px;padding:0 9px;letter-spacing:2px">···</button>
       <div id="rota-menu" style="display:none;position:absolute;top:calc(100% + 6px);right:0;z-index:600;background:var(--surface);border:1px solid var(--border2);border-radius:14px;padding:6px;min-width:168px;box-shadow:0 8px 28px rgba(0,0,0,.6)">
@@ -1037,11 +1031,6 @@ body{
         <div class="rm-item" id="rm-paste" onclick="pasteWeek();closeRotaMenu()" style="display:none"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg> Paste Week</div>
         <div class="rm-item" onclick="clearWeek();closeRotaMenu()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg> Clear Week</div>
       </div>
-    </div>
-    <!-- View toggle -->
-    <div class="view-toggle">
-      <button class="vt-btn active" id="vt-cards" onclick="setViewMode('cards')" title="Card view"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
-      <button class="vt-btn" id="vt-table" onclick="setViewMode('table')" title="Table view"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg></button>
     </div>
   </div>
 
@@ -1394,7 +1383,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 265; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 266; // ← bump this on every deploy — auto-shows in Settings
 // Detect an installed iOS/Android Home Screen PWA — Realtime/network behave very
 // differently here vs a normal browser tab (see the v226 fix in the reconnect logic
 // below), so several recovery paths branch on this.
@@ -2074,7 +2063,13 @@ let state = {
     }catch{return{};}
   })()
 };
-let viewMode = localStorage.getItem('cc_view') || 'cards';
+// v266: hardcoded to 'cards' — the cards/table view-toggle buttons were
+// removed from the header (barely used), so there's no UI left to switch to
+// or back out of 'table' mode. Reading a stale 'table' value out of
+// localStorage here would silently strand anyone who'd previously toggled it
+// with no way back. Table-mode rendering code is left in place (harmless,
+// unreachable) rather than ripped out, in case it's wanted again later.
+let viewMode = 'cards';
 let modalCtx = null;
 let modalSel = [];
 let modalEarlyMap = new Map(); // early starters {name→time} being edited in current modal
@@ -2780,9 +2775,8 @@ function renderStaff(){
 /* ─── View Mode ──────────────────────────────────────── */
 function setViewMode(mode){
   viewMode=mode;
-  localStorage.setItem('cc_view',mode);
-  document.getElementById('vt-cards').classList.toggle('active',mode==='cards');
-  document.getElementById('vt-table').classList.toggle('active',mode==='table');
+  // v266: the vt-cards/vt-table toggle buttons were removed from the header,
+  // so there are no button elements left to mark active here.
   ['inside','delivery'].forEach(t=>{
     document.getElementById(`${t}-cards-wrap`).style.display=mode==='cards'?'block':'none';
     document.getElementById(`${t}-table-wrap`).style.display=mode==='table'?'block':'none';
@@ -2818,10 +2812,10 @@ function _doShowView(v){
   document.querySelectorAll('.nav-btn').forEach(x=>x.classList.remove('active'));
   document.getElementById(`view-${v}`).classList.add('active');
   document.getElementById(`nav-${v}`).classList.add('active');
+  // v266: week-nav now lives inside #type-tabs (moved from the shared #header
+  // row), so hiding/showing type-tabs for non-rota views already takes the
+  // week-nav with it — no separate toggle needed here any more.
   document.getElementById('type-tabs').style.display=v==='rota'?'flex':'none';
-  // Hide rota-specific header controls when not on rota view
-  const wkNav=document.querySelector('.week-nav');
-  if(wkNav)wkNav.style.display=v==='rota'?'flex':'none';
   if(v==='staff'){renderStaff();populateNewStaffPalette();}
   if(v==='sales'){
     _updateSalesLockBtn();
