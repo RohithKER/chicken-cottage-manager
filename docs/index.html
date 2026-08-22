@@ -16,46 +16,21 @@
 <style>
 /* ─── Reset ──────────────────────────────────────── */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-/* v284 — dropped the "height:100%;height:100dvh" override pattern down to a
-   plain 100% on html/body and #app/#main-app below. In a Home-Screen
-   standalone PWA there is no dynamically-appearing/disappearing browser
-   toolbar for dvh to account for in the first place (that's the entire
-   reason dvh exists over vh) — so it was never solving a real problem here,
-   while v283's fix (moving --safe-bottom to #bottom-nav's own padding) had
-   zero visible effect on a real-device screenshot, which rules out the
-   "auto-height doesn't include child padding" theory and points instead at
-   the outer shell's own height calculation being unreliable on this device.
-   100% against a Home Screen PWA's fixed native window is the simpler,
-   better-supported quantity — removing dvh as a variable entirely.
-
-   v288 — the full bottom-zone dump (real device) proved html, body, #app,
-   and #main-app ALL report their own bottom edge at exactly innerHeight
-   (812), with document.elementsFromPoint() finding literally nothing at all
-   — not even body/html — anywhere past that line. So the DOCUMENT ITSELF is
-   capped 30+px short of the true physical screen; no amount of #bottom-nav-
-   specific CSS could ever have worked, because there's no document to
-   render into past 812 in the first place. v284 already switched this rule
-   from height:100dvh to height:100% and it made no difference (812 either
-   way) — so plain 100% is ALSO resolving to the small/safe-area-excluded
-   viewport here, not just dvh specifically. Testing explicit 100vh now,
-   since vh and % are not guaranteed equivalent (% resolves against the
-   initial containing block's computed height, which recent WebKit iOS
-   versions have had genuine regressions around — see the iOS 26 safe-area
-   bugs found via web research two rounds ago — while vh/lvh are meant to
-   target the "large viewport" explicitly, which should include the safe
-   area). If 100vh still reads 812, the next step is trying 100lvh
-   specifically, since WebKit's own spec distinguishes vh from lvh even
-   though most engines currently treat them the same. */
+/* ROOT CAUSE / FIX (resolved after v282-v289 investigation) — on some
+   WebKit/iOS builds (confirmed: iPhone 17, iOS 26.6), sizing html/body/#app/
+   #main-app with height:100% (or 100dvh) resolves against the JS-reported
+   "small" viewport (window.innerHeight, safe-area excluded) rather than the
+   true physical screen height — capping the ENTIRE DOCUMENT short of the
+   real bottom edge and leaving body's background exposed below #bottom-nav
+   no matter how #bottom-nav itself is styled. Explicit height:100vh resolves
+   correctly to the true physical height on this device/OS and must be kept
+   on all four of these elements (html, body, #app, #main-app). Confirmed
+   fixed via real-device diagnostic dump + screenshot: nav now sits flush to
+   the true bottom edge with no gap. Do not revert to 100% or 100dvh here. */
 html,body{height:100vh;overflow:hidden;overscroll-behavior:none}
 body{
   font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',sans-serif;
-  /* v282 TEMP DEBUG — do not ship: bright magenta stand-in for #191919, purely
-     to find out (via a real device screenshot) whether the reported bottom-nav
-     black gap is part of this page's own paint (in which case it'll turn
-     magenta) or native iOS/WKWebView chrome outside the DOM entirely (in which
-     case it'll stay solid black). REVERT to background:#191919 as soon as the
-     answer comes back — see matching TEMP DEBUG comment on #bottom-nav below. */
-  background:#ff00ff;color:rgba(255,255,255,0.88);
+  background:#191919;color:rgba(255,255,255,0.88);
   -webkit-tap-highlight-color:transparent;
   touch-action:manipulation;
   -webkit-text-size-adjust:100%;
@@ -510,116 +485,19 @@ body{
 /* ─── Bottom Nav ─────────────────────────────────── */
 #bottom-nav{
   position:fixed;left:0;right:0;
-  /* v286 (REVERTED in v287) — tried bottom:calc(-1 * var(--safe-bottom)) on
-     the theory that the box just needed to reach past the JS-reported 812px
-     edge into a further-down true physical edge. DISPROVED by a controlled
-     Chrome test: forcing --safe-bottom to 34px and sampling
-     elementFromPoint() down the bar's length showed the box's PAINT and HIT-
-     TESTING silently stop at window.innerHeight, even though
-     getBoundingClientRect() reported a taller box reaching past it — pixels
-     requested beyond the browser's actual rendering surface simply don't
-     exist to paint, in any engine. So v286's larger navRect numbers on the
-     real device were real but meaningless: nothing painted in that extra
-     space either. Back to bottom:0 — the real fix has to be about why this
-     WKWebView's rendering surface doesn't extend into the safe area despite
-     env(safe-area-inset-bottom) correctly reporting 34px, not about pushing
-     a fixed element past whatever surface it's given. */
   bottom:0;margin:0 auto;
   width:100%;max-width:480px;
   display:flex;
-  /* v282 TEMP DEBUG — do not ship: bright cyan stand-in for #191919. Round 1
-     of this debug build proved (real device screenshot) that the gap below
-     this bar renders in body's magenta, not black — meaning this bar's own
-     box was falling short of the true physical bottom edge, a real layout
-     bug, not native OS chrome. See the v283 fix directly below for what
-     changed and why. REVERT to background:#191919 once the fix is confirmed.
-     v287 — found the actual root cause via web research: a documented Safari
-     26 iOS bug where a position:fixed element with a FULLY OPAQUE solid
-     background gets clipped and fails to paint into part of the area it's
-     positioned over, while the exact same element with the tiniest bit of
-     transparency (alpha 0.99 instead of 1) paints correctly across the whole
-     area — Safari apparently routes opaque vs. near-opaque fixed layers
-     through different compositing paths, and only the near-opaque one
-     reliably covers the full safe-area-inclusive region. This matches every
-     symptom exactly: correct layout geometry (confirmed via getBoundingClientRect
-     in earlier rounds), paint stopping short despite that. Using rgba(...,0.99)
-     here as the test color — visually indistinguishable from fully opaque —
-     to confirm this theory before applying the same 0.99 alpha to the real
-     #191919 production color. Source: Edoardo Lunardi, "Safari 26 and the
-     Strange Case of Fixed Overlays" (edoardolunardi.dev), Sept 2025. */
-  background:rgba(0,255,255,0.99);border-top:1px solid var(--border);
+  background:#191919;border-top:1px solid var(--border);
   z-index:20;
-  /* v283 — root-cause fix for the confirmed real gap (magenta showed below
-     this bar in the v282 debug screenshot). Previously the ONLY place
-     --safe-bottom was applied was inside .nav-btn's own padding-bottom (see
-     the v278 comment below on .nav-btn) — #bottom-nav itself had no explicit
-     padding-bottom of its own, and relied entirely on flex's default
-     align-items:stretch to pull its auto/intrinsic height up to match its
-     tallest .nav-btn child (content + 8px top pad + (6px + safe-bottom)
-     bottom pad). That's an extra layer of indirection: #bottom-nav's own
-     rendered box height, in that setup, is not itself driven by any value
-     that includes --safe-bottom — it's whatever height the flex algorithm
-     decides its intrinsic content needs, which on this specific WKWebView
-     standalone-PWA runtime evidently doesn't reliably grow by the full
-     calc(6px + var(--safe-bottom)) amount baked into a child's padding (a
-     real, if hard-to-fully-explain-from-a-desktop-browser, WebKit auto-height/
-     calc()/env() interaction — Chrome's rendering of the same markup does NOT
-     reproduce this, which is exactly why every prior desktop/Chrome
-     verification kept coming back clean). Fixed by applying --safe-bottom
-     directly as padding-bottom on #bottom-nav's OWN box below — its own
-     explicit box model, not inherited via a child's intrinsic-sizing — and
-     removing the identical amount from .nav-btn's padding-bottom (see below)
-     so the safe-area allowance is still counted exactly once, not doubled
-     (doubling it back would reintroduce the original v234 "big black gap"
-     bug this whole investigation started from). Total visual spacing between
-     the label and the true bottom edge is unchanged by this refactor — only
-     WHERE that space is declared moved, from an auto-sized child's padding to
-     the fixed-positioned parent's own explicit padding, which is the more
-     robust, spec-unambiguous place for it to live. Also dropped
-     left:50%/transform:translateX(-50%) in favor of left:0;right:0;margin:0
-     auto for horizontal centering — functionally identical, but removes
-     `transform` from #bottom-nav's own rule entirely, one less variable while
-     we're hardening this against WebKit-specific fixed-position quirks. */
-  /* v286's padding-bottom doubling (2×--safe-bottom) is reverted in v287
-     along with the bottom:-safe-bottom shift above — see that comment for
-     why. Back to a single copy, as established in v283. */
+  /* --safe-bottom is applied exactly once, as this element's own
+     padding-bottom (not duplicated on .nav-btn — see the comment there).
+     The real root cause of the long-investigated bottom-nav gap was never
+     here: it was html/body/#app/#main-app being sized with height:100%,
+     which capped the whole document short of the true screen height on
+     some WebKit/iOS builds — see the fix and explanation on the html,body
+     rule above. */
   padding-bottom:var(--safe-bottom);
-  /* v234 — previously padding-bottom:var(--safe-bottom) lived here. That correctly
-     extended the bar's own background down to the true bottom edge on notched/
-     home-indicator iPhones, but the tap targets (icon+label inside .nav-btn) kept
-     their original position above that padding, so the safe-area space just looked
-     like an unclaimed strip of background below the icons rather than the icons
-     themselves sitting closer to the edge. Moved the safe-area allowance onto
-     .nav-btn's own min-height instead (see below), with justify-content:center, so
-     the icon/label group visually shifts down together with the bar rather than
-     staying pinned above a growing gap. Requires viewport-fit=cover on the
-     <meta name="viewport"> tag to get a non-zero env(safe-area-inset-bottom) at
-     all — already present in this file (checked), so no change needed there.
-
-     v238 — a real on-device photo (not just numbers) finally showed what the
-     Chrome-simulated test couldn't: a genuine, visible color seam between the
-     icon row and the strip below it, which really is pure black, not this bar's
-     own color. Re-checked manifest.json: background_color and theme_color are
-     already #191919, and the <meta name="theme-color"> tag matches too — so
-     there's no mismatch in the fields the manifest/meta spec actually exposes.
-     What WAS still slightly off: this rule's own background was a translucent
-     rgba(22,22,22,0.97) over a backdrop-filter blur — technically a hair darker
-     than the app's real #191919 background once blended, and reliant on
-     whatever's scrolled behind it. Changed to a flat, opaque #191919 (byte-
-     identical to manifest/theme-color/body) and dropped the now-pointless
-     backdrop-filter (nothing shows through an opaque background anyway) so
-     there is exactly one dark color used everywhere, top to bottom, with no
-     blending step that could ever drift from it.
-
-     Flagging honestly: if the black strip in the photo is coming from native
-     iOS chrom (the window's own background behind the WebView, outside the
-     page's DOM/CSS/manifest entirely — plausible, since nothing paint-side in
-     this page has explained it despite two rounds of direct, on-device-matching
-     tests), this change won't touch it, and manifest_color changes are also
-     part of the install-time-cached category like the icon itself — may need
-     another remove-and-re-add to even take effect, on top of possibly not
-     being the real mechanism at all.
-  */
 }
 .nav-btn{
   flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:3px;
@@ -1661,22 +1539,17 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 289; // ← bump this on every deploy — auto-shows in Settings
-// v282-v289: TEMPORARY DEBUG BUILD — body/#bottom-nav swapped to magenta/cyan
-// to diagnose the bottom-nav black-gap report. v282 proved the gap is a real
-// layout bug. v283/v284/v286/v287 (relocating --safe-bottom, relocating
-// #bottom-nav to a direct body child, shifting bottom to a negative offset,
-// and fixing a documented Safari 26 opaque-fixed-layer clipping bug) ALL had
-// zero visible effect on the real device. v288's full bottom-zone dump found
-// the actual cause: html, body, #app, and #main-app ALL report their own
-// bottom edge at exactly innerHeight — the DOCUMENT ITSELF is capped short of
-// the true physical screen, so no #bottom-nav-specific CSS could ever have
-// worked. v289 switches html/body/#app/#main-app from height:100% (set in
-// v284, no different from the original 100dvh — both capped at the same
-// value) to explicit height:100vh, testing whether vh resolves against a
-// larger viewport than % does on this specific WebKit build. MUST be
-// reverted to the real #191919 theme color AND have the HUD removed once
-// this is resolved — do not leave this shipped.
+const APP_VERSION = 290; // ← bump this on every deploy — auto-shows in Settings
+// v282-v289 investigated a long-standing bottom-nav gap report (a strip of
+// body's background visible below #bottom-nav on real devices). Root cause,
+// confirmed in v289: html/body/#app/#main-app were sized with height:100%,
+// which on some WebKit/iOS builds resolves against the JS-reported "small"
+// viewport rather than the true physical screen — capping the whole document
+// short of the real bottom edge, so no #bottom-nav-specific fix could ever
+// have worked. Fixed by switching those four elements to explicit
+// height:100vh (see the html,body rule and #bottom-nav rule for details).
+// v290 removes the temporary debug colors and diagnostic HUD used to
+// investigate this, now that the fix is confirmed on-device.
 // Detect an installed iOS/Android Home Screen PWA — Realtime/network behave very
 // differently here vs a normal browser tab (see the v226 fix in the reconnect logic
 // below), so several recovery paths branch on this.
@@ -1685,112 +1558,18 @@ document.addEventListener('DOMContentLoaded',()=>{
   const el=document.getElementById('app-version-label');
   if(el)el.textContent=`Version ${APP_VERSION}${IS_STANDALONE?' • PWA':''} • Cloud sync`;
 });
-// v284 TEMP DEBUG — do not ship past this diagnostic round.
-// Part 1: physically relocate #bottom-nav to be a DIRECT CHILD OF <body>,
-// completely independent of #app/#main-app's own nesting/height calculation.
-// v283 (moving --safe-bottom's declaration onto #bottom-nav's own
-// padding-bottom) had zero visible effect on a real-device screenshot, which
-// rules out "auto-height doesn't include child padding" as the cause and
-// means the whole #app > #main-app > #bottom-nav nesting itself is suspect,
-// not just how #bottom-nav's own box is sized. This makes #bottom-nav as
-// structurally simple as possible: <body> is its ONLY ancestor from here on,
-// so nothing about #app/#main-app's height/flex/dvh handling can be involved
-// even indirectly. showScreen() above already toggles #bottom-nav's display
-// in lockstep with #main-app to compensate for it no longer being hidden
-// automatically as a side effect of #main-app's own display:none.
+// #bottom-nav is kept as a direct child of <body>, independent of
+// #app/#main-app's own nesting — a deliberate structural simplification so
+// nothing about #app/#main-app's height/flex handling can affect it even
+// indirectly. showScreen() toggles its display in lockstep with #main-app
+// to compensate for it no longer being hidden automatically as a side
+// effect of #main-app's own display:none.
 document.addEventListener('DOMContentLoaded',()=>{
   const bn=document.getElementById('bottom-nav');
   if(bn && bn.parentElement!==document.body){
     bn.style.display='none'; // starts hidden; showScreen('main') reveals it
     document.body.appendChild(bn);
   }
-});
-// Part 2: on-screen diagnostic HUD — a real device screenshot with this build
-// gives us hard numbers instead of another blind CSS guess. Answers exactly
-// what the user asked: does #bottom-nav's own rendered bottom edge actually
-// reach window.innerHeight? Does visualViewport.height differ from
-// innerHeight (a real, documented source of iOS fixed-position/safe-area
-// mismatches)? What is --safe-bottom actually resolving to on this device?
-// REMOVE this whole HUD block once the bottom-nav gap is confirmed fixed.
-// v288 TEMP DEBUG — full rewrite of the HUD per the user's explicit request
-// after v287 (documented Safari 26 opaque-fixed-layer fix) STILL showed no
-// visible change: stop assuming the gap is #bottom-nav's own background at
-// all. This dumps, on every load: (1) every element in the document whose
-// bounding rect intersects the bottom ~100px of the screen (plus a little
-// beyond innerHeight, in case something is rendered past what JS considers
-// the viewport), with its computed position/z-index/background/opacity, and
-// (2) document.elementsFromPoint() (the FULL stack at a point, not just the
-// topmost hit) sampled at several y-coordinates spanning that same zone.
-// This answers definitively what is actually occupying the magenta strip,
-// rather than assuming it's #bottom-nav.
-function _fullBottomZoneDump(){
-  const zoneTop = window.innerHeight - 100;
-  const all = document.querySelectorAll('*');
-  const hits = [];
-  all.forEach(el=>{
-    if(el.id==='_debug-hud') return;
-    const r = el.getBoundingClientRect();
-    if(r.width===0 && r.height===0) return;
-    if(r.bottom < zoneTop || r.top > window.innerHeight + 60) return;
-    const cs = getComputedStyle(el);
-    hits.push({
-      tag: el.tagName,
-      id: el.id||null,
-      cls: (el.className && el.className.toString) ? el.className.toString().slice(0,40) : null,
-      top: +r.top.toFixed(1), bottom: +r.bottom.toFixed(1),
-      left: +r.left.toFixed(1), right: +r.right.toFixed(1),
-      position: cs.position, zIndex: cs.zIndex,
-      bg: cs.backgroundColor, opacity: cs.opacity,
-      display: cs.display, visibility: cs.visibility
-    });
-  });
-  const xMid = window.innerWidth/2;
-  const pointSamples = [];
-  for(const dy of [-90,-70,-50,-30,-10,0,10,20,30,40]){
-    const y = window.innerHeight + dy;
-    let stack;
-    try{
-      stack = (document.elementsFromPoint(xMid, y)||[]).map(e=>e.id||e.className||e.tagName);
-    }catch(e){ stack = ['ERR:'+e.message]; }
-    pointSamples.push({y: Math.round(y), stack});
-  }
-  return {innerHeight: window.innerHeight, xMid, hits, pointSamples};
-}
-function _debugHud(){
-  let hud=document.getElementById('_debug-hud');
-  if(!hud){
-    hud=document.createElement('div');
-    hud.id='_debug-hud';
-    hud.style.cssText='position:fixed;top:0;left:0;right:0;max-height:70vh;z-index:99999;'+
-      'background:rgba(0,0,0,0.9);color:#0f0;font:9px/1.35 monospace;'+
-      'padding:4px 6px;white-space:pre-wrap;overflow-y:auto;pointer-events:auto;'+
-      '-webkit-overflow-scrolling:touch;';
-    document.body.appendChild(hud);
-  }
-  const dump = _fullBottomZoneDump();
-  const lines = [`v${APP_VERSION} FULL BOTTOM-ZONE DUMP — innerHeight:${dump.innerHeight} xMid:${dump.xMid.toFixed(0)}`,
-    ``,
-    `-- elements intersecting bottom ~100px (${dump.hits.length} found) --`];
-  dump.hits
-    .sort((a,b)=>b.top-a.top)
-    .forEach(h=>{
-      lines.push(`${h.tag}#${h.id||'-'} .${h.cls||'-'} top:${h.top} bot:${h.bottom} L:${h.left} R:${h.right} pos:${h.position} z:${h.zIndex} bg:${h.bg} op:${h.opacity} disp:${h.display} vis:${h.visibility}`);
-    });
-  lines.push(``, `-- elementsFromPoint(xMid, innerHeight+dy) --`);
-  dump.pointSamples.forEach(p=>{
-    lines.push(`y=${p.y}: [${p.stack.join(', ')||'(empty)'}]`);
-  });
-  hud.textContent = lines.join('\n');
-}
-document.addEventListener('DOMContentLoaded',()=>{
-  setTimeout(_debugHud,300);
-  window.addEventListener('resize',()=>setTimeout(_debugHud,300));
-  window.addEventListener('orientationchange',()=>setTimeout(_debugHud,300));
-  // Safety-net refresh for the first few seconds after load, in case a
-  // screen transition happens without going through showScreen() directly
-  // (e.g. an already-active Supabase session resolving asynchronously).
-  let _n=0;
-  const _iv=setInterval(()=>{ _debugHud(); if(++_n>=8)clearInterval(_iv); },500);
 });
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
 // Days with early starters and their start time label
@@ -4715,10 +4494,10 @@ function showScreen(screen){
   document.getElementById('auth-screen').style.display='none';
   document.getElementById('pending-screen').style.display='none';
   document.getElementById('main-app').style.display='none';
-  // v284: #bottom-nav was moved to be a direct child of <body> (see the
-  // _relocateBottomNav() call below) so it's no longer hidden automatically
-  // when #main-app is display:none — it needs its own explicit toggle here,
-  // in lockstep with main-app, so it still only shows on the actual app
+  // #bottom-nav is a direct child of <body> (see the relocation logic near
+  // APP_VERSION above), so it's no longer hidden automatically when
+  // #main-app is display:none — it needs its own explicit toggle here, in
+  // lockstep with main-app, so it still only shows on the actual app
   // screens and not during loading/auth/pending.
   const _bn=document.getElementById('bottom-nav');
   if(_bn)_bn.style.display='none';
@@ -4733,11 +4512,6 @@ function showScreen(screen){
     if(_bn)_bn.style.display='flex';
     setViewMode(viewMode);
   }
-  // v284 TEMP DEBUG: refresh the diagnostic HUD every time the screen
-  // changes, so it always reflects whatever's actually on-screen in a
-  // real-device screenshot rather than a fixed timer guess that might fire
-  // before/after the relevant transition.
-  if(typeof _debugHud==='function')setTimeout(_debugHud,50);
 }
 /* ─── Toast ──────────────────────────────────────────── */
 function toast(msg){
