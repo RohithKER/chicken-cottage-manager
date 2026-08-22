@@ -660,17 +660,21 @@ body{
 /* v272: horizontal padding matched to .rota-toolbar's (10px, was 14px) so the
    week-nav row sits at the exact same width/inset as Rota/Delivery — side by
    side, the arrows were noticeably closer to center on Sales than on Rota.
-   Vertical padding stays at 10px (Sales' arrow buttons are 40x40 vs Rota's
-   36x36, so it needs a touch more vertical room). */
+   v273: the row's HEIGHT still didn't match — this row used 10px vertical
+   padding + 40x40 arrow buttons, vs Rota/Delivery's 6px vertical padding +
+   36x36 buttons, making Sales' row noticeably taller. Padding and button size
+   (and font-size, which scales with the button) now match .rota-toolbar /
+   .week-nav button exactly, so all three tabs' week-nav rows are the same
+   height as well as the same width/inset. */
 #sales-week-nav{
   display:flex;align-items:center;justify-content:space-between;
-  padding:10px;border-bottom:1px solid var(--border);flex-shrink:0;
+  padding:6px 10px;border-bottom:1px solid var(--border);flex-shrink:0;
 }
 #sales-week-nav button{
   background:none;border:none;color:var(--text2);
-  width:40px;height:40px;border-radius:8px;
+  width:36px;height:36px;border-radius:8px;
   display:flex;align-items:center;justify-content:center;
-  font-size:22px;cursor:pointer;transition:background .1s;
+  font-size:20px;cursor:pointer;transition:background .1s;
 }
 #sales-week-nav button:active{background:var(--surface2)}
 #sales-week-label{font-size:14px;font-weight:700;color:var(--text);letter-spacing:-0.2px}
@@ -853,6 +857,13 @@ body{
 #perms-overlay.open{opacity:1;pointer-events:auto}
 #perms-sheet{transform:translateY(40px) scale(.96);transition:transform .22s cubic-bezier(.22,.68,0,1)}
 #perms-overlay.open #perms-sheet{transform:translateY(0) scale(1)}
+/* ─── Manage Staff sheet open/close animation ── */
+/* v273: identical fade+scale technique to #perms-overlay/#perms-sheet above —
+   same sheet pattern, just reached from a different Settings row. */
+#staff-mgmt-overlay{opacity:0;transition:opacity .22s;pointer-events:none}
+#staff-mgmt-overlay.open{opacity:1;pointer-events:auto}
+#staff-mgmt-sheet{transform:translateY(40px) scale(.96);transition:transform .22s cubic-bezier(.22,.68,0,1)}
+#staff-mgmt-overlay.open #staff-mgmt-sheet{transform:translateY(0) scale(1)}
 
 /* ─── Round A animation pass (v257) ──────────────────────────
    Brings every remaining "dead" (instant-snap) overlay in line with the
@@ -1172,6 +1183,21 @@ body{
           <div class="um-switch" id="unique-switch-settings" style="flex-shrink:0"></div>
         </div>
       </div>
+      <!-- v273: "Manage Staff" — lets staff be added/edited/removed from
+           Settings too, in addition to the existing Staff bottom-nav tab
+           (both stay in place side by side for now; see openStaffMgmtSheet()
+           below). Gated by the same can_view_staff_tab permission that
+           already controls the Staff tab's visibility, rather than a new
+           flag — same underlying "can this user see staff management"
+           question, just a second entry point onto it. -->
+      <div class="settings-group" id="settings-staff-group">
+        <div class="sg-label">Staff</div>
+        <div class="si" onclick="openStaffMgmtSheet()">
+          <div class="si-icon" style="background:rgba(167,139,250,.15)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+          <div><strong>Manage Staff</strong><span>Add, rename, recolour, or remove staff</span></div>
+          <div class="si-arr">›</div>
+        </div>
+      </div>
       <div class="settings-group">
         <div class="sg-label">Data</div>
         <div class="si" onclick="exportBackup()">
@@ -1388,6 +1414,47 @@ body{
   </div>
 </div>
 
+<!-- v273: Manage Staff sheet — reached from the new Settings row, same
+     bottom-sheet pattern as #perms-overlay/#perms-sheet above. Reuses the
+     Staff tab's exact list/add-form markup (renderStaff()/
+     populateNewStaffPalette()/addStaff() now write to both this sheet's
+     containers and the Staff tab's, suffixed '-modal' vs '' — see those
+     functions), and the same rename/color-pick/delete overlays the Staff tab
+     already uses (showInputDialog/#color-sheet-overlay/showConfirm) —
+     those three had their z-index raised to sit above this sheet, see the
+     v273 z-index notes near #confirm-overlay/#input-dialog-overlay/
+     #color-sheet-overlay. -->
+<div id="staff-mgmt-overlay" style="display:none;position:fixed;inset:0;z-index:9700;background:rgba(0,0,0,.75);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);align-items:flex-end;justify-content:center">
+  <div id="staff-mgmt-sheet" style="width:100%;max-width:480px;background:var(--surface);border-radius:20px 20px 0 0;border-top:1px solid var(--border2);padding:0 0 calc(env(safe-area-inset-bottom,0px)+20px);max-height:90dvh;display:flex;flex-direction:column;gap:0">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 12px;border-bottom:1px solid var(--border);flex-shrink:0">
+      <div style="font-size:16px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><span>Manage Staff</span></div>
+      <div onclick="closeStaffMgmtSheet()" style="cursor:pointer;font-size:20px;color:var(--text3);padding:4px 8px">×</div>
+    </div>
+    <div style="overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1;min-height:0;padding:14px 16px 8px">
+      <div class="section-label">Staff</div>
+      <div class="staff-list" id="sl-inside-modal"></div>
+      <div class="section-label">Delivery Staff</div>
+      <div class="staff-list" id="sl-delivery-modal"></div>
+      <div class="add-form" id="staff-add-panel-modal">
+        <label>Add Staff Member</label>
+        <input class="input" id="ns-name-modal" placeholder="Full name" autocorrect="off" autocapitalize="words" maxlength="40" style="margin-bottom:8px">
+        <select class="input" id="ns-type-modal">
+          <option value="inside">Staff</option>
+          <option value="delivery">Delivery</option>
+          <option value="both">Both</option>
+        </select>
+        <div style="margin:6px 0 2px">
+          <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Colour</div>
+          <div id="new-staff-palette-modal" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:2px"></div>
+        </div>
+        <div class="form-row">
+          <button class="btn-sm primary" onclick="addStaff('-modal')">Add Member</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Shift Picker Modal -->
 <div id="overlay" onclick="handleOverlay(event)">
   <div id="sheet">
@@ -1445,7 +1512,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 272; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 273; // ← bump this on every deploy — auto-shows in Settings
 // Detect an installed iOS/Android Home Screen PWA — Realtime/network behave very
 // differently here vs a normal browser tab (see the v226 fix in the reconnect logic
 // below), so several recovery paths branch on this.
@@ -1869,6 +1936,11 @@ function _applyPermUI(){
   if(salesBtn)salesBtn.style.display=(_perms.can_view_sales||_perms.can_edit_sales)?'':'none';
   const staffBtn=document.getElementById('nav-staff');
   if(staffBtn)staffBtn.style.display=_perms.can_view_staff_tab?'':'none';
+  // v273: "Manage Staff" row in Settings — same can_view_staff_tab permission
+  // as the bottom-nav tab above (this is a second entry point onto the same
+  // underlying access question, not a new permission).
+  const staffSettingsGroup=document.getElementById('settings-staff-group');
+  if(staffSettingsGroup)staffSettingsGroup.style.display=_perms.can_view_staff_tab?'':'none';
   // Sales edit controls — hidden for view-only users
   const hint=document.getElementById('sales-tap-hint');
   if(hint)hint.textContent=canEditSales?'Tap a day to enter sales':'Tap a day to view sales';
@@ -1990,6 +2062,25 @@ function closePermsPanel(){
   // hide via display:none after the 220ms transition finishes, instead of
   // cutting the animation off instantly.
   const overlay=document.getElementById('perms-overlay');
+  overlay.classList.remove('open');
+  setTimeout(()=>{overlay.style.display='none';},220);
+}
+
+/* ─── Manage Staff Sheet (v273) ──────────────────────
+   Reached from the new Settings row — reuses the Staff tab's own
+   renderStaff()/populateNewStaffPalette() (suffix '-modal') so it always
+   shows the exact same data as the tab, no separate load step needed. Same
+   open/close choreography as openPermsPanel()/closePermsPanel() above. */
+function openStaffMgmtSheet(){
+  closeUserMenu();
+  const overlay=document.getElementById('staff-mgmt-overlay');
+  overlay.style.display='flex';
+  requestAnimationFrame(()=>overlay.classList.add('open'));
+  renderStaff();
+  populateNewStaffPalette('-modal');
+}
+function closeStaffMgmtSheet(){
+  const overlay=document.getElementById('staff-mgmt-overlay');
   overlay.classList.remove('open');
   setTimeout(()=>{overlay.style.display='none';},220);
 }
@@ -2839,24 +2930,33 @@ function renderTable(type){
 
 function renderStaff(){
   const canEdit=_perms.can_edit_staffs;
-  // Show/hide the Add Member panel based on permission
-  const addPanel=document.getElementById('staff-add-panel');
-  if(addPanel)addPanel.style.display=canEdit?'':'none';
-  ['inside','delivery'].forEach(t=>{
-    const el=document.getElementById(`sl-${t}`);
-    if(!state.staff[t]||!state.staff[t].length){
-      el.innerHTML='<div style="color:var(--text3);font-size:13px;padding:8px 0">No staff yet</div>';return;
-    }
-    // v249 security fix: staff names are free text and were being inserted into
-    // innerHTML unescaped, both as visible text and inside inline onclick JS
-    // strings — escHtml() for display/attribute contexts, escHtml(escJsStr())
-    // wherever a name is embedded inside a single-quoted onclick argument.
-    el.innerHTML=state.staff[t].map(n=>`<div class="staff-item">
-      <div class="staff-color-dot" ${canEdit?`onclick="pickStaffColor('${escHtml(escJsStr(n))}','${t}')" style="width:28px;height:28px;border-radius:50%;background:${getStaffHex(n,t)};flex-shrink:0;cursor:pointer;border:2px solid rgba(255,255,255,.2)"`:`style="width:28px;height:28px;border-radius:50%;background:${getStaffHex(n,t)};flex-shrink:0;border:2px solid rgba(255,255,255,.2)"`}></div>
-      <span class="pill" style="${pillStyle(n,t)}${canEdit?';cursor:pointer;user-select:none':''}" ${canEdit?`onclick="renameStaff('${t}','${escHtml(escJsStr(n))}')" title="Tap to rename"`:''}>${escHtml(n)}</span>
-      <div style="flex:1"></div>
-      ${canEdit?`<button class="btn-del" onclick="removeStaff('${t}','${escHtml(escJsStr(n))}')">×</button>`:''}
-    </div>`).join('');
+  // v273: Staff can now be managed from two places — the original Staff tab
+  // (suffix '') and the new "Manage Staff" sheet reachable from Settings
+  // (suffix '-modal', see openStaffMgmtSheet()). Both read/write the exact
+  // same state.staff data, so every render here updates BOTH sets of
+  // containers, keeping them in lockstep no matter which surface (or
+  // neither) is currently visible.
+  ['','-modal'].forEach(suffix=>{
+    // Show/hide the Add Member panel based on permission
+    const addPanel=document.getElementById('staff-add-panel'+suffix);
+    if(addPanel)addPanel.style.display=canEdit?'':'none';
+    ['inside','delivery'].forEach(t=>{
+      const el=document.getElementById(`sl-${t}${suffix}`);
+      if(!el)return;
+      if(!state.staff[t]||!state.staff[t].length){
+        el.innerHTML='<div style="color:var(--text3);font-size:13px;padding:8px 0">No staff yet</div>';return;
+      }
+      // v249 security fix: staff names are free text and were being inserted into
+      // innerHTML unescaped, both as visible text and inside inline onclick JS
+      // strings — escHtml() for display/attribute contexts, escHtml(escJsStr())
+      // wherever a name is embedded inside a single-quoted onclick argument.
+      el.innerHTML=state.staff[t].map(n=>`<div class="staff-item">
+        <div class="staff-color-dot" ${canEdit?`onclick="pickStaffColor('${escHtml(escJsStr(n))}','${t}')" style="width:28px;height:28px;border-radius:50%;background:${getStaffHex(n,t)};flex-shrink:0;cursor:pointer;border:2px solid rgba(255,255,255,.2)"`:`style="width:28px;height:28px;border-radius:50%;background:${getStaffHex(n,t)};flex-shrink:0;border:2px solid rgba(255,255,255,.2)"`}></div>
+        <span class="pill" style="${pillStyle(n,t)}${canEdit?';cursor:pointer;user-select:none':''}" ${canEdit?`onclick="renameStaff('${t}','${escHtml(escJsStr(n))}')" title="Tap to rename"`:''}>${escHtml(n)}</span>
+        <div style="flex:1"></div>
+        ${canEdit?`<button class="btn-del" onclick="removeStaff('${t}','${escHtml(escJsStr(n))}')">×</button>`:''}
+      </div>`).join('');
+    });
   });
 }
 
@@ -3312,10 +3412,15 @@ function closeModal(){
 function handleOverlay(e){if(e.target===document.getElementById('overlay'))closeModal();}
 
 /* ─── Staff CRUD ─────────────────────────────────────── */
-async function addStaff(){
+// v273: suffix parameter — same dual-surface reasoning as renderStaff()/
+// populateNewStaffPalette() above. Defaults to '' so the Staff tab's existing
+// "Add Member" button (which calls addStaff() with no argument) is unaffected.
+async function addStaff(suffix=''){
   if(!requirePerm('can_edit_staffs','manage staff'))return;
-  const name=sanitizeNameInput(document.getElementById('ns-name').value,40);
-  const type=document.getElementById('ns-type').value;
+  const nameEl=document.getElementById('ns-name'+suffix);
+  const typeEl=document.getElementById('ns-type'+suffix);
+  const name=sanitizeNameInput(nameEl.value,40);
+  const type=typeEl.value;
   if(!name){toast('Enter a name');return;}
   // Un-blacklist if they were previously removed
   if(staffBlacklist.has(name)){
@@ -3325,7 +3430,7 @@ async function addStaff(){
   }
   if(type==='inside'||type==='both'){if(!state.staff.inside.includes(name))state.staff.inside.push(name);}
   if(type==='delivery'||type==='both'){if(!state.staff.delivery.includes(name))state.staff.delivery.push(name);}
-  document.getElementById('ns-name').value='';
+  nameEl.value='';
   // Save colour — use typed keys if in both lists so colours stay independent
   if(type==='both'){
     staffColors[name+'|inside']=newStaffColor;
@@ -3944,16 +4049,20 @@ function handleImport(e){
 }
 /* ─── New Staff Colour Selection ────────────────────── */
 let newStaffColor = COLOR_PALETTE[0];
-function populateNewStaffPalette(){
-  const el=document.getElementById('new-staff-palette');
+// v273: suffix parameter added for the same reason as renderStaff() above —
+// '' targets the Staff tab's palette, '-modal' targets the Manage Staff
+// sheet's. Defaults to '' so every pre-existing call site (which never
+// passed an argument) keeps behaving exactly as before.
+function populateNewStaffPalette(suffix=''){
+  const el=document.getElementById('new-staff-palette'+suffix);
   if(!el)return;
   el.innerHTML=COLOR_PALETTE.map(hex=>`
-    <div class="cp-swatch${hex===newStaffColor?' active':''}" data-hex="${hex}" style="background:${hex};width:36px;min-height:36px" onclick="selectNewStaffColor('${hex}')"></div>
+    <div class="cp-swatch${hex===newStaffColor?' active':''}" data-hex="${hex}" style="background:${hex};width:36px;min-height:36px" onclick="selectNewStaffColor('${hex}','${suffix}')"></div>
   `).join('');
 }
-function selectNewStaffColor(hex){
+function selectNewStaffColor(hex, suffix=''){
   newStaffColor=hex;
-  document.querySelectorAll('#new-staff-palette .cp-swatch').forEach(el=>
+  document.querySelectorAll('#new-staff-palette'+suffix+' .cp-swatch').forEach(el=>
     el.classList.toggle('active',el.dataset.hex===hex));
 }
 
@@ -5907,7 +6016,13 @@ setInterval(function(){
 </div>
 
 <!-- Confirm Dialog -->
-<div id="confirm-overlay" style="display:none;position:fixed;inset:0;z-index:9500;align-items:center;justify-content:center;background:rgba(0,0,0,.6);padding:24px">
+<!-- v273: z-index raised 9500→9750 — showConfirm() (removeStaff's "Remove
+     X?" confirmation) is now also reachable from inside #staff-mgmt-overlay
+     (z-index 9700), so this needs to sit above that or the confirm dialog
+     would render invisibly behind the sheet. Still below #generic-confirm-
+     overlay (9800) and #update-modal-overlay (9999), so those relationships
+     are unchanged. -->
+<div id="confirm-overlay" style="display:none;position:fixed;inset:0;z-index:9750;align-items:center;justify-content:center;background:rgba(0,0,0,.6);padding:24px">
   <div id="confirm-card" style="width:100%;max-width:320px;background:#252525;border-radius:16px;padding:24px;box-shadow:0 8px 32px rgba(0,0,0,.6)">
     <div id="cfm-title" style="font-size:17px;font-weight:700;color:var(--text);margin-bottom:8px"></div>
     <div id="cfm-body" style="font-size:13px;color:var(--text2);line-height:1.5;margin-bottom:20px"></div>
@@ -5942,7 +6057,10 @@ setInterval(function(){
 </div>
 
 <!-- Input Dialog (replaces native prompt() for staff rename) -->
-<div id="input-dialog-overlay" style="display:none;position:fixed;inset:0;z-index:9600;background:rgba(0,0,0,.65);align-items:center;justify-content:center;padding:24px">
+<!-- v273: z-index raised 9600→9750 — showInputDialog() (renameStaff's rename
+     prompt) is now also reachable from inside #staff-mgmt-overlay (z-index
+     9700); see the note on #confirm-overlay above. -->
+<div id="input-dialog-overlay" style="display:none;position:fixed;inset:0;z-index:9750;background:rgba(0,0,0,.65);align-items:center;justify-content:center;padding:24px">
   <div id="input-dialog-card" style="width:100%;max-width:320px;background:#252525;border-radius:16px;padding:24px;box-shadow:0 8px 32px rgba(0,0,0,.6)">
     <div id="inp-dlg-title" style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:12px"></div>
     <input id="inp-dlg-field" type="text" style="width:100%;box-sizing:border-box;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;outline:none;margin-bottom:16px" onkeydown="if(event.key==='Enter')document.getElementById('inp-dlg-ok').click();if(event.key==='Escape')closeInputDialog()">
@@ -5966,7 +6084,10 @@ setInterval(function(){
 </div>
 
 <!-- Colour Picker Sheet -->
-<div id="color-sheet-overlay" style="display:none;position:fixed;inset:0;z-index:9000;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.55)" onclick="if(event.target===this)closeColorSheet()">
+<!-- v273: z-index raised 9000→9750 — pickStaffColor() is now also reachable
+     from inside #staff-mgmt-overlay (z-index 9700); see the note on
+     #confirm-overlay above. -->
+<div id="color-sheet-overlay" style="display:none;position:fixed;inset:0;z-index:9750;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.55)" onclick="if(event.target===this)closeColorSheet()">
   <div id="color-sheet" style="width:100%;max-width:480px;background:#1a1a2e;border-radius:18px 18px 0 0;padding:20px 20px 32px;box-shadow:0 -4px 24px rgba(0,0,0,.6)">
     <div style="width:36px;height:4px;background:#333;border-radius:2px;margin:0 auto 18px"></div>
     <div style="font-size:13px;color:var(--text2);text-align:center;margin-bottom:16px">Choose colour for <strong id="cp-title" style="color:var(--text)"></strong></div>
