@@ -1,6 +1,6 @@
-/* CC Manager Service Worker — v284 */
+/* CC Manager Service Worker — v285 */
 
-const CACHE = 'cc-v284';
+const CACHE = 'cc-v285';
 const CDN_SUPABASE = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
 
 // v260 — ROOT CAUSE of the third auto-update report: this file's fetch handler

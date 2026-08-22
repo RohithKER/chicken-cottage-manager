@@ -1610,18 +1610,20 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 284; // ← bump this on every deploy — auto-shows in Settings
-// v282-v284: TEMPORARY DEBUG BUILD — body/#bottom-nav swapped to magenta/cyan
+const APP_VERSION = 285; // ← bump this on every deploy — auto-shows in Settings
+// v282-v285: TEMPORARY DEBUG BUILD — body/#bottom-nav swapped to magenta/cyan
 // to diagnose the bottom-nav black-gap report. v282's screenshot proved the
 // gap is a real layout bug (magenta, not black). v283 (moving --safe-bottom
 // onto #bottom-nav's own padding) had ZERO visible effect on a real-device
-// screenshot — ruling that theory out. v284 relocates #bottom-nav to be a
+// screenshot — ruling that theory out. v284 relocated #bottom-nav to be a
 // direct child of <body> (fully independent of #app/#main-app's own
-// height/dvh handling) and adds an on-screen diagnostic HUD (top of screen)
-// reporting real measured values, so the next screenshot gives hard evidence
-// either way instead of another blind guess. MUST be reverted to the real
-// #191919 theme colors AND have the HUD removed once this is resolved — do
-// not leave this shipped.
+// height/dvh handling) and added an on-screen diagnostic HUD (top of screen)
+// reporting real measured values. v285 just hardens the HUD's own timing
+// (hooks into showScreen() + a short repeating refresh) so it reliably shows
+// numbers for whatever screen is actually visible in the screenshot, instead
+// of a fixed-timer snapshot that could catch the app mid-transition. MUST be
+// reverted to the real #191919 theme colors AND have the HUD removed once
+// this is resolved — do not leave this shipped.
 // Detect an installed iOS/Android Home Screen PWA — Realtime/network behave very
 // differently here vs a normal browser tab (see the v226 fix in the reconnect logic
 // below), so several recovery paths branch on this.
@@ -1688,6 +1690,11 @@ document.addEventListener('DOMContentLoaded',()=>{
   setTimeout(_debugHud,300);
   window.addEventListener('resize',()=>setTimeout(_debugHud,300));
   window.addEventListener('orientationchange',()=>setTimeout(_debugHud,300));
+  // Safety-net refresh for the first few seconds after load, in case a
+  // screen transition happens without going through showScreen() directly
+  // (e.g. an already-active Supabase session resolving asynchronously).
+  let _n=0;
+  const _iv=setInterval(()=>{ _debugHud(); if(++_n>=8)clearInterval(_iv); },500);
 });
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
 // Days with early starters and their start time label
@@ -4630,6 +4637,11 @@ function showScreen(screen){
     if(_bn)_bn.style.display='flex';
     setViewMode(viewMode);
   }
+  // v284 TEMP DEBUG: refresh the diagnostic HUD every time the screen
+  // changes, so it always reflects whatever's actually on-screen in a
+  // real-device screenshot rather than a fixed timer guess that might fire
+  // before/after the relevant transition.
+  if(typeof _debugHud==='function')setTimeout(_debugHud,50);
 }
 /* ─── Toast ──────────────────────────────────────────── */
 function toast(msg){
