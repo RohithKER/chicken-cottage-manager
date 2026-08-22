@@ -1642,23 +1642,22 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 287; // ← bump this on every deploy — auto-shows in Settings
-// v282-v287: TEMPORARY DEBUG BUILD — body/#bottom-nav swapped to magenta/cyan
+const APP_VERSION = 288; // ← bump this on every deploy — auto-shows in Settings
+// v282-v288: TEMPORARY DEBUG BUILD — body/#bottom-nav swapped to magenta/cyan
 // to diagnose the bottom-nav black-gap report. v282 proved the gap is a real
-// layout bug. v283/v284/v286 (relocating --safe-bottom, relocating #bottom-nav
-// to a direct body child, shifting bottom to a negative offset) all had zero
-// visible effect on a real device — a controlled Chrome test in this same
-// session proved v286's approach specifically could never work (position:fixed
-// elements are clipped to the browser's actual rendering surface no matter
-// what CSS bottom value claims). v287 found the real root cause via web
-// research: a documented Safari 26 iOS bug where a position:fixed element
-// with a FULLY OPAQUE solid background gets clipped short, while the same
-// element with alpha 0.99 instead of 1 paints correctly across the whole
-// area it's positioned over (see the v287 comment on #bottom-nav for the
-// source). Testing that now with rgba(...,0.99) on the debug cyan color.
-// MUST be reverted to the real #191919 theme color (also given 0.99 alpha if
-// this is confirmed) AND have the HUD removed once this is confirmed — do
-// not leave this shipped.
+// layout bug. v283/v284/v286/v287 (relocating --safe-bottom, relocating
+// #bottom-nav to a direct body child, shifting bottom to a negative offset,
+// and fixing a documented Safari 26 opaque-fixed-layer clipping bug) ALL had
+// zero visible effect on the real device, despite each being a concretely
+// verified/sourced theory rather than a guess. Given that, v288 stops
+// assuming the gap has anything to do with #bottom-nav's own background at
+// all — the HUD now dumps EVERY element in the document whose bounding rect
+// intersects the bottom ~100px of the screen (position/z-index/background/
+// opacity for each), plus document.elementsFromPoint() (the full stack, not
+// just the topmost hit) sampled across that same zone. This should reveal
+// definitively what's actually occupying that space. MUST be reverted to the
+// real #191919 theme color AND have the HUD removed once this is resolved —
+// do not leave this shipped.
 // Detect an installed iOS/Android Home Screen PWA — Realtime/network behave very
 // differently here vs a normal browser tab (see the v226 fix in the reconnect logic
 // below), so several recovery paths branch on this.
@@ -1694,36 +1693,75 @@ document.addEventListener('DOMContentLoaded',()=>{
 // innerHeight (a real, documented source of iOS fixed-position/safe-area
 // mismatches)? What is --safe-bottom actually resolving to on this device?
 // REMOVE this whole HUD block once the bottom-nav gap is confirmed fixed.
+// v288 TEMP DEBUG — full rewrite of the HUD per the user's explicit request
+// after v287 (documented Safari 26 opaque-fixed-layer fix) STILL showed no
+// visible change: stop assuming the gap is #bottom-nav's own background at
+// all. This dumps, on every load: (1) every element in the document whose
+// bounding rect intersects the bottom ~100px of the screen (plus a little
+// beyond innerHeight, in case something is rendered past what JS considers
+// the viewport), with its computed position/z-index/background/opacity, and
+// (2) document.elementsFromPoint() (the FULL stack at a point, not just the
+// topmost hit) sampled at several y-coordinates spanning that same zone.
+// This answers definitively what is actually occupying the magenta strip,
+// rather than assuming it's #bottom-nav.
+function _fullBottomZoneDump(){
+  const zoneTop = window.innerHeight - 100;
+  const all = document.querySelectorAll('*');
+  const hits = [];
+  all.forEach(el=>{
+    if(el.id==='_debug-hud') return;
+    const r = el.getBoundingClientRect();
+    if(r.width===0 && r.height===0) return;
+    if(r.bottom < zoneTop || r.top > window.innerHeight + 60) return;
+    const cs = getComputedStyle(el);
+    hits.push({
+      tag: el.tagName,
+      id: el.id||null,
+      cls: (el.className && el.className.toString) ? el.className.toString().slice(0,40) : null,
+      top: +r.top.toFixed(1), bottom: +r.bottom.toFixed(1),
+      left: +r.left.toFixed(1), right: +r.right.toFixed(1),
+      position: cs.position, zIndex: cs.zIndex,
+      bg: cs.backgroundColor, opacity: cs.opacity,
+      display: cs.display, visibility: cs.visibility
+    });
+  });
+  const xMid = window.innerWidth/2;
+  const pointSamples = [];
+  for(const dy of [-90,-70,-50,-30,-10,0,10,20,30,40]){
+    const y = window.innerHeight + dy;
+    let stack;
+    try{
+      stack = (document.elementsFromPoint(xMid, y)||[]).map(e=>e.id||e.className||e.tagName);
+    }catch(e){ stack = ['ERR:'+e.message]; }
+    pointSamples.push({y: Math.round(y), stack});
+  }
+  return {innerHeight: window.innerHeight, xMid, hits, pointSamples};
+}
 function _debugHud(){
   let hud=document.getElementById('_debug-hud');
   if(!hud){
     hud=document.createElement('div');
     hud.id='_debug-hud';
-    hud.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99999;'+
-      'background:rgba(0,0,0,0.85);color:#0f0;font:10px/1.4 monospace;'+
-      'padding:4px 6px;white-space:pre-wrap;pointer-events:none;';
+    hud.style.cssText='position:fixed;top:0;left:0;right:0;max-height:70vh;z-index:99999;'+
+      'background:rgba(0,0,0,0.9);color:#0f0;font:9px/1.35 monospace;'+
+      'padding:4px 6px;white-space:pre-wrap;overflow-y:auto;pointer-events:auto;'+
+      '-webkit-overflow-scrolling:touch;';
     document.body.appendChild(hud);
   }
-  const bn=document.getElementById('bottom-nav');
-  const rect=bn?bn.getBoundingClientRect():null;
-  const vv=window.visualViewport;
-  const probe=document.createElement('div');
-  probe.style.cssText='position:fixed;bottom:0;height:0;padding-bottom:env(safe-area-inset-bottom,0px);visibility:hidden';
-  document.body.appendChild(probe);
-  const safeAreaProbe=getComputedStyle(probe).paddingBottom;
-  document.body.removeChild(probe);
-  hud.textContent=
-    `v${APP_VERSION} DEBUG HUD — innerHeight:${window.innerHeight} `+
-    `docElClientHeight:${document.documentElement.clientHeight} `+
-    `vvHeight:${vv?vv.height:'n/a'} vvOffsetTop:${vv?vv.offsetTop:'n/a'}\n`+
-    `navRect.bottom:${rect?rect.bottom.toFixed(1):'n/a'} `+
-    `navRect.top:${rect?rect.top.toFixed(1):'n/a'} `+
-    `navRect.height:${rect?rect.height.toFixed(1):'n/a'} `+
-    `navParent:${bn?bn.parentElement.id||bn.parentElement.tagName:'n/a'}\n`+
-    `envSafeAreaBottomProbe:${safeAreaProbe} `+
-    `(v287: navRect numbers should be back to matching innerHeight, as before `+
-    `v286 — the fix this round is the bar's background alpha, not its geometry; `+
-    `what matters now is whether the magenta gap in the screenshot is gone)`;
+  const dump = _fullBottomZoneDump();
+  const lines = [`v${APP_VERSION} FULL BOTTOM-ZONE DUMP — innerHeight:${dump.innerHeight} xMid:${dump.xMid.toFixed(0)}`,
+    ``,
+    `-- elements intersecting bottom ~100px (${dump.hits.length} found) --`];
+  dump.hits
+    .sort((a,b)=>b.top-a.top)
+    .forEach(h=>{
+      lines.push(`${h.tag}#${h.id||'-'} .${h.cls||'-'} top:${h.top} bot:${h.bottom} L:${h.left} R:${h.right} pos:${h.position} z:${h.zIndex} bg:${h.bg} op:${h.opacity} disp:${h.display} vis:${h.visibility}`);
+    });
+  lines.push(``, `-- elementsFromPoint(xMid, innerHeight+dy) --`);
+  dump.pointSamples.forEach(p=>{
+    lines.push(`y=${p.y}: [${p.stack.join(', ')||'(empty)'}]`);
+  });
+  hud.textContent = lines.join('\n');
 }
 document.addEventListener('DOMContentLoaded',()=>{
   setTimeout(_debugHud,300);
