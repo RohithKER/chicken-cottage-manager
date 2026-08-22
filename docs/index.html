@@ -140,7 +140,10 @@ body{
   font-size:20px;cursor:pointer;transition:background .1s;
 }
 .week-nav button:active{background:var(--surface2)}
-#week-label{font-size:12px;color:var(--text2);min-width:62px;text-align:center;font-weight:500}
+/* v269: was #week-label — now a class, since Rota and Delivery are separate
+   tabs and each has its own week-nav/label element (kept in sync together by
+   _setWeekLabels()). */
+.rota-week-label{font-size:12px;color:var(--text2);min-width:62px;text-align:center;font-weight:500}
 .icon-btn{
   background:var(--surface2);border:1px solid var(--border);
   border-radius:8px;width:36px;height:36px;
@@ -153,19 +156,18 @@ body{
 .refresh-icon.syncing{animation:spin-sync .7s linear infinite}
 @keyframes spin-sync{to{transform:rotate(360deg)}}
 
-/* ─── Type Tabs ──────────────────────────────────── */
-#type-tabs{
+/* ─── Rota/Delivery Toolbar ──────────────────────── */
+/* v269: was #type-tabs (shared by both Staff/Delivery pill-tabs inside a
+   single Rota view). Rota and Delivery are now separate top-level tabs, so
+   this is a class shared by each tab's own toolbar (#rota-toolbar,
+   #delivery-toolbar) instead of one shared, ID-addressed element. The
+   Staff/Delivery pill buttons (.type-tab) are gone — switching between them
+   is now just switching bottom-nav tabs. */
+.rota-toolbar{
   flex-shrink:0;display:flex;align-items:center;
   background:var(--bg);border-bottom:1px solid var(--border);
   padding:6px 10px;gap:4px;
 }
-.type-tab{
-  flex:1;padding:8px 6px;border:none;border-radius:8px;
-  font-size:13px;font-weight:500;cursor:pointer;
-  transition:all .15s;color:var(--text2);background:none;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-height:36px;
-}
-.type-tab.active{background:var(--surface2);color:var(--text);font-weight:700}
 .cp-btn{
   background:none;border:none;font-size:17px;padding:0 8px;cursor:pointer;
   opacity:.65;transition:opacity .15s;line-height:1;flex-shrink:0;
@@ -196,6 +198,7 @@ body{
 .view{display:none;padding:10px 10px 6px}
 .view.active{display:block}
 #view-rota{padding:0}
+#view-delivery{padding:0}
 #view-sales.active{display:flex;flex-direction:column;padding:0;height:100%;position:relative;overflow:hidden}
 /* v246 — quick fade+slide when a view/panel becomes visible. Runs purely off
    display:none→block (or the toggle of a dedicated class below), so it never
@@ -1004,32 +1007,58 @@ body{
     <div class="icon-btn" id="sync-btn" onclick="refreshFromCloud()" title="Refresh data from cloud"><span class="refresh-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></span></div>
   </div>
 
-  <div id="type-tabs">
-    <button class="type-tab active" id="type-tab-staff" onclick="setType('inside')">Staff</button>
-    <button class="type-tab" id="type-tab-delivery" onclick="setType('delivery')">Delivery</button>
-    <div style="flex:1"></div>
-    <!-- Week nav — moved here from #header (v266) so it sits between the type
-         tabs and the overflow menu instead of the top row; see comment near
-         the removed .view-toggle below. -->
+  <!-- v269: Rota (staff shifts) and Delivery (driver shifts) are now separate
+       top-level tabs instead of an in-page Staff/Delivery pill switcher inside
+       one shared "Rota" view. Each tab gets its own toolbar (week-nav +
+       overflow menu) — #rota-toolbar and #delivery-toolbar below — built from
+       the same markup, just with distinct element ids so both can exist in
+       the DOM at once (only one is ever shown, per _doShowView). They both
+       drive the same shareRota()/copyWeek()/pasteWeek()/clearWeek()/
+       saveRotaStaffToCloud() functions unchanged, since those already key off
+       state.type — which _doShowView now sets to 'inside' or 'delivery' when
+       switching to the corresponding tab, taking over the job the old
+       setType()-via-pill-click used to do. -->
+  <div id="rota-toolbar" class="rota-toolbar">
     <div class="week-nav">
       <button onclick="changeWeek(-1)">‹</button>
-      <div id="week-label">This week</div>
+      <div id="week-label" class="rota-week-label">This week</div>
       <button onclick="changeWeek(1)">›</button>
     </div>
-    <!-- Overflow menu — now the rightmost control (v266), where the card/table
-         view toggle used to be, since that toggle was removed as barely used. -->
+    <div style="flex:1"></div>
     <div style="position:relative">
-      <button class="cp-btn" id="rota-more-btn" onclick="toggleRotaMenu()" title="More" style="font-size:16px;padding:0 9px;letter-spacing:2px">···</button>
+      <button class="cp-btn" id="rota-more-btn" onclick="toggleRotaMenu('rota-menu')" title="More" style="font-size:16px;padding:0 9px;letter-spacing:2px">···</button>
       <div id="rota-menu" style="display:none;position:absolute;top:calc(100% + 6px);right:0;z-index:600;background:var(--surface);border:1px solid var(--border2);border-radius:14px;padding:6px;min-width:168px;box-shadow:0 8px 28px rgba(0,0,0,.6)">
-        <div class="rm-item" onclick="shareRota();closeRotaMenu()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg> Share Rota</div>
-        <div class="rm-item" onclick="openLog();closeRotaMenu()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> Activity Log</div>
+        <div class="rm-item" onclick="shareRota();closeRotaMenu('rota-menu')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg> Share Rota</div>
+        <div class="rm-item" onclick="openLog();closeRotaMenu('rota-menu')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> Activity Log</div>
         <div style="height:1px;background:var(--border);margin:4px 0"></div>
-        <div class="rm-item" onclick="saveRotaStaffToCloud();closeRotaMenu()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg> Save to Cloud</div>
-        <div class="rm-item" onclick="confirmSyncAll();closeRotaMenu()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> Full Sync (push + pull)</div>
+        <div class="rm-item" onclick="saveRotaStaffToCloud();closeRotaMenu('rota-menu')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg> Save to Cloud</div>
+        <div class="rm-item" onclick="confirmSyncAll();closeRotaMenu('rota-menu')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> Full Sync (push + pull)</div>
         <div style="height:1px;background:var(--border);margin:4px 0"></div>
-        <div class="rm-item" onclick="copyWeek();closeRotaMenu()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy Week</div>
-        <div class="rm-item" id="rm-paste" onclick="pasteWeek();closeRotaMenu()" style="display:none"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg> Paste Week</div>
-        <div class="rm-item" onclick="clearWeek();closeRotaMenu()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg> Clear Week</div>
+        <div class="rm-item" onclick="copyWeek();closeRotaMenu('rota-menu')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy Week</div>
+        <div class="rm-item rm-paste-item" onclick="pasteWeek();closeRotaMenu('rota-menu')" style="display:none"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg> Paste Week</div>
+        <div class="rm-item" onclick="clearWeek();closeRotaMenu('rota-menu')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg> Clear Week</div>
+      </div>
+    </div>
+  </div>
+  <div id="delivery-toolbar" class="rota-toolbar" style="display:none">
+    <div class="week-nav">
+      <button onclick="changeWeek(-1)">‹</button>
+      <div id="week-label-delivery" class="rota-week-label">This week</div>
+      <button onclick="changeWeek(1)">›</button>
+    </div>
+    <div style="flex:1"></div>
+    <div style="position:relative">
+      <button class="cp-btn" id="delivery-more-btn" onclick="toggleRotaMenu('delivery-menu')" title="More" style="font-size:16px;padding:0 9px;letter-spacing:2px">···</button>
+      <div id="delivery-menu" style="display:none;position:absolute;top:calc(100% + 6px);right:0;z-index:600;background:var(--surface);border:1px solid var(--border2);border-radius:14px;padding:6px;min-width:168px;box-shadow:0 8px 28px rgba(0,0,0,.6)">
+        <div class="rm-item" onclick="shareRota();closeRotaMenu('delivery-menu')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg> Share Rota</div>
+        <div class="rm-item" onclick="openLog();closeRotaMenu('delivery-menu')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> Activity Log</div>
+        <div style="height:1px;background:var(--border);margin:4px 0"></div>
+        <div class="rm-item" onclick="saveRotaStaffToCloud();closeRotaMenu('delivery-menu')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg> Save to Cloud</div>
+        <div class="rm-item" onclick="confirmSyncAll();closeRotaMenu('delivery-menu')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> Full Sync (push + pull)</div>
+        <div style="height:1px;background:var(--border);margin:4px 0"></div>
+        <div class="rm-item" onclick="copyWeek();closeRotaMenu('delivery-menu')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy Week</div>
+        <div class="rm-item rm-paste-item" onclick="pasteWeek();closeRotaMenu('delivery-menu')" style="display:none"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg> Paste Week</div>
+        <div class="rm-item" onclick="clearWeek();closeRotaMenu('delivery-menu')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg> Clear Week</div>
       </div>
     </div>
   </div>
@@ -1037,13 +1066,14 @@ body{
   <div id="content">
 
     <div id="view-rota" class="view active">
-      <!-- Staff rota — shown when type=inside -->
       <div id="rota-inside">
         <div id="inside-cards-wrap" class="rota-cards-wrap" style="display:none"></div>
         <div id="inside-table-wrap" class="rota-table-wrap"></div>
       </div>
-      <!-- Delivery rota — shown when type=delivery -->
-      <div id="rota-delivery" style="display:none">
+    </div>
+
+    <div id="view-delivery" class="view">
+      <div id="rota-delivery">
         <div id="delivery-cards-wrap" class="rota-cards-wrap" style="display:none"></div>
         <div id="delivery-table-wrap" class="rota-table-wrap"></div>
       </div>
@@ -1183,6 +1213,9 @@ body{
   <div id="bottom-nav">
     <button class="nav-btn active" onclick="showView('rota')" id="nav-rota">
       <div class="nav-btn-inner"><span class="nav-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span></div><span>Rota</span>
+    </button>
+    <button class="nav-btn" onclick="showView('delivery')" id="nav-delivery">
+      <div class="nav-btn-inner"><span class="nav-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg></span></div><span>Delivery</span>
     </button>
     <button class="nav-btn" onclick="showView('staff')" id="nav-staff">
       <div class="nav-btn-inner"><span class="nav-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span></div><span>Staff</span>
@@ -1383,7 +1416,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 268; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 269; // ← bump this on every deploy — auto-shows in Settings
 // Detect an installed iOS/Android Home Screen PWA — Realtime/network behave very
 // differently here vs a normal browser tab (see the v226 fix in the reconnect logic
 // below), so several recovery paths branch on this.
@@ -1815,29 +1848,37 @@ function _applyPermUI(){
   if(rotaGroup)rotaGroup.style.display=canSettings?'':'none';
   const restoreRow=document.getElementById('settings-restore-row');
   if(restoreRow)restoreRow.style.display=canSettings?'':'none';
-  // View-Rota gating: hide each type tab, hide the whole rota nav if neither granted,
-  // and switch state.type away from a forbidden type
+  // v269: Rota (staff) and Delivery (driver) gating — each is now its own
+  // bottom-nav tab, so this hides/shows the tab button itself (same pattern
+  // as can_view_staff_tab/nav-staff above), instead of hiding a pill inside a
+  // shared Rota view and nudging state.type away from a forbidden type.
   const canStaffRota=_perms.can_view_staff_rota;
   const canDriverRota=_perms.can_view_driver_rota;
-  const staffTab=document.getElementById('type-tab-staff');
-  if(staffTab)staffTab.style.display=canStaffRota?'':'none';
-  const driverTab=document.getElementById('type-tab-delivery');
-  if(driverTab)driverTab.style.display=canDriverRota?'':'none';
   const rotaBtn=document.getElementById('nav-rota');
-  if(rotaBtn)rotaBtn.style.display=(canStaffRota||canDriverRota)?'':'none';
-  if(state.type==='inside'&&!canStaffRota&&canDriverRota)setType('delivery');
-  else if(state.type==='delivery'&&!canDriverRota&&canStaffRota)setType('inside');
-  // If user is currently viewing rota but has no view perms, kick them to another visible tab
+  if(rotaBtn)rotaBtn.style.display=canStaffRota?'':'none';
+  const deliveryBtn=document.getElementById('nav-delivery');
+  if(deliveryBtn)deliveryBtn.style.display=canDriverRota?'':'none';
+  // If user is currently on a rota tab they've just lost access to, redirect
+  // to the best remaining visible tab.
   const rotaView=document.getElementById('view-rota');
-  if(rotaView&&rotaView.classList.contains('active')&&!canStaffRota&&!canDriverRota){
-    if((_perms.can_edit_staffs||_perms.is_admin)&&_perms.can_view_staff_tab)showView('staff');
+  if(rotaView&&rotaView.classList.contains('active')&&!canStaffRota){
+    if(canDriverRota)showView('delivery');
+    else if((_perms.can_edit_staffs||_perms.is_admin)&&_perms.can_view_staff_tab)showView('staff');
+    else if(_perms.can_view_sales||_perms.can_edit_sales)showView('sales');
+    else showView('settings');
+  }
+  const deliveryView=document.getElementById('view-delivery');
+  if(deliveryView&&deliveryView.classList.contains('active')&&!canDriverRota){
+    if(canStaffRota)showView('rota');
+    else if((_perms.can_edit_staffs||_perms.is_admin)&&_perms.can_view_staff_tab)showView('staff');
     else if(_perms.can_view_sales||_perms.can_edit_sales)showView('sales');
     else showView('settings');
   }
   // Same treatment for the Staff tab itself, now gated by its own view permission
   const staffView=document.getElementById('view-staff');
   if(staffView&&staffView.classList.contains('active')&&!_perms.can_view_staff_tab){
-    if(canStaffRota||canDriverRota)showView('rota');
+    if(canStaffRota)showView('rota');
+    else if(canDriverRota)showView('delivery');
     else if(_perms.can_view_sales||_perms.can_edit_sales)showView('sales');
     else showView('settings');
   }
@@ -1851,7 +1892,7 @@ function _setupPendingWatcher(userId,email){
         // Reload and enter the app
         await loadPermissions(userId,email);
         await loadFromCloud();
-        document.getElementById('week-label').textContent=weekLabel(state.weekOffset);
+        _setWeekLabels();
         renderRota();
         showScreen('main');
         setupRealtime();
@@ -2101,6 +2142,14 @@ function weekLabel(off){
   if(off===-1)return'Last week';
   const d=weekStart(off);
   return `${d.getDate()} ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()]}`;
+}
+// v269: Rota and Delivery each have their own week-nav label now (#week-label,
+// #week-label-delivery) instead of one shared #week-label — they share a
+// single state.weekOffset, so both need updating together whenever it's
+// shown/changed. Matched by class rather than enumerating both ids.
+function _setWeekLabels(){
+  const txt=weekLabel(state.weekOffset);
+  document.querySelectorAll('.rota-week-label').forEach(el=>{el.textContent=txt;});
 }
 function dayDate(di,off){
   const d=new Date(weekStart(off)); d.setDate(d.getDate()+di); return d.getDate();
@@ -2805,6 +2854,11 @@ function showView(v){
   // bypass at all (v253: removed the hardcoded-admin bypass from _applyPermData too —
   // this flag only gates a nav button, not data access, so there's no lockout risk).
   if(v==='staff'&&!_perms.can_view_staff_tab)return;
+  // v269: Rota (staff shifts) and Delivery (driver shifts) are separate
+  // top-level tabs now, each gated by its own view permission — same pattern
+  // as can_view_staff_tab above.
+  if(v==='rota'&&!_perms.can_view_staff_rota)return;
+  if(v==='delivery'&&!_perms.can_view_driver_rota)return;
   _doShowView(v);
 }
 
@@ -2813,10 +2867,17 @@ function _doShowView(v){
   document.querySelectorAll('.nav-btn').forEach(x=>x.classList.remove('active'));
   document.getElementById(`view-${v}`).classList.add('active');
   document.getElementById(`nav-${v}`).classList.add('active');
-  // v266: week-nav now lives inside #type-tabs (moved from the shared #header
-  // row), so hiding/showing type-tabs for non-rota views already takes the
-  // week-nav with it — no separate toggle needed here any more.
-  document.getElementById('type-tabs').style.display=v==='rota'?'flex':'none';
+  // v269: Rota and Delivery each have their own toolbar (week-nav + overflow
+  // menu) now, instead of one shared #type-tabs row. Whichever tab is active
+  // also sets state.type — this is what used to happen via clicking the
+  // Staff/Delivery pill inside the single Rota view (setType()); now the tab
+  // switch itself carries that job, since it IS the type switch.
+  const rotaToolbar=document.getElementById('rota-toolbar');
+  if(rotaToolbar)rotaToolbar.style.display=v==='rota'?'flex':'none';
+  const deliveryToolbar=document.getElementById('delivery-toolbar');
+  if(deliveryToolbar)deliveryToolbar.style.display=v==='delivery'?'flex':'none';
+  if(v==='rota')state.type='inside';
+  if(v==='delivery')state.type='delivery';
   if(v==='staff'){renderStaff();populateNewStaffPalette();}
   if(v==='sales'){
     _updateSalesLockBtn();
@@ -2827,6 +2888,8 @@ function _doShowView(v){
   }
   if(v==='settings'){loadPendingUsers();}
   closeUserMenu();
+  closeRotaMenu('rota-menu');
+  closeRotaMenu('delivery-menu');
 }
 
 /* ─── Sales PIN ──────────────────────────────────────────── */
@@ -3025,17 +3088,9 @@ async function saveNewPin(){
   }catch(e){toast('Error saving PIN: '+e.message);}
 }
 
-function setType(t){
-  // Block switching to a rota the user can't view
-  if(t==='inside'&&!_perms.can_view_staff_rota){toast('⛔ No permission to view staff rota');return;}
-  if(t==='delivery'&&!_perms.can_view_driver_rota){toast('⛔ No permission to view driver rota');return;}
-  state.type=t;
-  document.querySelectorAll('.type-tab').forEach((el,i)=>
-    el.classList.toggle('active',(i===0&&t==='inside')||(i===1&&t==='delivery')));
-  // Both rotas are pre-rendered — just toggle visibility, no renderRota() needed
-  document.getElementById('rota-inside').style.display=t==='inside'?'':'none';
-  document.getElementById('rota-delivery').style.display=t==='delivery'?'':'none';
-}
+// v269: setType() removed — Rota and Delivery are separate top-level tabs
+// now, so switching between them (via showView('rota')/showView('delivery'))
+// IS the type switch; see _doShowView(), which sets state.type directly.
 
 function _currentRotaWrap(){
   // Whichever wrap is actually visible right now, based on type + viewMode
@@ -3045,7 +3100,7 @@ function _currentRotaWrap(){
 
 function changeWeek(d){
   state.weekOffset+=d;
-  document.getElementById('week-label').textContent=weekLabel(state.weekOffset);
+  _setWeekLabels();
   // Load schedules AND early shifts for the new window — early tags need fresh data too
   Promise.all([loadSchedules(),loadEarlyShift()]).then(()=>{
     renderRota();
@@ -3862,29 +3917,41 @@ function updatePasteBtn(){
   // legacy btn (hidden in DOM but kept for compat)
   const btn = document.getElementById('paste-btn');
   if(btn) btn.style.display = weekClipboard ? 'flex' : 'none';
-  // overflow menu paste item
-  const rm = document.getElementById('rm-paste');
-  if(rm) rm.style.display = weekClipboard ? 'flex' : 'none';
+  // v269: overflow menu paste item — now one per tab (Rota's + Delivery's),
+  // matched by class since there are two of them now instead of one #rm-paste.
+  document.querySelectorAll('.rm-paste-item').forEach(rm=>{
+    rm.style.display = weekClipboard ? 'flex' : 'none';
+  });
 }
-function toggleRotaMenu(){
+// v269: menuId identifies which overflow menu to operate on — 'rota-menu' or
+// 'delivery-menu' — since Rota and Delivery each have their own now, instead
+// of one shared #rota-menu. Defaults to 'rota-menu' for safety, though every
+// caller passes it explicitly.
+function toggleRotaMenu(menuId){
+  menuId = menuId || 'rota-menu';
   updatePasteBtn();
-  const m=document.getElementById('rota-menu');
-  if(m.classList.contains('open')){closeRotaMenu();return;}
+  const m=document.getElementById(menuId);
+  if(!m)return;
+  if(m.classList.contains('open')){closeRotaMenu(menuId);return;}
   m.style.display='block';
   void m.offsetWidth; // force reflow so the fade/scale-in transition actually plays
   m.classList.add('open');
 }
-function closeRotaMenu(){
-  const m=document.getElementById('rota-menu');
+function closeRotaMenu(menuId){
+  menuId = menuId || 'rota-menu';
+  const m=document.getElementById(menuId);
   if(!m)return;
   if(!m.classList.contains('open')){m.style.display='none';return;}
   m.classList.remove('open');
   // Let the .16s fade/scale-out finish before actually hiding it
   setTimeout(()=>{if(m&&!m.classList.contains('open'))m.style.display='none';},160);
 }
-// Close rota menu on outside tap
+// Close either rota menu on outside tap
 document.addEventListener('click',function(e){
-  if(!e.target.closest('#rota-more-btn')&&!e.target.closest('#rota-menu'))closeRotaMenu();
+  if(e.target.closest('#rota-more-btn')||e.target.closest('#rota-menu')||
+     e.target.closest('#delivery-more-btn')||e.target.closest('#delivery-menu'))return;
+  closeRotaMenu('rota-menu');
+  closeRotaMenu('delivery-menu');
 });
 
 function copyWeek(){
@@ -4536,7 +4603,7 @@ async function _startSession(u){
       saveColsToCloud('inside',[...DEFAULT_COLS.inside]).catch(()=>{});
     }
 
-    document.getElementById('week-label').textContent=weekLabel(state.weekOffset);
+    _setWeekLabels();
     renderRota();
     showScreen('main');
     setupRealtime();
