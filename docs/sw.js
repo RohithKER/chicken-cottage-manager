@@ -1,6 +1,6 @@
-/* CC Manager Service Worker — v262 */
+/* CC Manager Service Worker — v263 */
 
-const CACHE = 'cc-v262';
+const CACHE = 'cc-v263';
 const CDN_SUPABASE = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
 
 // v260 — ROOT CAUSE of the third auto-update report: this file's fetch handler
@@ -140,7 +140,7 @@ self.addEventListener('activate', event => {
         // auto-reloads on this message — it only shows the Update/Don't Update
         // popup and waits for the user (see the SW_UPDATED handler there).
         const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-        clients.forEach(client => client.postMessage({ type: 'SW_UPDATED', version: 262 }));
+        clients.forEach(client => client.postMessage({ type: 'SW_UPDATED', version: 263 }));
       })
   );
 });
