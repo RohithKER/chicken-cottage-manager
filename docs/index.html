@@ -26,8 +26,27 @@
    "auto-height doesn't include child padding" theory and points instead at
    the outer shell's own height calculation being unreliable on this device.
    100% against a Home Screen PWA's fixed native window is the simpler,
-   better-supported quantity — removing dvh as a variable entirely. */
-html,body{height:100%;overflow:hidden;overscroll-behavior:none}
+   better-supported quantity — removing dvh as a variable entirely.
+
+   v288 — the full bottom-zone dump (real device) proved html, body, #app,
+   and #main-app ALL report their own bottom edge at exactly innerHeight
+   (812), with document.elementsFromPoint() finding literally nothing at all
+   — not even body/html — anywhere past that line. So the DOCUMENT ITSELF is
+   capped 30+px short of the true physical screen; no amount of #bottom-nav-
+   specific CSS could ever have worked, because there's no document to
+   render into past 812 in the first place. v284 already switched this rule
+   from height:100dvh to height:100% and it made no difference (812 either
+   way) — so plain 100% is ALSO resolving to the small/safe-area-excluded
+   viewport here, not just dvh specifically. Testing explicit 100vh now,
+   since vh and % are not guaranteed equivalent (% resolves against the
+   initial containing block's computed height, which recent WebKit iOS
+   versions have had genuine regressions around — see the iOS 26 safe-area
+   bugs found via web research two rounds ago — while vh/lvh are meant to
+   target the "large viewport" explicitly, which should include the safe
+   area). If 100vh still reads 812, the next step is trying 100lvh
+   specifically, since WebKit's own spec distinguishes vh from lvh even
+   though most engines currently treat them the same. */
+html,body{height:100vh;overflow:hidden;overscroll-behavior:none}
 body{
   font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',sans-serif;
   /* v282 TEMP DEBUG — do not ship: bright magenta stand-in for #191919, purely
@@ -75,7 +94,7 @@ body{
 }
 
 /* ─── Shell ──────────────────────────────────────── */
-#app{display:flex;flex-direction:column;height:100%;max-width:480px;margin:0 auto;position:relative}
+#app{display:flex;flex-direction:column;height:100vh;max-width:480px;margin:0 auto;position:relative}
 
 /* ─── Auth Screen ────────────────────────────────── */
 #auth-screen{
@@ -1149,7 +1168,7 @@ body{
 </div>
 
 <!-- Main App -->
-<div id="main-app" style="display:none;flex-direction:column;height:100%">
+<div id="main-app" style="display:none;flex-direction:column;height:100vh">
 
   <div id="header">
     <img class="logo" id="app-logo" src="" alt="CC" style="width:32px;height:32px;border-radius:50%;object-fit:cover;flex-shrink:0">
@@ -1642,22 +1661,22 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 288; // ← bump this on every deploy — auto-shows in Settings
-// v282-v288: TEMPORARY DEBUG BUILD — body/#bottom-nav swapped to magenta/cyan
+const APP_VERSION = 289; // ← bump this on every deploy — auto-shows in Settings
+// v282-v289: TEMPORARY DEBUG BUILD — body/#bottom-nav swapped to magenta/cyan
 // to diagnose the bottom-nav black-gap report. v282 proved the gap is a real
 // layout bug. v283/v284/v286/v287 (relocating --safe-bottom, relocating
 // #bottom-nav to a direct body child, shifting bottom to a negative offset,
 // and fixing a documented Safari 26 opaque-fixed-layer clipping bug) ALL had
-// zero visible effect on the real device, despite each being a concretely
-// verified/sourced theory rather than a guess. Given that, v288 stops
-// assuming the gap has anything to do with #bottom-nav's own background at
-// all — the HUD now dumps EVERY element in the document whose bounding rect
-// intersects the bottom ~100px of the screen (position/z-index/background/
-// opacity for each), plus document.elementsFromPoint() (the full stack, not
-// just the topmost hit) sampled across that same zone. This should reveal
-// definitively what's actually occupying that space. MUST be reverted to the
-// real #191919 theme color AND have the HUD removed once this is resolved —
-// do not leave this shipped.
+// zero visible effect on the real device. v288's full bottom-zone dump found
+// the actual cause: html, body, #app, and #main-app ALL report their own
+// bottom edge at exactly innerHeight — the DOCUMENT ITSELF is capped short of
+// the true physical screen, so no #bottom-nav-specific CSS could ever have
+// worked. v289 switches html/body/#app/#main-app from height:100% (set in
+// v284, no different from the original 100dvh — both capped at the same
+// value) to explicit height:100vh, testing whether vh resolves against a
+// larger viewport than % does on this specific WebKit build. MUST be
+// reverted to the real #191919 theme color AND have the HUD removed once
+// this is resolved — do not leave this shipped.
 // Detect an installed iOS/Android Home Screen PWA — Realtime/network behave very
 // differently here vs a normal browser tab (see the v226 fix in the reconnect logic
 // below), so several recovery paths branch on this.
