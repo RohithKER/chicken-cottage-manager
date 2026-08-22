@@ -1394,7 +1394,15 @@ body{
        with no dedicated breathing room of its own — and the gear emoji ran straight
        into the text with nothing but a single, easy-to-miss space character between
        them. Icon and label are now explicit flex children with a real 8px gap. -->
-  <div id="perms-sheet" style="width:100%;max-width:480px;background:var(--surface);border-radius:20px 20px 0 0;border-top:1px solid var(--border2);padding:0 0 calc(env(safe-area-inset-bottom,0px)+20px);max-height:90dvh;display:flex;flex-direction:column;gap:0">
+  <!-- v277: padding-bottom calc() below was missing whitespace around the `+`
+       (calc(env(...)+20px)) — invalid CSS calc() syntax (the spec requires
+       whitespace around binary +/-), which silently drops the ENTIRE `padding`
+       shorthand as invalid, leaving all four sides at their unset default (0).
+       In practice this meant this sheet got ZERO safe-area bottom clearance on
+       notched iPhones — its own background stopped short of the true bottom
+       edge, exposing the darker overlay backdrop below it as a "seam"/gap.
+       Fixed by adding the required space: calc(env(...) + 20px). -->
+  <div id="perms-sheet" style="width:100%;max-width:480px;background:var(--surface);border-radius:20px 20px 0 0;border-top:1px solid var(--border2);padding:0 0 calc(env(safe-area-inset-bottom,0px) + 20px);max-height:90dvh;display:flex;flex-direction:column;gap:0">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 12px;border-bottom:1px solid var(--border);flex-shrink:0">
       <div style="font-size:16px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg><span>Manage Permissions</span></div>
       <div onclick="closePermsPanel()" style="cursor:pointer;font-size:20px;color:var(--text3);padding:4px 8px">×</div>
@@ -1416,7 +1424,11 @@ body{
      v273 z-index notes near #confirm-overlay/#input-dialog-overlay/
      #color-sheet-overlay. -->
 <div id="staff-mgmt-overlay" style="display:none;position:fixed;inset:0;z-index:9700;background:rgba(0,0,0,.75);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);align-items:flex-end;justify-content:center">
-  <div id="staff-mgmt-sheet" style="width:100%;max-width:480px;background:var(--surface);border-radius:20px 20px 0 0;border-top:1px solid var(--border2);padding:0 0 calc(env(safe-area-inset-bottom,0px)+20px);max-height:90dvh;display:flex;flex-direction:column;gap:0">
+  <!-- v277: same missing-whitespace calc() bug as #perms-sheet above
+       (calc(env(...)+20px) is invalid CSS — needs a space before the +),
+       which silently zeroed this sheet's safe-area bottom padding. This is
+       the exact cause of the gap below "Add Member" reported on iOS. -->
+  <div id="staff-mgmt-sheet" style="width:100%;max-width:480px;background:var(--surface);border-radius:20px 20px 0 0;border-top:1px solid var(--border2);padding:0 0 calc(env(safe-area-inset-bottom,0px) + 20px);max-height:90dvh;display:flex;flex-direction:column;gap:0">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 12px;border-bottom:1px solid var(--border);flex-shrink:0">
       <div style="font-size:16px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><span>Manage Staff</span></div>
       <div onclick="closeStaffMgmtSheet()" style="cursor:pointer;font-size:20px;color:var(--text3);padding:4px 8px">×</div>
@@ -1503,7 +1515,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 276; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 277; // ← bump this on every deploy — auto-shows in Settings
 // Detect an installed iOS/Android Home Screen PWA — Realtime/network behave very
 // differently here vs a normal browser tab (see the v226 fix in the reconnect logic
 // below), so several recovery paths branch on this.
