@@ -1539,7 +1539,15 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 290; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 291; // ← bump this on every deploy — auto-shows in Settings
+// v291 — fixed a "the app hard-refreshes every ~30s" report. Root cause: the
+// zombie-channel detector (in the periodic soft-sync loop below) treated any
+// 20+ seconds without a Realtime event as a dead socket and forced a full
+// hard-reconnect-and-rerender — but 20+ quiet seconds is completely normal
+// for a low-traffic single-admin session, not a sign of anything broken.
+// Widened that threshold to 2.5 minutes (_ZOMBIE_CHANNEL_SILENCE_MS). The 1s
+// heartbeat detector and the 90s standalone safety-net were not implicated
+// and are unchanged.
 // v282-v289 investigated a long-standing bottom-nav gap report (a strip of
 // body's background visible below #bottom-nav on real devices). Root cause,
 // confirmed in v289: html/body/#app/#main-app were sized with height:100%,
@@ -6092,6 +6100,19 @@ let _lastHardReconnect = 0;
 // finishing, regardless of which trigger (heartbeat/zombie/focus/safety-net/poll-timeout) fired.
 const _HARD_RECONNECT_MIN_GAP_MS = 15000;
 
+// v291 — the zombie-channel detector's original 20s no-events threshold (see the comment
+// on that check below) fired far too readily: a low-traffic single-admin session with
+// nobody else editing rota/sales at that exact moment routinely goes >20s between real
+// Realtime events as completely normal idle behavior, not a sign of a dead socket. That
+// made this detector — not the 1s heartbeat, not the 90s standalone safety-net — the main
+// driver of a full hard-reconnect-and-rerender cycle repeating roughly every 15-20s during
+// ordinary idle use, which read to users as "the app hard-refreshing every 30 seconds."
+// Widened to 2.5 minutes: still fast enough to recover a genuinely dead connection well
+// within a shift, but long enough that normal quiet periods no longer look identical to a
+// dead channel. Left the 15s circuit-breaker floor above and the heartbeat/safety-net
+// thresholds untouched — this detector was the identified offender, not those.
+const _ZOMBIE_CHANNEL_SILENCE_MS = 150000;
+
 // Full-strength recovery: disconnect + discard the current Supabase client's
 // Realtime socket, create a fresh client, re-verify the session, and rebuild
 // everything. Every recovery path below calls this instead of the weaker
@@ -6223,15 +6244,16 @@ setInterval(function(){
   _lastPeriodicSync = now;
 
   // Zombie-channel detector: if we've been subscribed for > 30s with zero Realtime
-  // events, the WebSocket may be silently dead. Escalate straight to a full hard
-  // reconnect (fresh client + fresh socket) rather than resubscribing channels on the
-  // same client — if the client's own socket/HTTP pool is the wedged part (the v133/
-  // v226 failure mode), resubscribing on it doesn't help.
-  // (20s threshold catches dead iOS PWA connections quickly.)
+  // events for _ZOMBIE_CHANNEL_SILENCE_MS, the WebSocket may be silently dead. Escalate
+  // straight to a full hard reconnect (fresh client + fresh socket) rather than
+  // resubscribing channels on the same client — if the client's own socket/HTTP pool is
+  // the wedged part (the v133/v226 failure mode), resubscribing on it doesn't help.
+  // (v291 — widened from 20s to _ZOMBIE_CHANNEL_SILENCE_MS; see that constant's comment
+  // for why the original 20s was firing on ordinary idle gaps, not just dead sockets.)
   const timeSinceEvent = now - _lastRealtimeEvent;
   const timeSinceLogin = now - (_sessionStartedAt || now);
-  if(_realtimeSetup && timeSinceLogin > 30000 && timeSinceEvent > 20000 && !_hbBusy){
-    console.warn('cc: No Realtime events in 20s — zombie channel detected, hard-reconnecting');
+  if(_realtimeSetup && timeSinceLogin > 30000 && timeSinceEvent > _ZOMBIE_CHANNEL_SILENCE_MS && !_hbBusy){
+    console.warn(`cc: No Realtime events in ${Math.round(_ZOMBIE_CHANNEL_SILENCE_MS/1000)}s — zombie channel detected, hard-reconnecting`);
     _lastRealtimeEvent = now; // reset before reconnect so we don't re-trigger mid-flight
     _hardReconnect('zombie-channel');
     return;
