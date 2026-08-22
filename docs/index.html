@@ -32,7 +32,24 @@ body{
   --text:rgba(255,255,255,0.90);--text2:rgba(255,255,255,0.55);--text3:rgba(255,255,255,0.32);
   --accent:#5B9CF5;--accent2:#7AAFF0;
   --red:#E87070;--green:#52C08A;
-  --safe-bottom:env(safe-area-inset-bottom,0px);
+  /* v278 — real on-device measurement (pixel-analysed against the physical
+     home-indicator pill in a user screenshot, on iOS, after a full delete +
+     re-add of the Home Screen icon ruled out stale-install causes) showed the
+     gap between the bottom-nav's label text and the home indicator was ~66-79pt
+     — roughly 2-2.3x the 34pt safe-area-inset-bottom Apple documents (and has
+     used unchanged across every Face-ID iPhone to date). No duplicate CSS rule
+     or double-application of --safe-bottom was found anywhere in this file
+     (checked every #bottom-nav/.nav-btn rule and every calc() using
+     --safe-bottom — each variable is referenced exactly once per consumer).
+     That points at env(safe-area-inset-bottom) itself resolving larger than
+     34px in this specific WKWebView/standalone-PWA runtime — a real, if
+     hard-to-fully-explain-from-outside, WebKit-side quirk rather than a bug
+     in this file's own math. Since 34px is Apple's fixed, documented value for
+     every notched/Face-ID iPhone, clamping here is safe (it can only ever
+     discard bogus excess, never a legitimately larger value — no such device
+     exists) and directly neutralizes the inflated reading at the one place
+     every consumer (#bottom-nav, all bottom sheets, #content) pulls from. */
+  --safe-bottom:min(env(safe-area-inset-bottom,0px), 34px);
   --safe-top:env(safe-area-inset-top,0px);
   --r:12px;--rs:8px;
   --shadow-sm:0 1px 4px rgba(0,0,0,.25),0 0 0 1px rgba(255,255,255,.04);
@@ -499,10 +516,26 @@ body{
   */
 }
 .nav-btn{
-  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
-  padding:8px 4px 6px;background:none;border:none;cursor:pointer;
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:3px;
+  /* v278 — replaced min-height:calc(52px + var(--safe-bottom)) + justify-
+     content:center with a fixed top padding and the safe-area allowance
+     folded directly into padding-bottom instead. The centered version grew
+     the button's box by the safe-area amount and then split that extra space
+     evenly above AND below the icon/label (flex centering) — so only HALF of
+     it ever showed as trailing clearance below the label, while the other
+     half silently pushed the icon+label down from the top. That's an
+     unnecessary extra layer of indirection between "--safe-bottom" and what
+     you actually see below the label, which made the real on-device gap
+     (see the --safe-bottom clamp comment above) much harder to reason about
+     from the CSS alone. This version is directly legible: the icon/label sit
+     at a fixed distance from the TOP of the bar always, and the ENTIRE
+     trailing gap below the label is exactly one copy of --safe-bottom (now
+     clamped to a real device's actual 34px) plus the small fixed 6px
+     cushion — nothing is split, doubled, or hidden in a centering
+     calculation. */
+  padding:8px 4px calc(6px + var(--safe-bottom));background:none;border:none;cursor:pointer;
   color:var(--text3);font-size:10px;font-weight:500;transition:color .2s;letter-spacing:0.2px;
-  position:relative;min-height:calc(52px + var(--safe-bottom));
+  position:relative;
 }
 .nav-btn-inner{
   display:flex;align-items:center;justify-content:center;
@@ -1515,7 +1548,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 277; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 278; // ← bump this on every deploy — auto-shows in Settings
 // Detect an installed iOS/Android Home Screen PWA — Realtime/network behave very
 // differently here vs a normal browser tab (see the v226 fix in the reconnect logic
 // below), so several recovery paths branch on this.
