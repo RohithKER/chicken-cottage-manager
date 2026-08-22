@@ -1118,28 +1118,15 @@ body{
       </div>
     </div>
 
-    <div id="view-staff" class="view" style="padding:12px">
-      <div class="section-label">Staff</div>
-      <div class="staff-list" id="sl-inside"></div>
-      <div class="section-label">Delivery Staff</div>
-      <div class="staff-list" id="sl-delivery"></div>
-      <div class="add-form" id="staff-add-panel">
-        <label>Add Staff Member</label>
-        <input class="input" id="ns-name" placeholder="Full name" autocorrect="off" autocapitalize="words" maxlength="40" style="margin-bottom:8px">
-        <select class="input" id="ns-type">
-          <option value="inside">Staff</option>
-          <option value="delivery">Delivery</option>
-          <option value="both">Both</option>
-        </select>
-        <div style="margin:6px 0 2px">
-          <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Colour</div>
-          <div id="new-staff-palette" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:2px"></div>
-        </div>
-        <div class="form-row">
-          <button class="btn-sm primary" onclick="addStaff()">Add Member</button>
-        </div>
-      </div>
-    </div>
+    <!-- v274: #view-staff (the standalone Staff tab) removed — staff
+         management now lives only in the Manage Staff sheet reached from
+         Settings (see #staff-mgmt-overlay). renderStaff()/
+         populateNewStaffPalette()/addStaff() already guard on missing
+         elements (they update both a '' suffix and a '-modal' suffix set of
+         containers — see v273), so removing this block's non-modal
+         containers (sl-inside/sl-delivery/staff-add-panel/ns-name/ns-type/
+         new-staff-palette) needed no changes to that logic at all — it just
+         quietly stops finding the '' suffix set and only updates '-modal'. -->
 
     <div id="view-settings" class="view" style="padding:12px">
 
@@ -1272,9 +1259,10 @@ body{
     <button class="nav-btn" onclick="showView('delivery')" id="nav-delivery">
       <div class="nav-btn-inner"><span class="nav-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg></span></div><span>Delivery</span>
     </button>
-    <button class="nav-btn" onclick="showView('staff')" id="nav-staff">
-      <div class="nav-btn-inner"><span class="nav-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span></div><span>Staff</span>
-    </button>
+    <!-- v274: nav-staff removed — staff management is reached from Settings
+         now (see #settings-staff-group / openStaffMgmtSheet()). Bottom nav
+         is 4 tabs; .nav-btn is already flex:1 so they redistribute evenly
+         with no CSS changes needed. -->
     <button class="nav-btn" onclick="showView('sales')" id="nav-sales">
       <div class="nav-btn-inner"><span class="nav-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="2" y1="20" x2="22" y2="20"/></svg></span></div><span>Sales</span>
     </button>
@@ -1512,7 +1500,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 273; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 274; // ← bump this on every deploy — auto-shows in Settings
 // Detect an installed iOS/Android Home Screen PWA — Realtime/network behave very
 // differently here vs a normal browser tab (see the v226 fix in the reconnect logic
 // below), so several recovery paths branch on this.
@@ -1934,11 +1922,10 @@ function _applyPermUI(){
   if(adminItem)adminItem.style.display=_perms.is_admin?'':'none';
   const salesBtn=document.getElementById('nav-sales');
   if(salesBtn)salesBtn.style.display=(_perms.can_view_sales||_perms.can_edit_sales)?'':'none';
-  const staffBtn=document.getElementById('nav-staff');
-  if(staffBtn)staffBtn.style.display=_perms.can_view_staff_tab?'':'none';
-  // v273: "Manage Staff" row in Settings — same can_view_staff_tab permission
-  // as the bottom-nav tab above (this is a second entry point onto the same
-  // underlying access question, not a new permission).
+  // v274: nav-staff/view-staff removed — "Manage Staff" in Settings is now
+  // the only entry point, still gated by the same can_view_staff_tab
+  // permission it always used (this was already a second entry point onto
+  // the same underlying access question as the old tab, not a new one).
   const staffSettingsGroup=document.getElementById('settings-staff-group');
   if(staffSettingsGroup)staffSettingsGroup.style.display=_perms.can_view_staff_tab?'':'none';
   // Sales edit controls — hidden for view-only users
@@ -1961,25 +1948,17 @@ function _applyPermUI(){
   if(deliveryBtn)deliveryBtn.style.display=canDriverRota?'':'none';
   // If user is currently on a rota tab they've just lost access to, redirect
   // to the best remaining visible tab.
+  // v274: 'staff' removed as a redirect destination in both chains below —
+  // it's no longer a view showView() can land on (see the note above staffSettingsGroup).
   const rotaView=document.getElementById('view-rota');
   if(rotaView&&rotaView.classList.contains('active')&&!canStaffRota){
     if(canDriverRota)showView('delivery');
-    else if((_perms.can_edit_staffs||_perms.is_admin)&&_perms.can_view_staff_tab)showView('staff');
     else if(_perms.can_view_sales||_perms.can_edit_sales)showView('sales');
     else showView('settings');
   }
   const deliveryView=document.getElementById('view-delivery');
   if(deliveryView&&deliveryView.classList.contains('active')&&!canDriverRota){
     if(canStaffRota)showView('rota');
-    else if((_perms.can_edit_staffs||_perms.is_admin)&&_perms.can_view_staff_tab)showView('staff');
-    else if(_perms.can_view_sales||_perms.can_edit_sales)showView('sales');
-    else showView('settings');
-  }
-  // Same treatment for the Staff tab itself, now gated by its own view permission
-  const staffView=document.getElementById('view-staff');
-  if(staffView&&staffView.classList.contains('active')&&!_perms.can_view_staff_tab){
-    if(canStaffRota)showView('rota');
-    else if(canDriverRota)showView('delivery');
     else if(_perms.can_view_sales||_perms.can_edit_sales)showView('sales');
     else showView('settings');
   }
@@ -2124,7 +2103,11 @@ function _buildUserPermRow(u){
     {key:'can_edit_settings',label:'Edit Settings'},
     {key:'can_view_staff_rota',label:'View Staff Rota',defaultTrue:true},
     {key:'can_view_driver_rota',label:'View Driver Rota',defaultTrue:true},
-    {key:'can_view_staff_tab',label:'View Staff Tab',defaultTrue:true},
+    // v274: label changed from 'View Staff Tab' — the standalone Staff tab is
+    // gone, this now gates the "Manage Staff" row in Settings. Key/column
+    // name (can_view_staff_tab) left unchanged to avoid a DB migration; only
+    // the human-facing label needed to stop saying "tab".
+    {key:'can_view_staff_tab',label:'Manage Staff',defaultTrue:true},
   ];
 
   fields.forEach(f=>{
@@ -2988,10 +2971,9 @@ function showView(v){
     _salesUnlocked=false;
     _updateSalesLockBtn();
   }
-  // Staff tab visibility permission — plain boolean, no is_admin or hardcoded-admin
-  // bypass at all (v253: removed the hardcoded-admin bypass from _applyPermData too —
-  // this flag only gates a nav button, not data access, so there's no lockout risk).
-  if(v==='staff'&&!_perms.can_view_staff_tab)return;
+  // v274: the 'staff' view/nav-button no longer exist — staff management
+  // moved into a Settings sheet (openStaffMgmtSheet()), gated directly by
+  // can_view_staff_tab there rather than through showView().
   // v269: Rota (staff shifts) and Delivery (driver shifts) are separate
   // top-level tabs now, each gated by its own view permission — same pattern
   // as can_view_staff_tab above.
@@ -3025,7 +3007,6 @@ function _doShowView(v){
   if(salesLockWrap)salesLockWrap.style.display=v==='sales'?'':'none';
   if(v==='rota')state.type='inside';
   if(v==='delivery')state.type='delivery';
-  if(v==='staff'){renderStaff();populateNewStaffPalette();}
   if(v==='sales'){
     _updateSalesLockBtn();
     // If data is already loaded for this week, render instantly (realtime keeps it fresh).
