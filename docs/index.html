@@ -657,9 +657,14 @@ body{
 ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px}
 
 /* ─── Sales View ─────────────────────────────────── */
+/* v272: horizontal padding matched to .rota-toolbar's (10px, was 14px) so the
+   week-nav row sits at the exact same width/inset as Rota/Delivery — side by
+   side, the arrows were noticeably closer to center on Sales than on Rota.
+   Vertical padding stays at 10px (Sales' arrow buttons are 40x40 vs Rota's
+   36x36, so it needs a touch more vertical room). */
 #sales-week-nav{
   display:flex;align-items:center;justify-content:space-between;
-  padding:10px 14px;border-bottom:1px solid var(--border);flex-shrink:0;
+  padding:10px;border-bottom:1px solid var(--border);flex-shrink:0;
 }
 #sales-week-nav button{
   background:none;border:none;color:var(--text2);
@@ -1440,7 +1445,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 271; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 272; // ← bump this on every deploy — auto-shows in Settings
 // Detect an installed iOS/Android Home Screen PWA — Realtime/network behave very
 // differently here vs a normal browser tab (see the v226 fix in the reconnect logic
 // below), so several recovery paths branch on this.
