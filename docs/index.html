@@ -1416,7 +1416,7 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 269; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 270; // ← bump this on every deploy — auto-shows in Settings
 // Detect an installed iOS/Android Home Screen PWA — Realtime/network behave very
 // differently here vs a normal browser tab (see the v226 fix in the reconnect logic
 // below), so several recovery paths branch on this.
@@ -2136,12 +2136,21 @@ function weekKey(off=state.weekOffset){
   const d=weekStart(off);
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
+// v270: single shared week-label rule for Rota, Delivery, AND Sales (which
+// used to always show a date range via its own separate salesWeekLabel(),
+// never "This/Last/Next week"). Now all three call this one function:
+// this/last/next week get the short word, any other week (2+ out either
+// direction) gets the full date range, formatted exactly how Sales always
+// displayed it — e.g. "17 Aug – 23 Aug 2026".
 function weekLabel(off){
   if(off===0)return'This week';
   if(off===1)return'Next week';
   if(off===-1)return'Last week';
-  const d=weekStart(off);
-  return `${d.getDate()} ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()]}`;
+  const s=weekStart(off);
+  const e=new Date(s); e.setDate(s.getDate()+6);
+  const so=s.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+  const eo=e.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+  return `${so} – ${eo}`;
 }
 // v269: Rota and Delivery each have their own week-nav label now (#week-label,
 // #week-label-delivery) instead of one shared #week-label — they share a
@@ -4673,16 +4682,13 @@ function fmt(d){
   return `${y}-${m}-${day}`;
 }
 
-function salesWeekLabel(dates){
-  const s=dates[0],e=dates[6];
-  const so=s.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
-  const eo=e.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
-  return `${so} – ${eo}`;
-}
+// v270: salesWeekLabel() removed — Sales now shares weekLabel(off) (in the
+// "Week helpers" section above) with Rota/Delivery instead of its own
+// always-show-dates implementation. See loadSalesWeek() below.
 
 async function loadSalesWeek(){
   const dates=getSalesWeekDates(salesWeekOffset);
-  document.getElementById('sales-week-label').textContent=salesWeekLabel(dates);
+  document.getElementById('sales-week-label').textContent=weekLabel(salesWeekOffset);
 
   // ── Step 1: render instantly from local cache (never block UI) ──
   const allCached=_loadSalesCache();
