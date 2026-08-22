@@ -479,18 +479,49 @@ body{
 
 /* ─── Bottom Nav ─────────────────────────────────── */
 #bottom-nav{
-  position:fixed;bottom:0;left:50%;transform:translateX(-50%);
+  position:fixed;left:0;right:0;bottom:0;margin:0 auto;
   width:100%;max-width:480px;
   display:flex;
-  /* v282 TEMP DEBUG — do not ship: bright cyan stand-in for #191919, paired
-     with body's magenta swap above. If the black gap below this bar turns
-     cyan too, the gap is part of #bottom-nav's own box (a real CSS bug we're
-     not catching in Chrome emulation). If it stays black while the bar itself
-     goes cyan, the gap is native OS chrome outside this page — no CSS fix is
-     possible, and #278/#238's safe-area work was never going to touch it.
-     REVERT to background:#191919 once the user sends back a screenshot. */
+  /* v282 TEMP DEBUG — do not ship: bright cyan stand-in for #191919. Round 1
+     of this debug build proved (real device screenshot) that the gap below
+     this bar renders in body's magenta, not black — meaning this bar's own
+     box was falling short of the true physical bottom edge, a real layout
+     bug, not native OS chrome. See the v283 fix directly below for what
+     changed and why. REVERT to background:#191919 once the fix is confirmed. */
   background:#00ffff;border-top:1px solid var(--border);
   z-index:20;
+  /* v283 — root-cause fix for the confirmed real gap (magenta showed below
+     this bar in the v282 debug screenshot). Previously the ONLY place
+     --safe-bottom was applied was inside .nav-btn's own padding-bottom (see
+     the v278 comment below on .nav-btn) — #bottom-nav itself had no explicit
+     padding-bottom of its own, and relied entirely on flex's default
+     align-items:stretch to pull its auto/intrinsic height up to match its
+     tallest .nav-btn child (content + 8px top pad + (6px + safe-bottom)
+     bottom pad). That's an extra layer of indirection: #bottom-nav's own
+     rendered box height, in that setup, is not itself driven by any value
+     that includes --safe-bottom — it's whatever height the flex algorithm
+     decides its intrinsic content needs, which on this specific WKWebView
+     standalone-PWA runtime evidently doesn't reliably grow by the full
+     calc(6px + var(--safe-bottom)) amount baked into a child's padding (a
+     real, if hard-to-fully-explain-from-a-desktop-browser, WebKit auto-height/
+     calc()/env() interaction — Chrome's rendering of the same markup does NOT
+     reproduce this, which is exactly why every prior desktop/Chrome
+     verification kept coming back clean). Fixed by applying --safe-bottom
+     directly as padding-bottom on #bottom-nav's OWN box below — its own
+     explicit box model, not inherited via a child's intrinsic-sizing — and
+     removing the identical amount from .nav-btn's padding-bottom (see below)
+     so the safe-area allowance is still counted exactly once, not doubled
+     (doubling it back would reintroduce the original v234 "big black gap"
+     bug this whole investigation started from). Total visual spacing between
+     the label and the true bottom edge is unchanged by this refactor — only
+     WHERE that space is declared moved, from an auto-sized child's padding to
+     the fixed-positioned parent's own explicit padding, which is the more
+     robust, spec-unambiguous place for it to live. Also dropped
+     left:50%/transform:translateX(-50%) in favor of left:0;right:0;margin:0
+     auto for horizontal centering — functionally identical, but removes
+     `transform` from #bottom-nav's own rule entirely, one less variable while
+     we're hardening this against WebKit-specific fixed-position quirks. */
+  padding-bottom:var(--safe-bottom);
   /* v234 — previously padding-bottom:var(--safe-bottom) lived here. That correctly
      extended the bar's own background down to the true bottom edge on notched/
      home-indicator iPhones, but the tap targets (icon+label inside .nav-btn) kept
@@ -545,8 +576,15 @@ body{
      trailing gap below the label is exactly one copy of --safe-bottom (now
      clamped to a real device's actual 34px) plus the small fixed 6px
      cushion — nothing is split, doubled, or hidden in a centering
-     calculation. */
-  padding:8px 4px calc(6px + var(--safe-bottom));background:none;border:none;cursor:pointer;
+     calculation.
+
+     v283 — the --safe-bottom term moved from here to #bottom-nav's own
+     padding-bottom (see the v283 comment on #bottom-nav above) so the safe
+     area allowance lives on the fixed-positioned element's own explicit box
+     instead of being inherited via this button's intrinsic flex-child
+     sizing. Left at a plain 6px here so it's counted exactly once, not
+     doubled between this rule and #bottom-nav's new padding-bottom. */
+  padding:8px 4px 6px;background:none;border:none;cursor:pointer;
   color:var(--text3);font-size:10px;font-weight:500;transition:color .2s;letter-spacing:0.2px;
   position:relative;
 }
@@ -1561,11 +1599,15 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 282; // ← bump this on every deploy — auto-shows in Settings
-// v282: TEMPORARY DEBUG BUILD — body/#bottom-nav swapped to magenta/cyan to
-// diagnose the bottom-nav black-gap report. See matching comments at the
-// body{} rule and #bottom-nav{} rule. MUST be reverted once the user's
-// on-device screenshot comes back — do not leave this shipped.
+const APP_VERSION = 283; // ← bump this on every deploy — auto-shows in Settings
+// v282/v283: TEMPORARY DEBUG BUILD — body/#bottom-nav swapped to magenta/cyan
+// to diagnose the bottom-nav black-gap report. See matching comments at the
+// body{} rule and #bottom-nav{} rule. v282's screenshot proved the gap is a
+// real layout bug (magenta, not black, showed below the bar) — v283 applies
+// the root-cause fix (see the v283 comment on #bottom-nav) while KEEPING the
+// debug colors for one more round of device confirmation. MUST be reverted
+// to the real #191919 theme colors once that screenshot comes back — do not
+// leave this shipped.
 // Detect an installed iOS/Android Home Screen PWA — Realtime/network behave very
 // differently here vs a normal browser tab (see the v226 fix in the reconnect logic
 // below), so several recovery paths branch on this.
