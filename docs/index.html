@@ -1539,7 +1539,20 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 291; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 292; // ← bump this on every deploy — auto-shows in Settings
+// v292 — fixed the update popup being unreliable in both directions. It was
+// nagging on already-current devices: reg.waiting/updatefound called
+// _showUpdateModal() with no version check at all, so a stale-but-harmless
+// waiting worker triggered it forever (no version = no dismissal ever stuck).
+// Now fixed by fetching the candidate worker's own script and only prompting
+// if its real version is actually greater than APP_VERSION. It was ALSO
+// silently never showing on some devices: the only real version-aware checks
+// (the 5-min visible-gated poll and the Realtime app_settings watcher) had no
+// foreground-triggered recheck and no timeout on the DB call, so a briefly-
+// opened device or one with a degraded connection could go long stretches —
+// or an entire session — without the check ever actually running. Added a
+// foreground hook (_onForegroundVersionCheck, mirrors _onForegroundSignal())
+// and an 8s timeout on the app_settings select().
 // v291 — fixed a "the app hard-refreshes every ~30s" report. Root cause: the
 // zombie-channel detector (in the periodic soft-sync loop below) treated any
 // 20+ seconds without a Realtime event as a dead socket and forced a full
@@ -4704,7 +4717,16 @@ async function _retryPendingOnLoad(){
 async function _checkAndPublishVersion(){
   if(!user)return;
   try{
-    const{data,error}=await db.from('app_settings').select('value').eq('key','app_version').maybeSingle();
+    // v292: every other Supabase call in this file races against a timeout; this one
+    // didn't. A device with a degraded/stale HTTP connection (the same failure mode
+    // _hardReconnect exists to fix elsewhere) could have this specific await hang
+    // indefinitely, with nothing to catch and no retry — silently killing the one
+    // check that's supposed to catch exactly that kind of device. Bounded to 8s.
+    const _t=new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),8000));
+    const{data,error}=await Promise.race([
+      db.from('app_settings').select('value').eq('key','app_version').maybeSingle(),
+      _t
+    ]);
     if(!error&&data){
       const dbVersion=Number(data.value);
       if(dbVersion>APP_VERSION){
@@ -4723,6 +4745,25 @@ async function _checkAndPublishVersion(){
 setInterval(function(){
   if(user&&document.visibilityState==='visible')_checkAndPublishVersion();
 },5*60*1000);
+// v292 — root cause of "the popup never shows on some devices even when outdated":
+// the 5-minute interval above only ever fires while the tab/PWA is already visible at
+// the exact moment it ticks, and there was no equivalent to _onForegroundSignal() (the
+// Realtime reconnect logic's foreground hook) to re-check the instant the app actually
+// comes back into view. A device opened in short bursts and backgrounded the rest of
+// the time — completely normal usage for this app — could go a very long stretch,
+// possibly an entire session, without the interval ever landing while visible. Mirrors
+// _onForegroundSignal()'s debounce pattern so rapid app-switching doesn't spam checks.
+let _lastVersionCheckOnForeground=0;
+function _onForegroundVersionCheck(){
+  if(document.visibilityState!=='visible')return;
+  if(!user)return;
+  const now=Date.now();
+  if(now-_lastVersionCheckOnForeground<10000)return; // debounce rapid switches/duplicate events
+  _lastVersionCheckOnForeground=now;
+  _checkAndPublishVersion().catch(()=>{});
+}
+document.addEventListener('visibilitychange',_onForegroundVersionCheck);
+window.addEventListener('focus',_onForegroundVersionCheck);
 
 /* ─── Realtime Sync ──────────────────────────────────── */
 let _realtimeSetup=false;
@@ -6532,18 +6573,61 @@ if('serviceWorker' in navigator){
   // call at all. Detecting that a new version exists is handled safely and
   // separately by the Supabase app_settings version poll/Realtime watcher above —
   // a plain DB row comparison that can never itself change what's cached or served.
+
+  // v292 — root cause of "the update popup nags even when already current": the two
+  // call sites below used to call _showUpdateModal() with NO version argument the
+  // moment ANY .waiting service worker object existed, regardless of whether it was
+  // actually newer than what's running. That's wrong on two counts: (1) a .waiting
+  // worker can genuinely be stale/harmless — e.g. one that was installed but never
+  // consented to (skipWaiting is deliberately never called, per v245) can sit there
+  // indefinitely even after the page itself is already on the latest version; (2)
+  // because no version was passed, _isVersionDismissed()'s guard never applied on
+  // show, and _lastShownVersion stayed null so _dismissUpdateModal() never persisted
+  // a dismissal either — meaning this specific nag could never be dismissed at all,
+  // short of actually tapping "Update". Confirmed live: a session already on v291
+  // (matching its last consented version, nothing dismissed) still had the popup
+  // open, driven by exactly this path.
+  //
+  // Fix: before showing anything, fetch the candidate worker's own script and read
+  // its real CACHE version, and only prompt if that's actually greater than the
+  // version currently running. This also means a genuine future prompt now carries
+  // a real version number, so per-version dismissal finally works correctly here too.
+  async function _versionOfWorker(sw){
+    if(!sw || !sw.scriptURL) return null;
+    try{
+      const res = await fetch(sw.scriptURL, {cache:'no-store'});
+      const text = await res.text();
+      const m = text.match(/CACHE\s*=\s*'cc-v(\d+)'/);
+      return m ? Number(m[1]) : null;
+    }catch(e){
+      console.warn('cc: could not read waiting SW version:', e);
+      return null;
+    }
+  }
+  async function _maybeShowUpdateForWaiting(sw){
+    const v = await _versionOfWorker(sw);
+    if(v && v > APP_VERSION){
+      _waitingSW = sw;
+      _showUpdateModal(v);
+    }else{
+      // Harmless/stale waiting worker (same version, older, or unreadable) — leave it
+      // exactly where the existing consent-gated design already leaves any worker
+      // nobody has explicitly updated to: sitting inert until _applyUpdate() or the
+      // browser's own default lifecycle deals with it. We only skip the POPUP here.
+      console.log(`cc: waiting SW found (v${v==null?'?':v}) but not newer than running v${APP_VERSION} — not prompting`);
+    }
+  }
+
   navigator.serviceWorker.register('./sw.js').then(function(reg){
     if(reg.waiting){
-      _waitingSW = reg.waiting;
-      _showUpdateModal();
+      _maybeShowUpdateForWaiting(reg.waiting);
     }
 
     reg.addEventListener('updatefound', function(){
       var newSW = reg.installing;
       newSW.addEventListener('statechange', function(){
         if(newSW.state === 'installed' && navigator.serviceWorker.controller){
-          _waitingSW = newSW;
-          _showUpdateModal();
+          _maybeShowUpdateForWaiting(newSW);
         }
       });
     });
