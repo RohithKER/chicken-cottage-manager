@@ -1539,7 +1539,20 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 292; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 293; // ← bump this on every deploy — auto-shows in Settings
+// v293 — fixed a data-resurrection bug distinct from the earlier v279/v281
+// clear-week race: purgeStaffFromCloud()/purgeStaffFromTypeCloud() (run when
+// a staff member is removed) did an unfiltered, unguarded SELECT+UPSERT
+// across the whole schedules table for any row containing their name — no
+// week_key scoping, no _pendingClears/_isStaleAgainstClear check. A row still
+// on the server for an already-cleared week got re-stamped with a fresh
+// updated_at while its name was stripped, which permanently defeats
+// _isStaleAgainstClear for that row afterward. Confirmed live in production:
+// one removal on 2026-08-23 re-timestamped rows across 19 weeks (Apr 27 -
+// Aug 31), both delivery and inside. Fixed by applying the same two guards
+// loadSchedules()/the Realtime handler already use — a cleared week's rows
+// are now skipped entirely (left as stale as they were) instead of being
+// resurrected just to remove a name from them.
 // v292 — fixed the update popup being unreliable in both directions. It was
 // nagging on already-current devices: reg.waiting/updatefound called
 // _showUpdateModal() with no version check at all, so a stale-but-harmless
@@ -3737,12 +3750,38 @@ function _doRemoveStaff(type,name){
   }
   renderStaff();renderRota();toast(`${name} removed from ${type}`);
 }
+// v293 — root cause of "cleared week came back after a staff member was
+// removed": this used to select EVERY row anywhere in the table's history
+// containing the removed name (no week_key filter) and unconditionally
+// upsert all of them with a fresh updated_at — including rows belonging to
+// a week+type that was already cleared. Unlike every other write path in
+// this file, that upsert had no _pendingClears/_isStaleAgainstClear check at
+// all, so a stale row still sitting on the server for a cleared week didn't
+// just get read back in — it got RE-STAMPED with today's updated_at, which
+// permanently defeats _isStaleAgainstClear for that row from then on (it now
+// looks like a legitimate post-clear write to every other guarded path).
+// Fixed by applying the exact same two checks loadSchedules() and the
+// Realtime handler already use: skip a row entirely — don't touch it, don't
+// re-timestamp it — if its week+type has an unconfirmed pending clear in
+// flight, or if the row itself predates a confirmed clear for its week+type.
+// A cleared week's leftover rows are left exactly as stale as they already
+// were, instead of being resurrected just to strip a name out of them.
+function _purgeableRows(data){
+  return data.filter(row=>{
+    const twk=`${row.schedule_type}|${row.week_key}`;
+    if(_pendingClears.has(twk))return false;
+    if(_isStaleAgainstClear(row))return false;
+    return true;
+  });
+}
 async function purgeStaffFromCloud(name){
   if(!user)return;
   try{
     const{data}=await db.from('schedules').select('*').contains('staff_names',[name]);
     if(!data||!data.length)return;
-    const updates=data.map(row=>({
+    const toUpdate=_purgeableRows(data);
+    if(!toUpdate.length)return;
+    const updates=toUpdate.map(row=>({
       ...row,staff_names:row.staff_names.filter(n=>n!==name),
       updated_at:new Date().toISOString()
     }));
@@ -3756,7 +3795,9 @@ async function purgeStaffFromTypeCloud(name,schedType){
     const{data}=await db.from('schedules').select('*')
       .eq('schedule_type',schedType).contains('staff_names',[name]);
     if(!data||!data.length)return;
-    const updates=data.map(row=>({
+    const toUpdate=_purgeableRows(data);
+    if(!toUpdate.length)return;
+    const updates=toUpdate.map(row=>({
       ...row,staff_names:row.staff_names.filter(n=>n!==name),
       updated_at:new Date().toISOString()
     }));
