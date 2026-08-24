@@ -1539,7 +1539,15 @@ const { createClient } = supabase;
 let db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ─── Constants ──────────────────────────────────────── */
-const APP_VERSION = 293; // ← bump this on every deploy — auto-shows in Settings
+const APP_VERSION = 294; // ← bump this on every deploy — auto-shows in Settings
+// v294 — fixed the "···" overflow menu (Rota/Delivery) being blank on cold
+// load, only reappearing after switching tabs. _doShowView() is the only
+// code that ever clears #rota-more-wrap/#delivery-more-wrap's static
+// display:none, but it only ever ran via an explicit showView() call (a
+// nav-bar tap, or a permission-redirect) — never for the tab that's already
+// active on boot (baked into the static HTML), since nothing in the init
+// chain called showView() for it. Fixed by resyncing whichever view is
+// actually active once main-app is shown (_syncActiveViewChrome()).
 // v293 — fixed a data-resurrection bug distinct from the earlier v279/v281
 // clear-week race: purgeStaffFromCloud()/purgeStaffFromTypeCloud() (run when
 // a staff member is removed) did an unfiltered, unguarded SELECT+UPSERT
@@ -3285,6 +3293,27 @@ function _doShowView(v){
   closeUserMenu();
   closeRotaMenu('rota-menu');
   closeRotaMenu('delivery-menu');
+}
+
+// v294 — "the ··· overflow menu is blank on cold load, only reappears after
+// switching tabs" bug: _doShowView() above is the ONLY code that ever clears
+// #rota-more-wrap/#delivery-more-wrap's static display:none (and sets the
+// toolbar/sales-lock/sync-btn visibility that goes with it) — but it only
+// runs via an explicit showView() call: a nav-bar tap, or _applyPermUI()'s
+// redirect-away branches. The tab that's already active on boot (baked
+// straight into the static HTML as .active — Rota, normally) never goes
+// through showView() during a normal init at all, so none of that ever gets
+// applied until the user happens to navigate away and back. Fix: once
+// main-app is shown, explicitly resync whichever view the DOM says is
+// actually active. _doShowView() is idempotent (safe to call again for a
+// view that's already correct — re-adding classes it already has, resetting
+// state.type to the value it should already be), so this needs no new state
+// tracking and can't fight with _applyPermUI()'s own showView() redirects,
+// which may have already run by this point and changed which view is active.
+function _syncActiveViewChrome(){
+  const activeView=document.querySelector('.view.active');
+  if(!activeView)return;
+  _doShowView(activeView.id.replace('view-',''));
 }
 
 /* ─── Sales PIN ──────────────────────────────────────────── */
@@ -5119,6 +5148,7 @@ async function _startSession(u){
     _setWeekLabels();
     renderRota();
     showScreen('main');
+    _syncActiveViewChrome(); // v294 — see comment above its definition
     setupRealtime();
     _sessionStartedAt=Date.now();
     _lastRealtimeEvent=Date.now(); // give channels grace before zombie check fires
